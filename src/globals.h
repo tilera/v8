@@ -98,6 +98,9 @@ namespace internal {
 #elif defined(__MIPSEL__)
 #define V8_HOST_ARCH_MIPS 1
 #define V8_HOST_ARCH_32_BIT 1
+#elif defined(__tilegx__)
+#define V8_HOST_ARCH_TILEGX 1
+#define V8_HOST_ARCH_64_BIT 1
 #else
 #error Host architecture was not detected as supported by v8
 #endif
@@ -106,7 +109,8 @@ namespace internal {
 // in the same way as the host architecture, that is, target the native
 // environment as presented by the compiler.
 #if !defined(V8_TARGET_ARCH_X64) && !defined(V8_TARGET_ARCH_IA32) && \
-    !defined(V8_TARGET_ARCH_ARM) && !defined(V8_TARGET_ARCH_MIPS)
+    !defined(V8_TARGET_ARCH_ARM) && !defined(V8_TARGET_ARCH_MIPS) && \
+    !defined(V8_TARGET_ARCH_TILEGX)
 #if defined(_M_X64) || defined(__x86_64__)
 #define V8_TARGET_ARCH_X64 1
 #elif defined(_M_IX86) || defined(__i386__)
@@ -115,6 +119,8 @@ namespace internal {
 #define V8_TARGET_ARCH_ARM 1
 #elif defined(__MIPSEL__)
 #define V8_TARGET_ARCH_MIPS 1
+#elif defined(__tilegx__)
+#define V8_TARGET_ARCH_TILEGX 1
 #else
 #error Target architecture was not detected as supported by v8
 #endif
@@ -135,6 +141,10 @@ namespace internal {
     !(defined(V8_HOST_ARCH_IA32) || defined(V8_HOST_ARCH_MIPS)))
 #error Target architecture mips is only supported on mips and ia32 host
 #endif
+#if (defined(V8_TARGET_ARCH_TILEGX) && \
+    !(defined(V8_HOST_ARCH_IA32) || defined(V8_HOST_ARCH_TILEGX)))
+#error Target architecture tilegx is only supported on tilegx and ia32 host
+#endif
 
 // Determine whether we are running in a simulated environment.
 // Setting USE_SIMULATOR explicitly from the build script will force
@@ -144,6 +154,9 @@ namespace internal {
 #define USE_SIMULATOR 1
 #endif
 #if (defined(V8_TARGET_ARCH_MIPS) && !defined(V8_HOST_ARCH_MIPS))
+#define USE_SIMULATOR 1
+#endif
+#if (defined(V8_TARGET_ARCH_TILEGX) && !defined(V8_HOST_ARCH_TILEGX))
 #define USE_SIMULATOR 1
 #endif
 #endif
