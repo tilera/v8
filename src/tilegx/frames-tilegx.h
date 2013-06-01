@@ -30,4 +30,25 @@
 #ifndef V8_TILEGX_FRAMES_TILEGX_H_
 #define V8_TILEGX_FRAMES_TILEGX_H_
 
+namespace v8 {
+namespace internal {
+
+const int kNumJSCallerSaved = 30;
+
+typedef Object* JSCallerSavedBuffer[kNumJSCallerSaved];
+
+class JavaScriptFrameConstants : public AllStatic {
+ public:
+  // FP-relative.
+  static const int kLocal0Offset = StandardFrameConstants::kExpressionsOffset;
+  static const int kLastParameterOffset = +2 * kPointerSize;
+  static const int kFunctionOffset = StandardFrameConstants::kMarkerOffset;
+
+  // Caller SP-relative.
+  static const int kParam0Offset   = -2 * kPointerSize;
+  static const int kReceiverOffset = -1 * kPointerSize;
+};
+
+} }  // namespace v8::internal
+
 #endif
