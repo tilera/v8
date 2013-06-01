@@ -52,7 +52,7 @@ inline Atomic32 NoBarrier_CompareAndSwap(volatile Atomic32* ptr,
                                          Atomic32 new_value) {
   Atomic32 val;
   __insn_mtspr(SPR_CMPEXCH_VALUE, old_value);
-  val = __insn_cmpexch4((void *)ptr, n);
+  val = __insn_cmpexch4((void *)ptr, new_value);
   return val;
 }
 
@@ -61,7 +61,7 @@ inline Atomic32 NoBarrier_CompareAndSwap(volatile Atomic32* ptr,
 inline Atomic32 NoBarrier_AtomicExchange(volatile Atomic32* ptr,
                                          Atomic32 new_value) {
   Atomic32 val;
-  val = __insn_exch4((void *)ptr, n);
+  val = __insn_exch4((void *)ptr, new_value);
   return val;
 }
 
@@ -144,14 +144,14 @@ inline Atomic64 NoBarrier_CompareAndSwap(volatile Atomic64* ptr,
                                          Atomic64 new_value) {
   Atomic64 val;
   __insn_mtspr(SPR_CMPEXCH_VALUE, old_value);
-  val = __insn_cmpexch((void *)ptr, n);
+  val = __insn_cmpexch((void *)ptr, new_value);
   return val;
 }
 
 inline Atomic64 NoBarrier_AtomicExchange(volatile Atomic64* ptr,
                                          Atomic64 new_value) {
   Atomic64 val;
-  val = __insn_exch((void *)ptr, n);
+  val = __insn_exch((void *)ptr, new_value);
   return val;
 }
 
