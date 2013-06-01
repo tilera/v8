@@ -47,6 +47,8 @@ namespace internal {
 // TileGX has 64 64bit registers.
 struct Register {
   static const int kNumRegisters = 64;
+  // For Float Register
+  static const int kMaxNumRegisters = 64;
   static const int kMaxNumAllocatableRegisters = 50;
   static const int kSizeInBytes = 8;
 
@@ -161,6 +163,28 @@ const Register tp  = { kRegister_tp_Code };
 const Register sp  = { kRegister_sp_Code };
 const Register lr  = { kRegister_lr_Code };
 const Register no_reg = { kRegister_no_reg_Code };
+
+// TileGX reuse Integer reg as float reg.
+typedef Register DoubleRegister;
+
+class Assembler : public AssemblerBase {
+ public:
+  // Create an assembler. Instructions and relocation information are emitted
+  // into a buffer, with the instructions starting from the beginning and the
+  // relocation information starting from the end of the buffer. See CodeDesc
+  // for a detailed comment on the layout (globals.h).
+  //
+  // If the provided buffer is NULL, the assembler allocates and grows its own
+  // buffer, and buffer_size determines the initial buffer size. The buffer is
+  // owned by the assembler and deallocated upon destruction of the assembler.
+  //
+  // If the provided buffer is not NULL, the assembler uses the provided buffer
+  // for code generation and assumes its size to be buffer_size. If the buffer
+  // is too small, a fatal error occurs. No deallocation of the buffer is done
+  // upon destruction of the assembler.
+  Assembler(Isolate* isolate, void* buffer, int buffer_size);
+  virtual ~Assembler() { }
+};
 
 } }  // namespace v8::internal
 

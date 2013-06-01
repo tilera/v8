@@ -32,5 +32,29 @@
 #include "tilegx/assembler-tilegx.h"
 #include "v8globals.h"
 
+namespace v8 {
+namespace internal {
+
+// MacroAssembler implements a collection of frequently used macros.
+class MacroAssembler: public Assembler {
+ public:
+  // The isolate parameter can be NULL if the macro assembler should
+  // not use isolate-dependent functionality. In this case, it's the
+  // responsibility of the caller to never invoke such function on the
+  // macro assembler.
+  MacroAssembler(Isolate* isolate, void* buffer, int size);
+
+  void set_has_frame(bool value) { has_frame_ = value; }
+  bool has_frame() { return has_frame_; }
+
+  // Activation support.
+  void EnterFrame(StackFrame::Type type);
+  void LeaveFrame(StackFrame::Type type);
+
+ private:
+  bool has_frame_;
+};
+
+} }  // namespace v8::internal
 
 #endif  // V8_TILEGX_MACRO_ASSEMBLER_TILEGX_H_
