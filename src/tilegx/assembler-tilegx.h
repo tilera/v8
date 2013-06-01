@@ -152,6 +152,7 @@ const int kRegister_fp_Code = 52;
 const int kRegister_tp_Code = 53;
 const int kRegister_sp_Code = 54;
 const int kRegister_lr_Code = 55;
+const int kRegister_no_reg_Code = -1;
 
 const Register pc  = { kRegister_pc_Code };
 const Register gp  = { kRegister_gp_Code };
@@ -159,6 +160,7 @@ const Register fp  = { kRegister_fp_Code };
 const Register tp  = { kRegister_tp_Code };
 const Register sp  = { kRegister_sp_Code };
 const Register lr  = { kRegister_lr_Code };
+const Register no_reg = { kRegister_no_reg_Code };
 
 } }  // namespace v8::internal
 
