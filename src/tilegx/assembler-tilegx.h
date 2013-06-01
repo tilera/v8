@@ -160,4 +160,6 @@ const Register tp  = { kRegister_tp_Code };
 const Register sp  = { kRegister_sp_Code };
 const Register lr  = { kRegister_lr_Code };
 
+} }  // namespace v8::internal
+
 #endif  // V8_TILEGX_ASSEMBLER_TILEGX_H_
