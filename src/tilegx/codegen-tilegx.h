@@ -44,6 +44,8 @@ class CodeGenerator: public AstVisitor {
   CodeGenerator() {
     InitializeAstVisitor();
   }
+
+  DEFINE_AST_VISITOR_SUBCLASS_MEMBERS();
 };
 
 } }  // namespace v8::internal

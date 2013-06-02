@@ -164,6 +164,22 @@ const Register sp  = { kRegister_sp_Code };
 const Register lr  = { kRegister_lr_Code };
 const Register no_reg = { kRegister_no_reg_Code };
 
+// Class Operand represents a shifter operand in data processing instructions.
+class Operand BASE_EMBEDDED {
+ public:
+
+  // Register.
+  INLINE(explicit Operand(Register rm));
+
+  // Return true if this is a register operand.
+  INLINE(bool is_reg() const);
+
+  Register rm() const { return rm_; }
+
+ private:
+  Register rm_;
+};
+
 // TileGX reuse Integer reg as float reg.
 typedef Register DoubleRegister;
 
@@ -184,6 +200,49 @@ class Assembler : public AssemblerBase {
   // upon destruction of the assembler.
   Assembler(Isolate* isolate, void* buffer, int buffer_size);
   virtual ~Assembler() { }
+
+  void bind(Label* L);  // Binds an unbound label L to current code position.
+
+  static const int kInstrSize = sizeof(Instr);
+
+  // Return the code target address at a call site from the return address
+  // of that call in the instruction stream.
+  inline static Address target_address_from_return_address(Address pc);
+
+  // Read/Modify the code target address in the branch/call instruction at pc.
+  static Address target_address_at(Address pc);
+  static void set_target_address_at(Address pc, Address target);
+
+  int64_t buffer_space() const { return reloc_info_writer.pos() - pc_; }
+
+
+  RelocInfoWriter reloc_info_writer;
+
+ protected:
+
+  // Record reloc info for current pc_.
+  void RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data = 0);
+
+ private:
+  // Code generation
+  // The relocation writer's position is at least kGap bytes below the end of
+  // the generated instructions. This is so that multi-instruction sequences do
+  // not have to check for overflow. The same is true for writes of large
+  // relocation info entries.
+  static const int kGap = 32;
+
+  inline void CheckBuffer();
+  void GrowBuffer();
+
+  friend class EnsureSpace;
+  friend class PositionsRecorder;
+};
+
+class EnsureSpace BASE_EMBEDDED {
+ public:
+  explicit EnsureSpace(Assembler* assembler) {
+    assembler->CheckBuffer();
+  }
 };
 
 } }  // namespace v8::internal

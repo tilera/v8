@@ -43,5 +43,19 @@
 #include "debug.h"
 
 
+namespace v8 {
+namespace internal {
+
+Address Assembler::target_address_from_return_address(Address pc) {
+  return pc - 4 * Assembler::kInstrSize;
+}
+
+void Assembler::CheckBuffer() {
+  if (buffer_space() <= kGap) {
+    GrowBuffer();
+  }
+}
+
+} }  // namespace v8::internal
 
 #endif  // V8_TILEGX_ASSEMBLER_TILEGX_INL_H_

@@ -28,5 +28,18 @@
 #ifndef  V8_TILEGX_CONSTANTS_H_
 #define  V8_TILEGX_CONSTANTS_H_
 
+enum Condition {
+  // Any value < 0 is considered no_condition.
+  kNoCondition  = -1,
+
+  equal         =  4,
+  not_equal     =  5,
+
+  cc_default    = kNoCondition
+};
+
+// TileGX has 64bit width instruction encoding.
+typedef int64_t Instr;
+
 
 #endif    // #ifndef V8_TILEGX_CONSTANTS_H_

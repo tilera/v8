@@ -54,6 +54,28 @@ inline Object* JavaScriptFrame::function_slot_object() const {
   return Memory::Object_at(fp() + offset);
 }
 
+class ExitFrameConstants : public AllStatic {
+ public:
+  // See some explanation in MacroAssembler::EnterExitFrame.
+  // This marks the top of the extra allocated stack space.
+  static const int kStackSpaceOffset = -3 * kPointerSize;
+
+  static const int kCodeOffset = -2 * kPointerSize;
+
+  static const int kSPOffset = -1 * kPointerSize;
+
+  // The caller fields are below the frame pointer on the stack.
+  static const int kCallerFPOffset = +0 * kPointerSize;
+  // The calling JS function is between FP and PC.
+  static const int kCallerPCOffset = +1 * kPointerSize;
+
+  // MIPS-specific: a pointer to the old sp to avoid unnecessary calculations.
+  static const int kCallerSPOffset = +2 * kPointerSize;
+
+  // FP-relative displacement of the caller's SP.
+  static const int kCallerSPDisplacement = +2 * kPointerSize;
+};
+
 } }  // namespace v8::internal
 
 #endif

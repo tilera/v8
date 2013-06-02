@@ -131,6 +131,8 @@ class FullCodeGenerator: public AstVisitor {
   static const int kBackEdgeDistanceUnit = 142;
 #elif V8_TARGET_ARCH_MIPS
   static const int kBackEdgeDistanceUnit = 142;
+#elif V8_TARGET_ARCH_TILEGX
+  static const int kBackEdgeDistanceUnit = 142;
 #else
 #error Unsupported target architecture.
 #endif

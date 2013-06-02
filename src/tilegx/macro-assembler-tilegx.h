@@ -47,11 +47,39 @@ class MacroAssembler: public Assembler {
   void set_has_frame(bool value) { has_frame_ = value; }
   bool has_frame() { return has_frame_; }
 
+  void set_allow_stub_calls(bool value) { allow_stub_calls_ = value; }
+  bool allow_stub_calls() { return allow_stub_calls_; }
+
   // Activation support.
   void EnterFrame(StackFrame::Type type);
   void LeaveFrame(StackFrame::Type type);
 
+  // Arguments macros.
+#define COND_TYPED_ARGS Condition cond, Register r1, const Operand& r2
+
+  // Cases when relocation is not needed.
+#define DECLARE_NORELOC_PROTOTYPE(Name, target_type) \
+  void Name(target_type target); \
+  void Name(target_type target, \
+            COND_TYPED_ARGS); \
+
+#define DECLARE_BRANCH_PROTOTYPES(Name) \
+  DECLARE_NORELOC_PROTOTYPE(Name, Label*) \
+  DECLARE_NORELOC_PROTOTYPE(Name, int16_t)
+
+  DECLARE_BRANCH_PROTOTYPES(Branch)
+  DECLARE_BRANCH_PROTOTYPES(BranchAndLink)
+
+#undef DECLARE_BRANCH_PROTOTYPES
+#undef COND_TYPED_ARGS
+
+  // Jump unconditionally to given label.
+  void jmp(Label* L) {
+    Branch(L);
+  }
+
  private:
+  bool allow_stub_calls_;
   bool has_frame_;
 };
 
