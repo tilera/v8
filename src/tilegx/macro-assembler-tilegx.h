@@ -44,12 +44,6 @@ class MacroAssembler: public Assembler {
   // macro assembler.
   MacroAssembler(Isolate* isolate, void* buffer, int size);
 
-  void set_has_frame(bool value) { has_frame_ = value; }
-  bool has_frame() { return has_frame_; }
-
-  void set_allow_stub_calls(bool value) { allow_stub_calls_ = value; }
-  bool allow_stub_calls() { return allow_stub_calls_; }
-
   // Activation support.
   void EnterFrame(StackFrame::Type type);
   void LeaveFrame(StackFrame::Type type);
@@ -73,15 +67,47 @@ class MacroAssembler: public Assembler {
 #undef DECLARE_BRANCH_PROTOTYPES
 #undef COND_TYPED_ARGS
 
+  // Invoke specified builtin JavaScript function. Adds an entry to
+  // the unresolved list if the name does not resolve.
+  void InvokeBuiltin(Builtins::JavaScript id,
+                     InvokeFlag flag,
+                     const CallWrapper& call_wrapper = NullCallWrapper());
+
+  Handle<Object> CodeObject() {
+    ASSERT(!code_object_.is_null());
+    return code_object_;
+  }
+
+  // Debug Purpose
+  void set_generating_stub(bool value) { generating_stub_ = value; }
+  bool generating_stub() { return generating_stub_; }
+  void set_allow_stub_calls(bool value) { allow_stub_calls_ = value; }
+  bool allow_stub_calls() { return allow_stub_calls_; }
+  void set_has_frame(bool value) { has_frame_ = value; }
+  bool has_frame() { return has_frame_; }
+
   // Jump unconditionally to given label.
   void jmp(Label* L) {
     Branch(L);
   }
 
  private:
+  bool generating_stub_;
   bool allow_stub_calls_;
   bool has_frame_;
+
+  // This handle will be patched with the code object on installation.
+  Handle<Object> code_object_;
 };
+
+#ifdef GENERATED_CODE_COVERAGE
+#define CODE_COVERAGE_STRINGIFY(x) #x
+#define CODE_COVERAGE_TOSTRING(x) CODE_COVERAGE_STRINGIFY(x)
+#define __FILE_LINE__ __FILE__ ":" CODE_COVERAGE_TOSTRING(__LINE__)
+#define ACCESS_MASM(masm) masm->stop(__FILE_LINE__); masm->
+#else
+#define ACCESS_MASM(masm) masm->
+#endif
 
 } }  // namespace v8::internal
 

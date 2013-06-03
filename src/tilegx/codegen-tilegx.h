@@ -45,6 +45,30 @@ class CodeGenerator: public AstVisitor {
     InitializeAstVisitor();
   }
 
+  static bool MakeCode(CompilationInfo* info);
+
+  // Printing of AST, etc. as requested by flags.
+  static void MakeCodePrologue(CompilationInfo* info, const char* kind);
+
+  // Allocate and install the code.
+  static Handle<Code> MakeCodeEpilogue(MacroAssembler* masm,
+                                       Code::Flags flags,
+                                       CompilationInfo* info);
+
+  // Print the code after compiling it.
+  static void PrintCode(Handle<Code> code, CompilationInfo* info);
+
+  static bool ShouldGenerateLog(Expression* type);
+
+  static void SetFunctionInfo(Handle<JSFunction> fun,
+                              FunctionLiteral* lit,
+                              bool is_toplevel,
+                              Handle<Script> script);
+
+  static bool RecordPositions(MacroAssembler* masm,
+                              int pos,
+                              bool right_here = false);
+
   DEFINE_AST_VISITOR_SUBCLASS_MEMBERS();
 };
 

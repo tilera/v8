@@ -183,6 +183,14 @@ class Operand BASE_EMBEDDED {
 // TileGX reuse Integer reg as float reg.
 typedef Register DoubleRegister;
 
+class MemOperand : public Operand {
+ public:
+  explicit MemOperand(Register rn);
+
+ private:
+  friend class Assembler;
+};
+
 class Assembler : public AssemblerBase {
  public:
   // Create an assembler. Instructions and relocation information are emitted
@@ -201,10 +209,16 @@ class Assembler : public AssemblerBase {
   Assembler(Isolate* isolate, void* buffer, int buffer_size);
   virtual ~Assembler() { }
 
+  // GetCode emits any pending (non-emitted) code and fills the descriptor
+  // desc. GetCode() is idempotent; it returns the same result if no other
+  // Assembler functions are invoked in between GetCode() calls.
+  void GetCode(CodeDesc* desc);
+
   void bind(Label* L);  // Binds an unbound label L to current code position.
 
   static const int kInstrSize = sizeof(Instr);
 
+  static Instr instr_at(byte* pc) { return *reinterpret_cast<Instr*>(pc); }
   // Return the code target address at a call site from the return address
   // of that call in the instruction stream.
   inline static Address target_address_from_return_address(Address pc);
@@ -216,7 +230,28 @@ class Assembler : public AssemblerBase {
   int64_t buffer_space() const { return reloc_info_writer.pos() - pc_; }
 
 
+  PositionsRecorder* positions_recorder() { return &positions_recorder_; }
+
   RelocInfoWriter reloc_info_writer;
+
+  static const int kPatchReturnSequenceAddressOffset = 0;
+
+  // Distance between start of patched debug break slot and the emitted address
+  // to jump to.
+  static const int kPatchDebugBreakSlotAddressOffset =  0 * kInstrSize;
+
+  // Difference between address of current opcode and value read from pc
+  // register.
+  static const int kPcLoadDelta = 4;
+
+  static const int kPatchDebugBreakSlotReturnOffset = 4 * kInstrSize;
+
+  // Number of instructions used for the JS return sequence. The constant is
+  // used by the debugger to patch the JS return sequence.
+  static const int kJSReturnSequenceInstructions = 7;
+  static const int kDebugBreakSlotInstructions = 4;
+  static const int kDebugBreakSlotLength =
+      kDebugBreakSlotInstructions * kInstrSize;
 
  protected:
 
@@ -233,6 +268,8 @@ class Assembler : public AssemblerBase {
 
   inline void CheckBuffer();
   void GrowBuffer();
+
+  PositionsRecorder positions_recorder_;
 
   friend class EnsureSpace;
   friend class PositionsRecorder;

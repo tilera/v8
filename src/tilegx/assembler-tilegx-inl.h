@@ -46,6 +46,42 @@
 namespace v8 {
 namespace internal {
 
+int Register::NumAllocatableRegisters() {
+    return kMaxNumAllocatableRegisters;
+}
+
+bool RelocInfo::IsPatchedReturnSequence() {
+#if 0
+  // FIXME 
+  Instr instr0 = Assembler::instr_at(pc_);
+  Instr instr1 = Assembler::instr_at(pc_ + 1 * Assembler::kInstrSize);
+  Instr instr2 = Assembler::instr_at(pc_ + 2 * Assembler::kInstrSize);
+  bool patched_return = ((instr0 & kOpcodeMask) == LUI &&
+                         (instr1 & kOpcodeMask) == ORI &&
+                         ((instr2 & kOpcodeMask) == JAL ||
+                          ((instr2 & kOpcodeMask) == SPECIAL &&
+                           (instr2 & kFunctionFieldMask) == JALR)));
+  return patched_return;
+#else
+  return true;;
+#endif
+}
+
+Address RelocInfo::target_address() {
+  ASSERT(IsCodeTarget(rmode_) || IsRuntimeEntry(rmode_));
+  return Assembler::target_address_at(pc_);
+}
+
+void RelocInfo::set_target_address(Address target, WriteBarrierMode mode) {
+  ASSERT(IsCodeTarget(rmode_) || IsRuntimeEntry(rmode_));
+  Assembler::set_target_address_at(pc_, target);
+  if (mode == UPDATE_WRITE_BARRIER && host() != NULL && IsCodeTarget(rmode_)) {
+    Object* target_code = Code::GetCodeFromTargetAddress(target);
+    host()->GetHeap()->incremental_marking()->RecordWriteIntoCode(
+        host(), this, HeapObject::cast(target_code));
+  }
+}
+
 Address Assembler::target_address_from_return_address(Address pc) {
   return pc - 4 * Assembler::kInstrSize;
 }

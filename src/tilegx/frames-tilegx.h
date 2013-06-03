@@ -33,7 +33,70 @@
 namespace v8 {
 namespace internal {
 
+// Register lists.
+// Note that the bit values must match those used in actual instruction
+// encoding.
+const int kNumRegs = 64;
+
+const RegList kJSCallerSaved =
+  1L << 2  |  // r2
+  1L << 3  |  // r3
+  1L << 4  |  // r4
+  1L << 5  |  // r5
+  1L << 6  |  // r6
+  1L << 7  |  // r7
+  1L << 8  |  // r8
+  1L << 9  |  // r9
+  1L << 10 |  // r10
+  1L << 11 |  // r11
+  1L << 12 |  // r12
+  1L << 13 |  // r13
+  1L << 14 |  // r14
+  1L << 15 |  // r15
+  1L << 16 |  // r16
+  1L << 17 |  // r17
+  1L << 18 |  // r18
+  1L << 19 |  // r19
+  1L << 20 |  // r20
+  1L << 21 |  // r21
+  1L << 22 |  // r22
+  1L << 23 |  // r23
+  1L << 24 |  // r24
+  1L << 25 |  // r25
+  1L << 26 |  // r26
+  1L << 27 |  // r27
+  1L << 28 |  // r28
+  1L << 29;   // r29
+
 const int kNumJSCallerSaved = 30;
+
+int JSCallerSavedCode(int n);
+
+// Callee-saved registers preserved when switching from C to JavaScript.
+const RegList kCalleeSaved =
+  1L << 30 |  // r30
+  1L << 31 |  // r31
+  1L << 32 |  // r32
+  1L << 33 |  // r33
+  1L << 34 |  // r34
+  1L << 35 |  // r35
+  1L << 36 |  // r36
+  1L << 37 |  // r37
+  1L << 38 |  // r38
+  1L << 39 |  // r39
+  1L << 40 |  // r40
+  1L << 41 |  // r41
+  1L << 42 |  // r42
+  1L << 43 |  // r43
+  1L << 44 |  // r44
+  1L << 45 |  // r45
+  1L << 46 |  // r46
+  1L << 47 |  // r47
+  1L << 48 |  // r48
+  1L << 49;   // r49
+
+const int kNumCalleeSaved = 20;
+
 
 typedef Object* JSCallerSavedBuffer[kNumJSCallerSaved];
 
@@ -75,6 +138,53 @@ class ExitFrameConstants : public AllStatic {
   // FP-relative displacement of the caller's SP.
   static const int kCallerSPDisplacement = +2 * kPointerSize;
 };
+
+class InternalFrameConstants : public AllStatic {
+ public:
+  // FP-relative.
+  static const int kCodeOffset = StandardFrameConstants::kExpressionsOffset;
+};
+
+class ArgumentsAdaptorFrameConstants : public AllStatic {
+ public:
+  // FP-relative.
+  static const int kLengthOffset = StandardFrameConstants::kExpressionsOffset;
+
+  static const int kFrameSize =
+      StandardFrameConstants::kFixedFrameSize + kPointerSize;
+};
+
+class ConstructFrameConstants : public AllStatic {
+ public:
+  // FP-relative.
+  static const int kImplicitReceiverOffset = -6 * kPointerSize;
+  static const int kConstructorOffset      = -5 * kPointerSize;
+  static const int kLengthOffset           = -4 * kPointerSize;
+  static const int kCodeOffset = StandardFrameConstants::kExpressionsOffset;
+
+  static const int kFrameSize =
+      StandardFrameConstants::kFixedFrameSize + 4 * kPointerSize;
+};
+
+class EntryFrameConstants : public AllStatic {
+ public:
+  static const int kCallerFPOffset      = -3 * kPointerSize;
+};
+
+// Number of registers for which space is reserved in safepoints. Must be a
+// multiple of 8.
+const int kNumSafepointRegisters = 24;
+
+// Define the list of registers actually saved at safepoints.
+// Note that the number of saved registers may be smaller than the reserved
+// space, i.e. kNumSafepointSavedRegisters <= kNumSafepointRegisters.
+const RegList kSafepointSavedRegisters = kJSCallerSaved | kCalleeSaved;
+const int kNumSafepointSavedRegisters =
+    kNumJSCallerSaved + kNumCalleeSaved;
+
+typedef Object* JSCallerSavedBuffer[kNumJSCallerSaved];
+
+const int kUndefIndex = -1;
 
 } }  // namespace v8::internal
 
