@@ -148,12 +148,84 @@ struct Register {
   int code_;
 };
 
+#define REGISTER(N, C) \
+  const int kRegister_ ## N ## _Code = C; \
+  const Register N = { C }
+
+REGISTER(r0, 0);
+REGISTER(r1, 1);
+REGISTER(r2, 2);
+REGISTER(r3, 3);
+REGISTER(r4, 4);
+REGISTER(r5, 5);
+REGISTER(r6, 6);
+REGISTER(r7, 7);
+REGISTER(r8, 8);
+REGISTER(r9, 9);
+REGISTER(r10, 10);
+REGISTER(r11, 11);
+REGISTER(r12, 12);
+REGISTER(r13, 13);
+REGISTER(r14, 14);
+REGISTER(r15, 15);
+REGISTER(r16, 16);
+REGISTER(r17, 17);
+REGISTER(r18, 18);
+REGISTER(r19, 19);
+REGISTER(r20, 20);
+REGISTER(r21, 21);
+REGISTER(r22, 22);
+REGISTER(r23, 23);
+REGISTER(r24, 24);
+REGISTER(r25, 25);
+REGISTER(r26, 26);
+REGISTER(r27, 27);
+REGISTER(r28, 28);
+REGISTER(r29, 29);
+REGISTER(r30, 30);
+REGISTER(r31, 31);
+REGISTER(r32, 32);
+REGISTER(r33, 33);
+REGISTER(r34, 34);
+REGISTER(r35, 35);
+REGISTER(r36, 36);
+REGISTER(r37, 37);
+REGISTER(r38, 38);
+REGISTER(r39, 39);
+REGISTER(r40, 40);
+REGISTER(r41, 41);
+REGISTER(r42, 42);
+REGISTER(r43, 43);
+REGISTER(r44, 44);
+REGISTER(r45, 45);
+REGISTER(r46, 46);
+REGISTER(r47, 47);
+REGISTER(r48, 48);
+REGISTER(r49, 49);
+REGISTER(r50, 50);
+REGISTER(r51, 51);
+REGISTER(r52, 52);
+REGISTER(r53, 53);
+REGISTER(r54, 54);
+REGISTER(r55, 55);
+REGISTER(r56, 56);
+REGISTER(r57, 57);
+REGISTER(r58, 58);
+REGISTER(r59, 59);
+REGISTER(r60, 60);
+REGISTER(r61, 61);
+REGISTER(r62, 62);
+REGISTER(r63, 63);
+
+#undef REGISTER
+
 const int kRegister_pc_Code = 50;
 const int kRegister_gp_Code = 51;
 const int kRegister_fp_Code = 52;
 const int kRegister_tp_Code = 53;
 const int kRegister_sp_Code = 54;
 const int kRegister_lr_Code = 55;
+const int kRegister_zero_Code = 55;
 const int kRegister_no_reg_Code = -1;
 
 const Register pc  = { kRegister_pc_Code };
@@ -162,7 +234,18 @@ const Register fp  = { kRegister_fp_Code };
 const Register tp  = { kRegister_tp_Code };
 const Register sp  = { kRegister_sp_Code };
 const Register lr  = { kRegister_lr_Code };
+const Register zero_reg = { kRegister_zero_Code };
 const Register no_reg = { kRegister_no_reg_Code };
+
+// Register aliases.
+// cp is assumed to be a callee saved register.
+// Defined using #define instead of "static const Register&" because Clang
+// complains otherwise when a compilation unit that includes this header
+// doesn't use the variables.
+#define kRootRegister r0
+#define cp r1
+#define kLithiumScratchReg r2
+#define kLithiumScratchReg2 r3
 
 // Class Operand represents a shifter operand in data processing instructions.
 class Operand BASE_EMBEDDED {
@@ -209,6 +292,37 @@ class Assembler : public AssemblerBase {
   Assembler(Isolate* isolate, void* buffer, int buffer_size);
   virtual ~Assembler() { }
 
+  // Different nop operations are used by the code generator to detect certain
+  // states of the generated code.
+  enum NopMarkerTypes {
+    NON_MARKING_NOP = 0,
+    DEBUG_BREAK_NOP,
+    // IC markers.
+    PROPERTY_ACCESS_INLINED,
+    PROPERTY_ACCESS_INLINED_CONTEXT,
+    PROPERTY_ACCESS_INLINED_CONTEXT_DONT_DELETE,
+    // Helper values.
+    LAST_CODE_MARKER,
+    FIRST_IC_MARKER = PROPERTY_ACCESS_INLINED,
+    // Code aging
+    CODE_AGE_MARKER_NOP = 6
+  };
+
+  // Insert the smallest number of nop instructions
+  // possible to align the pc offset to a multiple
+  // of m. m must be a power of 2 (>= 8).
+  void Align(int m);
+
+  // Record a comment relocation entry that can be used by a disassembler.
+  // Use --code-comments to enable.
+  void RecordComment(const char* msg);
+  static int RelocateInternalReference(byte* pc, intptr_t pc_delta);
+
+  // Writes a single byte or word of data in the code stream.  Used for
+  // inline tables, e.g., jump-tables.
+  void db(uint8_t data);
+  void dd(uint32_t data);
+
   // GetCode emits any pending (non-emitted) code and fills the descriptor
   // desc. GetCode() is idempotent; it returns the same result if no other
   // Assembler functions are invoked in between GetCode() calls.
@@ -226,6 +340,33 @@ class Assembler : public AssemblerBase {
   // Read/Modify the code target address in the branch/call instruction at pc.
   static Address target_address_at(Address pc);
   static void set_target_address_at(Address pc, Address target);
+
+  // Here we are patching the address in the LUI/ORI instruction pair.
+  // These values are used in the serialization process and must be zero for
+  // MIPS platform, as Code, Embedded Object or External-reference pointers
+  // are split across two consecutive instructions and don't exist separately
+  // in the code, so the serializer should not step forwards in memory after
+  // a target is resolved and written.
+  static const int kSpecialTargetSize = 0;
+
+  // Number of consecutive instructions used to store 32bit constant.
+  // Before jump-optimizations, this constant was used in
+  // RelocInfo::target_address_address() function to tell serializer address of
+  // the instruction that follows LUI/ORI instruction pair. Now, with new jump
+  // optimization, where jump-through-register instruction that usually
+  // follows LUI/ORI pair is substituted with J/JAL, this constant equals
+  // to 3 instructions (LUI+ORI+J/JAL/JR/JALR).
+  static const int kInstructionsFor32BitConstant = 3;
+
+  // This sets the branch destination (which gets loaded at the call address).
+  // This is for calls and branches within generated code.  The serializer
+  // has already deserialized the lui/ori instructions etc.
+  inline static void deserialization_set_special_target_at(
+      Address instruction_payload, Address target) {
+    set_target_address_at(
+        instruction_payload - kInstructionsFor32BitConstant * kInstrSize,
+        target);
+  }
 
   int64_t buffer_space() const { return reloc_info_writer.pos() - pc_; }
 
@@ -252,6 +393,17 @@ class Assembler : public AssemblerBase {
   static const int kDebugBreakSlotInstructions = 4;
   static const int kDebugBreakSlotLength =
       kDebugBreakSlotInstructions * kInstrSize;
+
+  // ---------------------------------------------------------------------------
+  // Instruction Encoding
+  
+  void st(Register rd, Register rs);
+  void ld(Register rd, Register rs);
+  void addi(Register rd, Register rs, int8_t imm);
+  void move(Register rt, Register rs);
+
+  // Check if an instruction is a branch of some kind.
+  static bool IsNop(Instr instr, unsigned int type);
 
  protected:
 

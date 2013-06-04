@@ -1,4 +1,4 @@
-// Copyright 2012 the V8 project authors. All rights reserved.
+// Copyright 2011 the V8 project authors. All rights reserved.
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
@@ -25,25 +25,17 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef  V8_TILEGX_CONSTANTS_H_
-#define  V8_TILEGX_CONSTANTS_H_
+#ifndef V8_TILEGX_LITHIUM_GAP_RESOLVER_TILEGX_H_
+#define V8_TILEGX_LITHIUM_GAP_RESOLVER_TILEGX_H_
 
-enum Condition {
-  // Any value < 0 is considered no_condition.
-  kNoCondition  = -1,
+#include "v8.h"
 
-  equal         =  4,
-  not_equal     =  5,
-  cc_always     = 18,
+#include "lithium.h"
 
-  // Aliases.
-  al            = cc_always,
-
-  cc_default    = kNoCondition
-};
-
-// TileGX has 64bit width instruction encoding.
-typedef int64_t Instr;
+namespace v8 {
+namespace internal {
 
 
-#endif    // #ifndef V8_TILEGX_CONSTANTS_H_
+} }  // namespace v8::internal
+
+#endif  // V8_TILEGX_LITHIUM_GAP_RESOLVER_TILEGX_H_

@@ -91,6 +91,121 @@ class MacroAssembler: public Assembler {
     Branch(L);
   }
 
+  // Jump, Call, and Ret pseudo instructions implementing inter-working.
+#define COND_ARGS Condition cond = al, Register rs = zero_reg, \
+  const Operand& rt = Operand(zero_reg)
+
+  void Jump(Register target, COND_ARGS);
+  void Jump(intptr_t target, RelocInfo::Mode rmode, COND_ARGS);
+  void Jump(Address target, RelocInfo::Mode rmode, COND_ARGS);
+  void Jump(Handle<Code> code, RelocInfo::Mode rmode, COND_ARGS);
+  static int CallSize(Register target, COND_ARGS);
+  void Call(Register target, COND_ARGS);
+  static int CallSize(Address target, RelocInfo::Mode rmode, COND_ARGS);
+  void Call(Address target, RelocInfo::Mode rmode, COND_ARGS);
+  int CallSize(Handle<Code> code,
+               RelocInfo::Mode rmode = RelocInfo::CODE_TARGET,
+               TypeFeedbackId ast_id = TypeFeedbackId::None(),
+               COND_ARGS);
+  void Call(Handle<Code> code,
+            RelocInfo::Mode rmode = RelocInfo::CODE_TARGET,
+            TypeFeedbackId ast_id = TypeFeedbackId::None(),
+            COND_ARGS);
+  void Ret(COND_ARGS);
+
+  void Branch(Label* L,
+              Condition cond,
+              Register rs,
+              Heap::RootListIndex index);
+
+#undef COND_ARGS
+
+  void Call(Label* target);
+
+  inline void Move(Register dst, Register src) {
+    if (!dst.is(src)) {
+      move(dst, src);
+    }
+  }
+
+  // Lower case push() for compatibility with arch-independent code.
+  void push(Register src) {
+    addi(sp, sp, -kPointerSize);
+    st(sp, src);
+  }
+
+  void pop(Register dst) {
+    ld(dst, sp);
+    addi(sp, sp, kPointerSize);
+  }
+
+  // Push a handle.
+  void Push(Handle<Object> handle);
+  void Push(Smi* smi) { Push(Handle<Smi>(smi, isolate())); }
+
+  // Push two registers. Pushes leftmost register first (to highest address).
+  void Push(Register src1, Register src2) {
+    addi(sp, sp, -kPointerSize);
+    st(sp, src1);
+    addi(sp, sp, -kPointerSize);
+    st(sp, src2);
+  }
+
+  // Jump the register contains a smi.
+  void JumpIfSmi(Register value,
+                 Label* smi_label,
+                 Register scratch = r0);
+
+  // Check if the map of an object is equal to a specified map and branch to a
+  // specified target if equal. Skip the smi check if not required (object is
+  // known to be a heap object)
+  void DispatchMap(Register obj,
+                   Register scratch,
+                   Handle<Map> map,
+                   Handle<Code> success,
+                   SmiCheckType smi_check_type);
+
+  // Emit code to discard a non-negative number of pointer-sized elements
+  // from the stack, clobbering only the sp register.
+  void Drop(int count,
+            Condition cond = cc_always,
+            Register reg = no_reg,
+            const Operand& op = Operand(no_reg));
+
+  // Call a code stub.
+  void CallStub(CodeStub* stub,
+                TypeFeedbackId ast_id = TypeFeedbackId::None(),
+                Condition cond = cc_always,
+                Register r1 = zero_reg,
+                const Operand& r2 = Operand(zero_reg));
+
+  // Call a runtime routine.
+  void CallRuntime(const Runtime::Function* f, int num_arguments);
+  void CallRuntimeSaveDoubles(Runtime::FunctionId id);
+
+  // Convenience function: Same as above, but takes the fid instead.
+  void CallRuntime(Runtime::FunctionId fid, int num_arguments);
+
+  // -------------------------------------------------------------------------
+  // Exception handling.
+
+  // Push a new try handler and link into try handler chain.
+  void PushTryHandler(StackHandler::Kind kind, int handler_index);
+
+  // Unlink the stack handler on top of the stack from the try handler chain.
+  // Must preserve the result register.
+  void PopTryHandler();
+
+  // Passes thrown value to the handler of top of the try handler chain.
+  void Throw(Register value);
+
+#ifdef ENABLE_DEBUGGER_SUPPORT
+  // -------------------------------------------------------------------------
+  // Debugger Support.
+
+  void DebugBreak();
+#endif
+
  private:
   bool generating_stub_;
   bool allow_stub_calls_;
@@ -98,7 +213,17 @@ class MacroAssembler: public Assembler {
 
   // This handle will be patched with the code object on installation.
   Handle<Object> code_object_;
+
+  static int SafepointRegisterStackIndex(int reg_code);
+
+  // Needs access to SafepointRegisterStackIndex for compiled frame
+  // traversal.
+  friend class StandardFrame;
 };
+
+enum RememberedSetAction { EMIT_REMEMBERED_SET, OMIT_REMEMBERED_SET };
+enum SmiCheck { INLINE_SMI_CHECK, OMIT_SMI_CHECK };
+enum RAStatus { kRAHasNotBeenSaved, kRAHasBeenSaved };
 
 #ifdef GENERATED_CODE_COVERAGE
 #define CODE_COVERAGE_STRINGIFY(x) #x

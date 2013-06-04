@@ -97,6 +97,74 @@ const RegList kCalleeSaved =
 
 const int kNumCalleeSaved = 20;
 
+const int kUndefIndex = -1;
+
+const int kSafepointRegisterStackIndexMap[kNumRegs] = {
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex,
+  kUndefIndex
+};
 
 typedef Object* JSCallerSavedBuffer[kNumJSCallerSaved];
 
@@ -183,8 +251,6 @@ const int kNumSafepointSavedRegisters =
     kNumJSCallerSaved + kNumCalleeSaved;
 
 typedef Object* JSCallerSavedBuffer[kNumJSCallerSaved];
-
-const int kUndefIndex = -1;
 
 } }  // namespace v8::internal
 

@@ -34,6 +34,222 @@
 namespace v8 {
 namespace internal {
 
+class RecordWriteStub: public PlatformCodeStub {
+ public:
+  RecordWriteStub(Register object,
+                  Register value,
+                  Register address,
+                  RememberedSetAction remembered_set_action,
+                  SaveFPRegsMode fp_mode)
+      : object_(object),
+        value_(value),
+        address_(address),
+        remembered_set_action_(remembered_set_action),
+        save_fp_regs_mode_(fp_mode),
+        regs_(object,   // An input reg.
+              address,  // An input reg.
+              value) {  // One scratch reg.
+  }
+
+  enum Mode {
+    STORE_BUFFER_ONLY,
+    INCREMENTAL,
+    INCREMENTAL_COMPACTION
+  };
+
+  virtual bool IsPregenerated();
+  static void GenerateFixedRegStubsAheadOfTime(Isolate* isolate);
+  virtual bool SometimesSetsUpAFrame() { return false; }
+
+  static void PatchBranchIntoNop(MacroAssembler* masm, int pos);
+  static void PatchNopIntoBranch(MacroAssembler* masm, int pos);
+  static Mode GetMode(Code* stub);
+  static void Patch(Code* stub, Mode mode);
+
+ private:
+  // This is a helper class for freeing up 3 scratch registers.  The input is
+  // two registers that must be preserved and one scratch register provided by
+  // the caller.
+  class RegisterAllocation {
+   public:
+    RegisterAllocation(Register object,
+                       Register address,
+                       Register scratch0)
+        : object_(object),
+          address_(address),
+          scratch0_(scratch0) {
+      ASSERT(!AreAliased(scratch0, object, address, no_reg));
+      scratch1_ = GetRegThatIsNotOneOf(object_, address_, scratch0_);
+    }
+
+    void Save(MacroAssembler* masm) {
+      ASSERT(!AreAliased(object_, address_, scratch1_, scratch0_));
+      // We don't have to save scratch0_ because it was given to us as
+      // a scratch register.
+      masm->push(scratch1_);
+    }
+
+    void Restore(MacroAssembler* masm) {
+      masm->pop(scratch1_);
+    }
+
+    // If we have to call into C then we need to save and restore all caller-
+    // saved registers that were not already preserved.  The scratch registers
+    // will be restored by other means so we don't bother pushing them here.
+    void SaveCallerSaveRegisters(MacroAssembler* masm, SaveFPRegsMode mode);
+    inline void RestoreCallerSaveRegisters(MacroAssembler*masm,
+                                           SaveFPRegsMode mode);
+    inline Register object() { return object_; }
+    inline Register address() { return address_; }
+    inline Register scratch0() { return scratch0_; }
+    inline Register scratch1() { return scratch1_; }
+
+   private:
+    Register object_;
+    Register address_;
+    Register scratch0_;
+    Register scratch1_;
+
+    Register GetRegThatIsNotOneOf(Register r1,
+                                  Register r2,
+                                  Register r3) {
+      for (int i = 0; i < Register::NumAllocatableRegisters(); i++) {
+        Register candidate = Register::FromAllocationIndex(i);
+        if (candidate.is(r1)) continue;
+        if (candidate.is(r2)) continue;
+        if (candidate.is(r3)) continue;
+        return candidate;
+      }
+      UNREACHABLE();
+      return no_reg;
+    }
+    friend class RecordWriteStub;
+  };
+
+  enum OnNoNeedToInformIncrementalMarker {
+    kReturnOnNoNeedToInformIncrementalMarker,
+    kUpdateRememberedSetOnNoNeedToInformIncrementalMarker
+  };
+
+  void Generate(MacroAssembler* masm);
+  void GenerateIncremental(MacroAssembler* masm, Mode mode);
+  void CheckNeedsToInformIncrementalMarker(
+      MacroAssembler* masm,
+      OnNoNeedToInformIncrementalMarker on_no_need,
+      Mode mode);
+  void InformIncrementalMarker(MacroAssembler* masm, Mode mode);
+
+  Major MajorKey() { return RecordWrite; }
+
+  int MinorKey() {
+    return ObjectBits::encode(object_.code()) |
+        ValueBits::encode(value_.code()) |
+        AddressBits::encode(address_.code()) |
+        RememberedSetActionBits::encode(remembered_set_action_) |
+        SaveFPRegsModeBits::encode(save_fp_regs_mode_);
+  }
+
+  void Activate(Code* code) {
+    code->GetHeap()->incremental_marking()->ActivateGeneratedStub(code);
+  }
+
+  class ObjectBits: public BitField<int, 0, 5> {};
+  class ValueBits: public BitField<int, 5, 5> {};
+  class AddressBits: public BitField<int, 10, 5> {};
+  class RememberedSetActionBits: public BitField<RememberedSetAction, 15, 1> {};
+  class SaveFPRegsModeBits: public BitField<SaveFPRegsMode, 16, 1> {};
+
+  Register object_;
+  Register value_;
+  Register address_;
+  RememberedSetAction remembered_set_action_;
+  SaveFPRegsMode save_fp_regs_mode_;
+  Label slow_;
+  RegisterAllocation regs_;
+};
+
+
+class UnaryOpStub: public PlatformCodeStub {
+ public:
+  UnaryOpStub(Token::Value op,
+              UnaryOverwriteMode mode,
+              UnaryOpIC::TypeInfo operand_type = UnaryOpIC::UNINITIALIZED)
+      : op_(op),
+        mode_(mode),
+        operand_type_(operand_type) {
+  }
+
+ private:
+  Token::Value op_;
+  UnaryOverwriteMode mode_;
+
+  // Operand type information determined at runtime.
+  UnaryOpIC::TypeInfo operand_type_;
+
+  virtual void PrintName(StringStream* stream);
+
+  class ModeBits: public BitField<UnaryOverwriteMode, 0, 1> {};
+  class OpBits: public BitField<Token::Value, 1, 7> {};
+  class OperandTypeInfoBits: public BitField<UnaryOpIC::TypeInfo, 8, 3> {};
+
+  Major MajorKey() { return UnaryOp; }
+  int MinorKey() {
+    return ModeBits::encode(mode_)
+           | OpBits::encode(op_)
+           | OperandTypeInfoBits::encode(operand_type_);
+  }
+
+  // Note: A lot of the helper functions below will vanish when we use virtual
+  // function instead of switch more often.
+  void Generate(MacroAssembler* masm);
+
+  void GenerateTypeTransition(MacroAssembler* masm);
+
+  void GenerateSmiStub(MacroAssembler* masm);
+  void GenerateSmiStubSub(MacroAssembler* masm);
+  void GenerateSmiStubBitNot(MacroAssembler* masm);
+  void GenerateSmiCodeSub(MacroAssembler* masm, Label* non_smi, Label* slow);
+  void GenerateSmiCodeBitNot(MacroAssembler* masm, Label* slow);
+
+  void GenerateNumberStub(MacroAssembler* masm);
+  void GenerateNumberStubSub(MacroAssembler* masm);
+  void GenerateNumberStubBitNot(MacroAssembler* masm);
+  void GenerateHeapNumberCodeSub(MacroAssembler* masm, Label* slow);
+  void GenerateHeapNumberCodeBitNot(MacroAssembler* masm, Label* slow);
+
+  void GenerateGenericStub(MacroAssembler* masm);
+  void GenerateGenericStubSub(MacroAssembler* masm);
+  void GenerateGenericStubBitNot(MacroAssembler* masm);
+  void GenerateGenericCodeFallback(MacroAssembler* masm);
+
+  virtual Code::Kind GetCodeKind() const { return Code::UNARY_OP_IC; }
+
+  virtual InlineCacheState GetICState() {
+    return UnaryOpIC::ToState(operand_type_);
+  }
+
+  virtual void FinishCode(Handle<Code> code) {
+    code->set_unary_op_type(operand_type_);
+  }
+};
+
+class StoreBufferOverflowStub: public PlatformCodeStub {
+ public:
+  explicit StoreBufferOverflowStub(SaveFPRegsMode save_fp)
+      : save_doubles_(save_fp) {}
+
+  void Generate(MacroAssembler* masm);
+
+  virtual bool IsPregenerated() { return true; }
+  static void GenerateFixedRegStubsAheadOfTime(Isolate* isolate);
+  virtual bool SometimesSetsUpAFrame() { return false; }
+
+ private:
+  SaveFPRegsMode save_doubles_;
+
+  Major MajorKey() { return StoreBufferOverflow; }
+  int MinorKey() { return (save_doubles_ == kSaveFPRegs) ? 1 : 0; }
+};
 
 } }  // namespace v8::internal
 
