@@ -424,6 +424,8 @@ void OS::DebugBreak() {
   asm("break");
 #elif defined(__native_client__)
   asm("hlt");
+#elif defined(__tilegx__)
+  asm("bpt");
 #else
   asm("int $3");
 #endif
