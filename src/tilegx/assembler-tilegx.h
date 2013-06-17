@@ -434,6 +434,43 @@ class EnsureSpace BASE_EMBEDDED {
   }
 };
 
+// CpuFeatures keeps track of which features are supported by the target CPU.
+// Supported features must be enabled by a CpuFeatureScope before use.
+class CpuFeatures : public AllStatic {
+ public:
+  // Detect features of the target CPU. Set safe defaults if the serializer
+  // is enabled (snapshots must be portable).
+  static void Probe();
+
+  // Check whether a feature is supported by the target CPU.
+  static bool IsSupported(CpuFeature f) {
+    ASSERT(initialized_);
+    return (supported_ & (1u << f)) != 0;
+  }
+
+  static bool IsFoundByRuntimeProbingOnly(CpuFeature f) {
+    ASSERT(initialized_);
+    return (found_by_runtime_probing_only_ &
+            (static_cast<uint64_t>(1) << f)) != 0;
+  }
+
+  static bool IsSafeForSnapshot(CpuFeature f) {
+    return (IsSupported(f) &&
+            (!Serializer::enabled() || !IsFoundByRuntimeProbingOnly(f)));
+  }
+
+ private:
+#ifdef DEBUG
+  static bool initialized_;
+#endif
+  static unsigned supported_;
+  static unsigned found_by_runtime_probing_only_;
+
+  friend class ExternalReference;
+  DISALLOW_COPY_AND_ASSIGN(CpuFeatures);
+};
+
+
 } }  // namespace v8::internal
 
 #endif  // V8_TILEGX_ASSEMBLER_TILEGX_H_

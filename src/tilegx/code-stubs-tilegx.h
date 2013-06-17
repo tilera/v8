@@ -251,6 +251,99 @@ class StoreBufferOverflowStub: public PlatformCodeStub {
   int MinorKey() { return (save_doubles_ == kSaveFPRegs) ? 1 : 0; }
 };
 
+// Trampoline stub to call into native code. To call safely into native code
+// in the presence of compacting GC (which can move code objects) we need to
+// keep the code which called into native pinned in the memory. Currently the
+// simplest approach is to generate such stub early enough so it can never be
+// moved by GC
+class DirectCEntryStub: public PlatformCodeStub {
+ public:
+  DirectCEntryStub() {}
+  void Generate(MacroAssembler* masm);
+  void GenerateCall(MacroAssembler* masm,
+                                ExternalReference function);
+  void GenerateCall(MacroAssembler* masm, Register target);
+
+ private:
+  Major MajorKey() { return DirectCEntry; }
+  int MinorKey() { return 0; }
+
+  bool NeedsImmovableCode() { return true; }
+};
+
+// Compute a transcendental math function natively, or call the
+// TranscendentalCache runtime function.
+class TranscendentalCacheStub: public PlatformCodeStub {
+ public:
+  enum ArgumentType {
+    TAGGED = 0 << TranscendentalCache::kTranscendentalTypeBits,
+    UNTAGGED = 1 << TranscendentalCache::kTranscendentalTypeBits
+  };
+
+  TranscendentalCacheStub(TranscendentalCache::Type type,
+                          ArgumentType argument_type)
+      : type_(type), argument_type_(argument_type) { }
+  void Generate(MacroAssembler* masm);
+ private:
+  TranscendentalCache::Type type_;
+  ArgumentType argument_type_;
+  void GenerateCallCFunction(MacroAssembler* masm, Register scratch);
+
+  Major MajorKey() { return TranscendentalCache; }
+  int MinorKey() { return type_ | argument_type_; }
+  Runtime::FunctionId RuntimeFunction();
+};
+
+class NameDictionaryLookupStub: public PlatformCodeStub {
+ public:
+  enum LookupMode { POSITIVE_LOOKUP, NEGATIVE_LOOKUP };
+
+  explicit NameDictionaryLookupStub(LookupMode mode) : mode_(mode) { }
+
+  void Generate(MacroAssembler* masm);
+
+  static void GenerateNegativeLookup(MacroAssembler* masm,
+                                     Label* miss,
+                                     Label* done,
+                                     Register receiver,
+                                     Register properties,
+                                     Handle<Name> name,
+                                     Register scratch0);
+
+  static void GeneratePositiveLookup(MacroAssembler* masm,
+                                     Label* miss,
+                                     Label* done,
+                                     Register elements,
+                                     Register name,
+                                     Register r0,
+                                     Register r1);
+
+  virtual bool SometimesSetsUpAFrame() { return false; }
+
+ private:
+  static const int kInlinedProbes = 4;
+  static const int kTotalProbes = 20;
+
+  static const int kCapacityOffset =
+      NameDictionary::kHeaderSize +
+      NameDictionary::kCapacityIndex * kPointerSize;
+
+  static const int kElementsStartOffset =
+      NameDictionary::kHeaderSize +
+      NameDictionary::kElementsStartIndex * kPointerSize;
+
+  Major MajorKey() { return NameDictionaryLookup; }
+
+  int MinorKey() {
+    return LookupModeBits::encode(mode_);
+  }
+
+  class LookupModeBits: public BitField<LookupMode, 0, 1> {};
+
+  LookupMode mode_;
+};
+
+
 } }  // namespace v8::internal
 
 #endif  // V8_TILEGX_CODE_STUBS_ARM_H_

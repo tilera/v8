@@ -73,6 +73,13 @@ class MacroAssembler: public Assembler {
                      InvokeFlag flag,
                      const CallWrapper& call_wrapper = NullCallWrapper());
 
+  // Store the function for the given builtin in the target register.
+  void GetBuiltinFunction(Register target, Builtins::JavaScript id);
+
+  // Store the code object for the given builtin in the target register and
+  // setup the function in a1.
+  void GetBuiltinEntry(Register target, Builtins::JavaScript id);
+
   Handle<Object> CodeObject() {
     ASSERT(!code_object_.is_null());
     return code_object_;
@@ -185,6 +192,18 @@ class MacroAssembler: public Assembler {
 
   // Convenience function: Same as above, but takes the fid instead.
   void CallRuntime(Runtime::FunctionId fid, int num_arguments);
+
+  // Tail call of a runtime routine (jump).
+  // Like JumpToExternalReference, but also takes care of passing the number
+  // of parameters.
+  void TailCallExternalReference(const ExternalReference& ext,
+                                 int num_arguments,
+                                 int result_size);
+
+  // Convenience function: tail call a runtime routine (jump).
+  void TailCallRuntime(Runtime::FunctionId fid,
+                       int num_arguments,
+                       int result_size);
 
   // -------------------------------------------------------------------------
   // Exception handling.

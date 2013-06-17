@@ -44,8 +44,32 @@ namespace v8 {
 namespace internal {
 
 void Assembler::move(Register rt, Register rs) {
-  GenInstrSPECIAL();
-  GenInstrPECIAL();
+  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+  abort();
+}
+
+void Assembler::GetCode(CodeDesc* desc) {
+  ASSERT(pc_ <= reloc_info_writer.pos());  // No overlap.
+  // Set up code descriptor.
+  desc->buffer = buffer_;
+  desc->buffer_size = buffer_size_;
+  desc->instr_size = pc_offset();
+  desc->reloc_size = (buffer_ + buffer_size_) - reloc_info_writer.pos();
+}
+
+void Assembler::bind(Label* L) {
+  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+  abort();
+}
+
+Address Assembler::target_address_at(Address pc) {
+  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+  abort();
+}
+
+void Assembler::set_target_address_at(Address pc, Address target) {
+  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+  abort();
 }
 
 } }  // namespace v8::internal
