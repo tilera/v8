@@ -43,9 +43,40 @@
 namespace v8 {
 namespace internal {
 
+#ifdef DEBUG
+bool CpuFeatures::initialized_ = false;
+#endif
+unsigned CpuFeatures::supported_ = 0;
+unsigned CpuFeatures::found_by_runtime_probing_only_ = 0;
+
+
+ExternalReference ExternalReference::cpu_features() {
+  UNIMPLEMENTED();
+  ASSERT(CpuFeatures::initialized_);
+  return ExternalReference(&CpuFeatures::supported_);
+}
+
+void CpuFeatures::Probe() {
+	UNIMPLEMENTED();
+}
+
+Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
+    : AssemblerBase(isolate, buffer, buffer_size),
+      positions_recorder_(this) {
+	      UNIMPLEMENTED();
+}
+
+void Assembler::st(Register rd, Register rs) {
+	UNREACHABLE();
+}
+void Assembler::ld(Register rd, Register rs) {
+	UNREACHABLE();
+}
+void Assembler::addi(Register rd, Register rs, int8_t imm) {
+	UNREACHABLE();
+}
 void Assembler::move(Register rt, Register rs) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+	UNREACHABLE();
 }
 
 void Assembler::GetCode(CodeDesc* desc) {
@@ -70,6 +101,55 @@ Address Assembler::target_address_at(Address pc) {
 void Assembler::set_target_address_at(Address pc, Address target) {
   printf("[%s:%d]\n", __FUNCTION__, __LINE__);
   abort();
+}
+
+void Assembler::Align(int m) {
+  UNREACHABLE();
+}
+
+void Assembler::db(uint8_t data) {
+  UNREACHABLE();
+}
+
+
+void Assembler::dd(uint32_t data) {
+  UNREACHABLE();
+}
+
+bool Assembler::IsNop(Instr instr, unsigned int type) {
+  UNREACHABLE();
+  return false;
+}
+
+const int RelocInfo::kApplyMask = RelocInfo::kCodeTargetMask |
+                                  1 << RelocInfo::INTERNAL_REFERENCE;
+
+int Assembler::RelocateInternalReference(byte* pc, intptr_t pc_delta) {
+	UNIMPLEMENTED();
+	return -1;
+}
+
+void Assembler::RecordComment(const char* msg) {
+	UNIMPLEMENTED();
+}
+
+MemOperand::MemOperand(Register rm) : Operand(rm) {
+}
+
+bool RelocInfo::IsCodedSpecially() {
+  // The deserializer needs to know whether a pointer is specially coded.  Being
+  // specially coded on MIPS means that it is a lui/ori instruction, and that is
+  // always the case inside code objects.
+  UNIMPLEMENTED();
+  return true;
+}
+
+void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {
+	UNIMPLEMENTED();
+}
+
+void Assembler::GrowBuffer() {
+	UNIMPLEMENTED();
 }
 
 } }  // namespace v8::internal

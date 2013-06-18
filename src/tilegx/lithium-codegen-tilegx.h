@@ -155,6 +155,7 @@ class LCodeGen BASE_EMBEDDED {
 
   // Parallel move support.
   void DoParallelMove(LParallelMove* move);
+  void DoGap(LGap* instr);
 
   MemOperand PrepareKeyedOperand(Register key,
                                  Register base,

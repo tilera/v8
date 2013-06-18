@@ -251,6 +251,16 @@ const Register no_reg = { kRegister_no_reg_Code };
 class Operand BASE_EMBEDDED {
  public:
 
+  // Immediate.
+  INLINE(explicit Operand(int64_t immediate,
+         RelocInfo::Mode rmode = RelocInfo::NONE32));
+  INLINE(explicit Operand(const ExternalReference& f));
+  INLINE(explicit Operand(const char* s));
+  INLINE(explicit Operand(Object** opp));
+  INLINE(explicit Operand(Context** cpp));
+  explicit Operand(Handle<Object> handle);
+  INLINE(explicit Operand(Smi* value));
+
   // Register.
   INLINE(explicit Operand(Register rm));
 
@@ -261,6 +271,11 @@ class Operand BASE_EMBEDDED {
 
  private:
   Register rm_;
+  int64_t imm64_;  // Valid if rm_ == no_reg.
+  RelocInfo::Mode rmode_;
+
+  friend class Assembler;
+  friend class MacroAssembler;
 };
 
 // TileGX reuse Integer reg as float reg.
@@ -424,6 +439,7 @@ class Assembler : public AssemblerBase {
   PositionsRecorder positions_recorder_;
 
   friend class EnsureSpace;
+  friend class CodePatcher;
   friend class PositionsRecorder;
 };
 

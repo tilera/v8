@@ -88,6 +88,7 @@ class Decoder {
   int InstructionDecode(byte* instruction);
 
  private:
+#if 0
   // Bottleneck functions to print into the out_buffer.
   void PrintChar(const char ch);
   void Print(const char* str);
@@ -127,6 +128,7 @@ class Decoder {
   // Each of these functions decodes one particular instruction type.
   void DecodeTypeRegister(Instruction* instr);
   void DecodeTypeImmediate(Instruction* instr);
+#endif
   void DecodeTypeJump(Instruction* instr);
 
   const disasm::NameConverter& converter_;
@@ -136,6 +138,8 @@ class Decoder {
   DISALLOW_COPY_AND_ASSIGN(Decoder);
 };
 
+
+#if 0
 
 // Support for assertions in the Decoder formatting functions.
 #define STRING_STARTS_WITH(string, compare_string) \
@@ -949,9 +953,11 @@ void Decoder::DecodeTypeJump(Instruction* instr) {
   }
 }
 
+#endif
 
 // Disassemble the instruction at *instr_ptr into the output buffer.
 int Decoder::InstructionDecode(byte* instr_ptr) {
+#if 0
   Instruction* instr = Instruction::At(instr_ptr);
   // Print raw instruction bytes.
   out_buffer_pos_ += OS::SNPrintF(out_buffer_ + out_buffer_pos_,
@@ -976,6 +982,10 @@ int Decoder::InstructionDecode(byte* instr_ptr) {
     }
   }
   return Instruction::kInstrSize;
+#else
+  UNREACHABLE();
+  return -1;
+#endif
 }
 
 
@@ -1004,12 +1014,13 @@ const char* NameConverter::NameOfCPURegister(int reg) const {
 
 
 const char* NameConverter::NameOfXMMRegister(int reg) const {
-  return v8::internal::FPURegisters::Name(reg);
+  UNREACHABLE();
+  return "nofpreg";
 }
 
 
 const char* NameConverter::NameOfByteCPURegister(int reg) const {
-  UNREACHABLE();  // MIPS does not have the concept of a byte register.
+  UNREACHABLE();
   return "nobytereg";
 }
 

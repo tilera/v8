@@ -64,7 +64,9 @@ class RecordWriteStub: public PlatformCodeStub {
   static void PatchBranchIntoNop(MacroAssembler* masm, int pos);
   static void PatchNopIntoBranch(MacroAssembler* masm, int pos);
   static Mode GetMode(Code* stub);
-  static void Patch(Code* stub, Mode mode);
+  static void Patch(Code* stub, Mode mode) {
+	  UNIMPLEMENTED();
+  }
 
  private:
   // This is a helper class for freeing up 3 scratch registers.  The input is
@@ -343,6 +345,21 @@ class NameDictionaryLookupStub: public PlatformCodeStub {
   LookupMode mode_;
 };
 
+// Enter C code from generated RegExp code in a way that allows
+// the C code to fix the return address in case of a GC.
+// Currently only needed on ARM and MIPS.
+class RegExpCEntryStub: public PlatformCodeStub {
+ public:
+  RegExpCEntryStub() {}
+  virtual ~RegExpCEntryStub() {}
+  void Generate(MacroAssembler* masm);
+
+ private:
+  Major MajorKey() { return RegExpCEntry; }
+  int MinorKey() { return 0; }
+
+  bool NeedsImmovableCode() { return true; }
+};
 
 } }  // namespace v8::internal
 

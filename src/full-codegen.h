@@ -333,7 +333,7 @@ class FullCodeGenerator: public AstVisitor {
 
   // Helper function to split control flow and avoid a branch to the
   // fall-through label if it is set up.
-#ifdef V8_TARGET_ARCH_MIPS
+#if defined(V8_TARGET_ARCH_MIPS) || defined(V8_TARGET_ARCH_TILEGX)
   void Split(Condition cc,
              Register lhs,
              const Operand&  rhs,

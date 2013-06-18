@@ -311,6 +311,27 @@ void Assembler::CheckBuffer() {
   }
 }
 
+
+Operand::Operand(int64_t immediate, RelocInfo::Mode rmode)  {
+  rm_ = no_reg;
+  imm64_ = immediate;
+  rmode_ = rmode;
+}
+
+
+Operand::Operand(const ExternalReference& f)  {
+  rm_ = no_reg;
+  imm64_ = reinterpret_cast<int64_t>(f.address());
+  rmode_ = RelocInfo::EXTERNAL_REFERENCE;
+}
+
+
+Operand::Operand(Smi* value) {
+  rm_ = no_reg;
+  imm64_ =  reinterpret_cast<intptr_t>(value);
+  rmode_ = RelocInfo::NONE32;
+}
+
 Operand::Operand(Register rm) {
   rm_ = rm;
 }

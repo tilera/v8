@@ -28,6 +28,13 @@
 #ifndef  V8_TILEGX_CONSTANTS_H_
 #define  V8_TILEGX_CONSTANTS_H_
 
+#define UNIMPLEMENTED_TILEGX()                                                \
+  v8::internal::PrintF("%s, \tline %d: \tfunction %s not implemented. \n",    \
+                       __FILE__, __LINE__, __func__)
+
+namespace v8 {
+namespace internal {
+
 enum Condition {
   // Any value < 0 is considered no_condition.
   kNoCondition  = -1,
@@ -45,5 +52,69 @@ enum Condition {
 // TileGX has 64bit width instruction encoding.
 typedef int64_t Instr;
 
+const int kNumRegisters = 64;
+const int kInvalidRegister = -1;
+
+// Helper functions for converting between register numbers and names.
+class Registers {
+ public:
+  // Return the name of the register.
+  static const char* Name(int reg);
+
+  // Lookup the register number for the name provided.
+  static int Number(const char* name);
+
+  struct RegisterAlias {
+    int reg;
+    const char* name;
+  };
+
+ private:
+  static const char* names_[kNumRegisters];
+  static const RegisterAlias aliases_[];
+};
+
+class Instruction {
+ public:
+  enum {
+    kInstrSize = 8,
+    kInstrSizeLog2 = 3
+  };
+
+  // Get the raw instruction bits.
+  inline Instr InstructionBits() const {
+    return *reinterpret_cast<const Instr*>(this);
+  }
+
+  // Set the raw instruction bits to value.
+  inline void SetInstructionBits(Instr value) {
+    *reinterpret_cast<Instr*>(this) = value;
+  }
+
+  // Read one particular bit out of the instruction bits.
+  inline int Bit(int nr) const {
+    return (InstructionBits() >> nr) & 1;
+  }
+
+  // Read a bit field out of the instruction bits.
+  inline int Bits(int hi, int lo) const {
+    return (InstructionBits() >> lo) & ((2 << (hi - lo)) - 1);
+  }
+
+  // Instructions are read of out a code stream. The only way to get a
+  // reference to an instruction is to convert a pointer. There is no way
+  // to allocate or create instances of class Instruction.
+  // Use the At(pc) function to create references to Instruction.
+  static Instruction* At(byte* pc) {
+    return reinterpret_cast<Instruction*>(pc);
+  }
+
+ private:
+  // We need to prevent the creation of instances of class Instruction.
+  DISALLOW_IMPLICIT_CONSTRUCTORS(Instruction);
+};
+
+
+} } // namespace v8::internal
 
 #endif    // #ifndef V8_TILEGX_CONSTANTS_H_

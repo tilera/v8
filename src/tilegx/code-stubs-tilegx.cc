@@ -3668,43 +3668,13 @@ void CodeStub::GenerateStubsAheadOfTime(Isolate* isolate) {
 }
 
 
-#if 0
 void CodeStub::GenerateFPStubs(Isolate* isolate) {
-  SaveFPRegsMode mode = kSaveFPRegs;
-  CEntryStub save_doubles(1, mode);
-  StoreBufferOverflowStub stub(mode);
-  // These stubs might already be in the snapshot, detect that and don't
-  // regenerate, which would lead to code stub initialization state being messed
-  // up.
-  Code* save_doubles_code;
-  if (!save_doubles.FindCodeInCache(&save_doubles_code, isolate)) {
-    save_doubles_code = *save_doubles.GetCode(isolate);
-  }
-  Code* store_buffer_overflow_code;
-  if (!stub.FindCodeInCache(&store_buffer_overflow_code, isolate)) {
-      store_buffer_overflow_code = *stub.GetCode(isolate);
-  }
-  save_doubles_code->set_is_pregenerated(true);
-  store_buffer_overflow_code->set_is_pregenerated(true);
-  isolate->set_fp_stubs_generated(true);
+	UNIMPLEMENTED();
 }
 
 
 void CEntryStub::GenerateAheadOfTime(Isolate* isolate) {
-  CEntryStub stub(1, kDontSaveFPRegs);
-  Handle<Code> code = stub.GetCode(isolate);
-  code->set_is_pregenerated(true);
-}
-
-
-static void JumpIfOOM(MacroAssembler* masm,
-                      Register value,
-                      Register scratch,
-                      Label* oom_label) {
-  STATIC_ASSERT(Failure::OUT_OF_MEMORY_EXCEPTION == 3);
-  STATIC_ASSERT(kFailureTag == 3);
-  __ andi(scratch, value, 0xf);
-  __ Branch(oom_label, eq, scratch, Operand(0xf));
+	UNIMPLEMENTED();
 }
 
 
@@ -3714,223 +3684,13 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
                               Label* throw_out_of_memory_exception,
                               bool do_gc,
                               bool always_allocate) {
-  // v0: result parameter for PerformGC, if any
-  // s0: number of arguments including receiver (C callee-saved)
-  // s1: pointer to the first argument          (C callee-saved)
-  // s2: pointer to builtin function            (C callee-saved)
-
-  Isolate* isolate = masm->isolate();
-
-  if (do_gc) {
-    // Move result passed in v0 into a0 to call PerformGC.
-    __ mov(a0, v0);
-    __ PrepareCallCFunction(1, 0, a1);
-    __ CallCFunction(ExternalReference::perform_gc_function(isolate), 1, 0);
-  }
-
-  ExternalReference scope_depth =
-      ExternalReference::heap_always_allocate_scope_depth(isolate);
-  if (always_allocate) {
-    __ li(a0, Operand(scope_depth));
-    __ lw(a1, MemOperand(a0));
-    __ Addu(a1, a1, Operand(1));
-    __ sw(a1, MemOperand(a0));
-  }
-
-  // Prepare arguments for C routine.
-  // a0 = argc
-  __ mov(a0, s0);
-  // a1 = argv (set in the delay slot after find_ra below).
-
-  // We are calling compiled C/C++ code. a0 and a1 hold our two arguments. We
-  // also need to reserve the 4 argument slots on the stack.
-
-  __ AssertStackIsAligned();
-
-  __ li(a2, Operand(ExternalReference::isolate_address(isolate)));
-
-  // To let the GC traverse the return address of the exit frames, we need to
-  // know where the return address is. The CEntryStub is unmovable, so
-  // we can store the address on the stack to be able to find it again and
-  // we never have to restore it, because it will not change.
-  { Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm);
-    // This branch-and-link sequence is needed to find the current PC on mips,
-    // saved to the ra register.
-    // Use masm-> here instead of the double-underscore macro since extra
-    // coverage code can interfere with the proper calculation of ra.
-    Label find_ra;
-    masm->bal(&find_ra);  // bal exposes branch delay slot.
-    masm->mov(a1, s1);
-    masm->bind(&find_ra);
-
-    // Adjust the value in ra to point to the correct return location, 2nd
-    // instruction past the real call into C code (the jalr(t9)), and push it.
-    // This is the return address of the exit frame.
-    const int kNumInstructionsToJump = 5;
-    masm->Addu(ra, ra, kNumInstructionsToJump * kPointerSize);
-    masm->sw(ra, MemOperand(sp));  // This spot was reserved in EnterExitFrame.
-    // Stack space reservation moved to the branch delay slot below.
-    // Stack is still aligned.
-
-    // Call the C routine.
-    masm->mov(t9, s2);  // Function pointer to t9 to conform to ABI for PIC.
-    masm->jalr(t9);
-    // Set up sp in the delay slot.
-    masm->addiu(sp, sp, -kCArgsSlotsSize);
-    // Make sure the stored 'ra' points to this position.
-    ASSERT_EQ(kNumInstructionsToJump,
-              masm->InstructionsGeneratedSince(&find_ra));
-  }
-
-  if (always_allocate) {
-    // It's okay to clobber a2 and a3 here. v0 & v1 contain result.
-    __ li(a2, Operand(scope_depth));
-    __ lw(a3, MemOperand(a2));
-    __ Subu(a3, a3, Operand(1));
-    __ sw(a3, MemOperand(a2));
-  }
-
-  // Check for failure result.
-  Label failure_returned;
-  STATIC_ASSERT(((kFailureTag + 1) & kFailureTagMask) == 0);
-  __ addiu(a2, v0, 1);
-  __ andi(t0, a2, kFailureTagMask);
-  __ Branch(USE_DELAY_SLOT, &failure_returned, eq, t0, Operand(zero_reg));
-  // Restore stack (remove arg slots) in branch delay slot.
-  __ addiu(sp, sp, kCArgsSlotsSize);
-
-
-  // Exit C frame and return.
-  // v0:v1: result
-  // sp: stack pointer
-  // fp: frame pointer
-  __ LeaveExitFrame(save_doubles_, s0, true);
-
-  // Check if we should retry or throw exception.
-  Label retry;
-  __ bind(&failure_returned);
-  STATIC_ASSERT(Failure::RETRY_AFTER_GC == 0);
-  __ andi(t0, v0, ((1 << kFailureTypeTagSize) - 1) << kFailureTagSize);
-  __ Branch(&retry, eq, t0, Operand(zero_reg));
-
-  // Special handling of out of memory exceptions.
-  JumpIfOOM(masm, v0, t0, throw_out_of_memory_exception);
-
-  // Retrieve the pending exception.
-  __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
-                                      isolate)));
-  __ lw(v0, MemOperand(t0));
-
-  // See if we just retrieved an OOM exception.
-  JumpIfOOM(masm, v0, t0, throw_out_of_memory_exception);
-
-  // Clear the pending exception.
-  __ li(a3, Operand(isolate->factory()->the_hole_value()));
-  __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
-                                      isolate)));
-  __ sw(a3, MemOperand(t0));
-
-  // Special handling of termination exceptions which are uncatchable
-  // by javascript code.
-  __ LoadRoot(t0, Heap::kTerminationExceptionRootIndex);
-  __ Branch(throw_termination_exception, eq, v0, Operand(t0));
-
-  // Handle normal exception.
-  __ jmp(throw_normal_exception);
-
-  __ bind(&retry);
-  // Last failure (v0) will be moved to (a0) for parameter when retrying.
+	UNIMPLEMENTED();
 }
 
 
 void CEntryStub::Generate(MacroAssembler* masm) {
-  // Called from JavaScript; parameters are on stack as if calling JS function
-  // s0: number of arguments including receiver
-  // s1: size of arguments excluding receiver
-  // s2: pointer to builtin function
-  // fp: frame pointer    (restored after C call)
-  // sp: stack pointer    (restored as callee's sp after C call)
-  // cp: current context  (C callee-saved)
-
-  // NOTE: Invocations of builtins may return failure objects
-  // instead of a proper result. The builtin entry handles
-  // this by performing a garbage collection and retrying the
-  // builtin once.
-
-  // NOTE: s0-s2 hold the arguments of this function instead of a0-a2.
-  // The reason for this is that these arguments would need to be saved anyway
-  // so it's faster to set them up directly.
-  // See MacroAssembler::PrepareCEntryArgs and PrepareCEntryFunction.
-
-  // Compute the argv pointer in a callee-saved register.
-  __ Addu(s1, sp, s1);
-
-  // Enter the exit frame that transitions from JavaScript to C++.
-  FrameScope scope(masm, StackFrame::MANUAL);
-  __ EnterExitFrame(save_doubles_);
-
-  // s0: number of arguments (C callee-saved)
-  // s1: pointer to first argument (C callee-saved)
-  // s2: pointer to builtin function (C callee-saved)
-
-  Label throw_normal_exception;
-  Label throw_termination_exception;
-  Label throw_out_of_memory_exception;
-
-  // Call into the runtime system.
-  GenerateCore(masm,
-               &throw_normal_exception,
-               &throw_termination_exception,
-               &throw_out_of_memory_exception,
-               false,
-               false);
-
-  // Do space-specific GC and retry runtime call.
-  GenerateCore(masm,
-               &throw_normal_exception,
-               &throw_termination_exception,
-               &throw_out_of_memory_exception,
-               true,
-               false);
-
-  // Do full GC and retry runtime call one final time.
-  Failure* failure = Failure::InternalError();
-  __ li(v0, Operand(reinterpret_cast<int32_t>(failure)));
-  GenerateCore(masm,
-               &throw_normal_exception,
-               &throw_termination_exception,
-               &throw_out_of_memory_exception,
-               true,
-               true);
-
-  __ bind(&throw_out_of_memory_exception);
-  // Set external caught exception to false.
-  Isolate* isolate = masm->isolate();
-  ExternalReference external_caught(Isolate::kExternalCaughtExceptionAddress,
-                                    isolate);
-  __ li(a0, Operand(false, RelocInfo::NONE32));
-  __ li(a2, Operand(external_caught));
-  __ sw(a0, MemOperand(a2));
-
-  // Set pending exception and v0 to out of memory exception.
-  Label already_have_failure;
-  JumpIfOOM(masm, v0, t0, &already_have_failure);
-  Failure* out_of_memory = Failure::OutOfMemoryException(0x1);
-  __ li(v0, Operand(reinterpret_cast<int32_t>(out_of_memory)));
-  __ bind(&already_have_failure);
-  __ li(a2, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
-                                      isolate)));
-  __ sw(v0, MemOperand(a2));
-  // Fall through to the next label.
-
-  __ bind(&throw_termination_exception);
-  __ ThrowUncatchable(v0);
-
-  __ bind(&throw_normal_exception);
-  __ Throw(v0);
+	UNIMPLEMENTED();
 }
-
-#endif
 
 void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
 #if 0
@@ -4286,37 +4046,15 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
   }
 }
 
+#endif
 
 void FunctionPrototypeStub::Generate(MacroAssembler* masm) {
-  Label miss;
-  Register receiver;
-  if (kind() == Code::KEYED_LOAD_IC) {
-    // ----------- S t a t e -------------
-    //  -- ra    : return address
-    //  -- a0    : key
-    //  -- a1    : receiver
-    // -----------------------------------
-    __ Branch(&miss, ne, a0,
-        Operand(masm->isolate()->factory()->prototype_string()));
-    receiver = a1;
-  } else {
-    ASSERT(kind() == Code::LOAD_IC);
-    // ----------- S t a t e -------------
-    //  -- a2    : name
-    //  -- ra    : return address
-    //  -- a0    : receiver
-    //  -- sp[0] : receiver
-    // -----------------------------------
-    receiver = a0;
-  }
-
-  StubCompiler::GenerateLoadFunctionPrototype(masm, receiver, a3, t0, &miss);
-  __ bind(&miss);
-  StubCompiler::TailCallBuiltin(masm, StubCompiler::MissBuiltin(kind()));
+	UNIMPLEMENTED();
 }
 
 
 void StringLengthStub::Generate(MacroAssembler* masm) {
+#if 0
   Label miss;
   Register receiver;
   if (kind() == Code::KEYED_LOAD_IC) {
@@ -4344,10 +4082,13 @@ void StringLengthStub::Generate(MacroAssembler* masm) {
 
   __ bind(&miss);
   StubCompiler::TailCallBuiltin(masm, StubCompiler::MissBuiltin(kind()));
+#else
+  UNIMPLEMENTED();
+#endif
 }
 
-
 void StoreArrayLengthStub::Generate(MacroAssembler* masm) {
+#if 0
   // This accepts as a receiver anything JSArray::SetElementsLength accepts
   // (currently anything except for external arrays which means anything with
   // elements of FixedArray type).  Value must be a number, but only smis are
@@ -4414,7 +4155,12 @@ void StoreArrayLengthStub::Generate(MacroAssembler* masm) {
   __ bind(&miss);
 
   StubCompiler::TailCallBuiltin(masm, StubCompiler::MissBuiltin(kind()));
+#else
+  UNIMPLEMENTED();
+#endif
 }
+
+#if 0
 
 
 Register InstanceofStub::left() { return a0; }
@@ -8271,6 +8017,22 @@ void ArrayConstructorStub::Generate(MacroAssembler* masm) {
   printf("[%s:%d]\n", __FUNCTION__, __LINE__);
   abort();
 #endif
+}
+
+void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
+	UNIMPLEMENTED();
+}
+
+void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
+	UNIMPLEMENTED();
+}
+
+void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
+	UNIMPLEMENTED();
+}
+
+void ArgumentsAccessStub::GenerateNewNonStrictSlow(MacroAssembler* masm) {
+	UNIMPLEMENTED();
 }
 
 #undef __
