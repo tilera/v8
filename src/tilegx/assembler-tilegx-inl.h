@@ -341,6 +341,12 @@ bool Operand::is_reg() const {
   return rm_.is_valid();
 }
 
+void Assembler::emit(Instr x) {
+  CheckBuffer();
+  *reinterpret_cast<Instr*>(pc_) = x;
+  pc_ += kInstrSize;
+}
+
 } }  // namespace v8::internal
 
 #endif  // V8_TILEGX_ASSEMBLER_TILEGX_INL_H_

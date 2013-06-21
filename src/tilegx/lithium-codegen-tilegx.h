@@ -276,15 +276,15 @@ class LCodeGen BASE_EMBEDDED {
   void DeoptimizeIf(Condition cc,
                     LEnvironment* environment,
                     Deoptimizer::BailoutType bailout_type,
-                    Register src1 = zero_reg,
-                    const Operand& src2 = Operand(zero_reg));
+                    Register src1 = zero,
+                    const Operand& src2 = Operand(zero));
   void DeoptimizeIf(Condition cc,
                     LEnvironment* environment,
-                    Register src1 = zero_reg,
-                    const Operand& src2 = Operand(zero_reg));
+                    Register src1 = zero,
+                    const Operand& src2 = Operand(zero));
   void SoftDeoptimize(LEnvironment* environment,
-                      Register src1 = zero_reg,
-                      const Operand& src2 = Operand(zero_reg));
+                      Register src1 = zero,
+                      const Operand& src2 = Operand(zero));
 
   void AddToTranslation(Translation* translation,
                         LOperand* op,

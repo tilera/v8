@@ -51,7 +51,9 @@ MacroAssembler::MacroAssembler(Isolate* arg_isolate, void* buffer, int size)
 }
 
 void MacroAssembler::LoadRoot(Register destination,
-                              Heap::RootListIndex index) { UNREACHABLE(); }
+                              Heap::RootListIndex index) {
+  ld(destination, MemOperand(kRootRegister, index << kPointerSizeLog2));
+}
 
 
 void MacroAssembler::LoadRoot(Register destination,
@@ -169,8 +171,21 @@ void MacroAssembler::LoadFromNumberDictionary(Label* miss,
 void MacroAssembler::Addu(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
 
 
-void MacroAssembler::Subu(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
-
+void MacroAssembler::Subu(Register rd, Register rs, const Operand& rt) 
+{
+  if (rt.is_reg()) {
+    sub(rd, rs, rt.rm());
+  } else {
+    if (is_int16(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+      addli(rd, rs, -rt.imm64_);
+    } else {
+      // li handles the relocation.
+      ASSERT(!rs.is(tt));
+      li(tt, rt);
+      sub(rd, rs, tt);
+    }
+  }
+}
 
 void MacroAssembler::Mul(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
 
@@ -212,10 +227,32 @@ void MacroAssembler::Ror(Register rd, Register rs, const Operand& rt) { UNREACHA
 
 //------------Pseudo-instructions-------------
 
-void MacroAssembler::li(Register rd, Operand j, LiFlags mode) { UNREACHABLE(); }
+void MacroAssembler::li(Register rd, Operand j, LiFlags mode) {
+  ASSERT(!j.is_reg());
+  if (MustUseReg(j.rmode_)) {
+    RecordRelocInfo(j.rmode_, j.imm64_);
+  }
+  // We always need the same number of instructions as we may need to patch
+  // this code to load another value which may need 2 instructions to load.
+  moveli(rd, (j.imm64_ >> 48) & 0xFFFF);
+  shl16insli(rd, rd, (j.imm64_ >> 32) & 0xFFFF);
+  shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF);
+  shl16insli(rd, rd, j.imm64_ & 0xFFFF);
+}
 
 
-void MacroAssembler::MultiPush(RegList regs) { UNREACHABLE(); }
+void MacroAssembler::MultiPush(RegList regs) {
+  int16_t num_to_push = NumberOfBitsSet(regs);
+  int16_t stack_offset = num_to_push * kPointerSize;
+
+  Subu(sp, sp, Operand(stack_offset));
+  for (int16_t i = kNumRegisters - 1; i >= 0; i--) {
+    if ((regs & (1 << i)) != 0) {
+      stack_offset -= kPointerSize;
+      st(ToRegister(i), MemOperand(sp, stack_offset));
+    }
+  }
+}
 
 
 void MacroAssembler::MultiPushReversed(RegList regs) { UNREACHABLE(); }
@@ -241,28 +278,359 @@ void MacroAssembler::MultiPopReversedFPU(RegList regs) { UNREACHABLE(); }
 
 void MacroAssembler::FlushICache(Register address, unsigned instructions) { UNREACHABLE(); }
 
+void MacroAssembler::Jr(Label* L) {
+
+  uint64_t imm64;
+  imm64 = jump_address(L);
+  {
+    // Buffer growth (and relocation) must be blocked for internal references
+    // until associated instructions are emitted and available to be patched.
+    RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
+    moveli(tt, (imm64_ >> 48) & 0xFFFF);
+    shl16insli(tt, tt, (imm64_ >> 32) & 0xFFFF);
+    shl16insli(tt, tt, (imm64_ >> 16) & 0xFFFF);
+    shl16insli(tt, tt, imm64_ & 0xFFFF);
+  }
+  jr(tt);
+}
 
 // Emulated condtional branches do not emit a nop in the branch delay slot.
 //
 // BRANCH_ARGS_CHECK checks that conditional jump arguments are correct.
-#define BRANCH_ARGS_CHECK(cond, rs, rt) ASSERT(                                \
-    (cond == cc_always && rs.is(zero_reg) && rt.rm().is(zero_reg)) ||          \
-    (cond != cc_always && (!rs.is(zero_reg) || !rt.rm().is(zero_reg))))
+#define BRANCH_ARGS_CHECK(cond, rs, rt) ASSERT(                        \
+    (cond == cc_always && rs.is(zero) && rt.rm().is(zero)) ||          \
+    (cond != cc_always && (!rs.is(zero) || !rt.rm().is(zero))))
 
 
-void MacroAssembler::Branch(int16_t offset) { UNREACHABLE(); }
+void MacroAssembler::Branch(int16_t offset) {
+  b(offset);
+}
 
 
 void MacroAssembler::Branch(int16_t offset, Condition cond, Register rs,
                             const Operand& rt) { UNREACHABLE(); }
 
 
-void MacroAssembler::Branch(Label* L) { UNREACHABLE(); }
-
+void MacroAssembler::Branch(Label* L) {
+  if (L->is_bound()) {
+    if (is_near(L)) {
+      BranchShort(L);
+    } else {
+      Jr(L);
+    }
+  } 
+  
+  BranchShort(L);
+}
 
 void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
-                            const Operand& rt) { UNREACHABLE(); }
+                            const Operand& rt) {
+  if (L->is_bound()) {
+    if (is_near(L)) {
+      BranchShort(L, cond, rs, rt, bdslot);
+    } else {
+      Label skip;
+      Condition neg_cond = NegateCondition(cond);
+      BranchShort(&skip, neg_cond, rs, rt);
+      Jr(L, bdslot);
+      bind(&skip);
+    }
+  } else
+    BranchShort(L, cond, rs, rt, bdslot);
+}
 
+void MacroAssembler::BranchShort(Label* L) {
+  // We use branch_offset as an argument for the branch instructions to be sure
+  // it is called just before generating the branch instruction, as needed.
+  b(shifted_branch_offset(L, false));
+}
+
+void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
+                                 const Operand& rt) {
+  BRANCH_ARGS_CHECK(cond, rs, rt);
+
+  int32_t offset = 0;
+  Register r2 = no_reg;
+  Register scratch = tt;
+  if (rt.is_reg()) {
+    r2 = rt.rm_;
+    // Be careful to always use shifted_branch_offset only just before the
+    // branch instruction, as the location will be remember for patching the
+    // target.
+    switch (cond) {
+      case cc_always:
+        offset = shifted_branch_offset(L, false);
+        b(offset);
+        break;
+      case eq:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          beqz(rs, offset);
+	} else {
+          cmpeq(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bnez(rs, offset);
+	}
+        break;
+      case ne:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          bnez(rs, offset);
+	} else {
+          cmpne(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bnez(rs, offset);
+	}
+        break;
+      // Signed comparison.
+      case greater:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          cmplts(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case greater_equal:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else {
+          cmplts(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      case less:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          bltz(rs, offset);
+        } else {
+          cmplts(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case less_equal:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          blez(rs, offset);
+        } else {
+          cmplts(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      // Unsigned comparison.
+      case Ugreater:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          cmpltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case Ugreater_equal:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else {
+          cmpltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      case Uless:
+        if (r2.is(zero)) {
+          // No code needs to be emitted.
+          return;
+        } else {
+          cmpltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case Uless_equal:
+        if (r2.is(zero)) {
+          offset = shifted_branch_offset(L, false);
+          b(offset);
+        } else {
+          cmpltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      default:
+        UNREACHABLE();
+    }
+  } else {
+    // Be careful to always use shifted_branch_offset only just before the
+    // branch instruction, as the location will be remember for patching the
+    // target.
+    switch (cond) {
+      case cc_always:
+        offset = shifted_branch_offset(L, false);
+        b(offset);
+        break;
+      case eq:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          beqz(rs, offset);
+	} else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          offset = shifted_branch_offset(L, false);
+	  cmpeq(scratch, rs, r2);
+          bnez(scratch, offset);
+	}
+        break;
+      case ne:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bnez(rs, offset);
+	} else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          offset = shifted_branch_offset(L, false);
+	  cmpne(scratch, rs, r2);
+          bnez(scratch, offset);
+	}
+        break;
+      // Signed comparison.
+      case greater:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmplts(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case greater_equal:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else if (is_int8(rt.imm64_)) {
+          cmpltsi(scratch, rs, rt.imm64_);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmplts(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      case less:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bltz(rs, offset);
+        } else if (is_int8(rt.imm64_)) {
+          cmpltsi(scratch, rs, rt.imm64_);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmplts(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case less_equal:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          blez(rs, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmplts(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      // Unsigned comparison.
+      case Ugreater:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmpltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case Ugreater_equal:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else if (is_int8(rt.imm64_)) {
+          cmpltui(scratch, rs, rt.imm64_);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmpltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+     case Uless:
+        if (rt.imm64_ == 0) {
+          // No code needs to be emitted.
+          return;
+        } else if (is_int8(rt.imm64_)) {
+          cmpltui(scratch, rs, rt.imm64_);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmpltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bnez(scratch, offset);
+        }
+        break;
+      case Uless_equal:
+        if (rt.imm64_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          b(offset);
+        } else {
+          ASSERT(!scratch.is(rs));
+          r2 = scratch;
+          li(r2, rt);
+          cmpltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beqz(scratch, offset);
+        }
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+  // Check that offset could actually hold on an int16_t.
+  ASSERT(is_intn(offset, 17));
+}
 
 void MacroAssembler::Branch(Label* L,
                             Condition cond,
@@ -287,7 +655,15 @@ void MacroAssembler::BranchAndLink(Label* L, Condition cond, Register rs,
 void MacroAssembler::Jump(Register target,
                           Condition cond,
                           Register rs,
-                          const Operand& rt) { UNREACHABLE(); }
+                          const Operand& rt) {
+  if (cond == cc_always) {
+    jr(target);
+  } else {
+    BRANCH_ARGS_CHECK(cond, rs, rt);
+    Branch(2, NegateCondition(cond), rs, rt);
+    jr(target);
+  }
+}
 
 
 void MacroAssembler::Jump(intptr_t target,
@@ -384,10 +760,44 @@ void MacroAssembler::DebugBreak() {
 // Exception handling.
 
 void MacroAssembler::PushTryHandler(StackHandler::Kind kind,
-                                    int handler_index) { UNREACHABLE(); }
+                                    int handler_index) {
+  // For the JSEntry handler, we must preserve r0-r4
+  // t1-t3 are available. We will build up the handler from the bottom by
+  // pushing on the stack.
+  // Set up the code object (t1) and the state (t2) for pushing.
+  unsigned state =
+      StackHandler::IndexField::encode(handler_index) |
+      StackHandler::KindField::encode(kind);
+  li(t1, Operand(CodeObject()), CONSTANT_SIZE);
+  li(t2, Operand(state));
+
+  // Push the frame pointer, context, state, and code object.
+  if (kind == StackHandler::JS_ENTRY) {
+    ASSERT_EQ(Smi::FromInt(0), 0);
+    // The second zero indicates no context.
+    // The first zero is the NULL frame pointer.
+    // The operands are reversed to match the order of MultiPush/Pop.
+    Push(zero, zero, t2, t1);
+  } else {
+    MultiPush(t1.bit() | t2.bit() | cp.bit() | fp.bit());
+  }
+
+  // Link the current handler as the next handler.
+  li(t2, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
+  ld(t1, MemOperand(t2));
+  push(t1);
+  // Set this new handler as the current one.
+  st(sp, MemOperand(t2));
+}
 
 
-void MacroAssembler::PopTryHandler() { UNREACHABLE(); }
+void MacroAssembler::PopTryHandler() {
+  //STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
+  pop(r1);
+  Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
+  li(tt, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
+  st(a1, MemOperand(tt));
+}
 
 
 void MacroAssembler::JumpToHandlerEntry() { UNREACHABLE(); }

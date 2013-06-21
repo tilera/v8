@@ -408,12 +408,12 @@ class MacroAssembler: public Assembler {
   void mov(Register rd, Register rt) { UNREACHABLE(); }
 
   // Load int32 in the rd register.
-  void li(Register rd, Operand j, LiFlags mode = OPTIMIZE_SIZE);
-  inline void li(Register rd, int32_t j, LiFlags mode = OPTIMIZE_SIZE) {
+  void li(Register rd, Operand j, LiFlags mode = CONSTANT_SIZE);
+  inline void li(Register rd, int64_t j, LiFlags mode = CONSTANT_SIZE) {
     li(rd, Operand(j), mode);
   }
   inline void li(Register dst, Handle<Object> value,
-                 LiFlags mode = OPTIMIZE_SIZE) {
+                 LiFlags mode = CONSTANT_SIZE) {
     li(dst, Operand(value), mode);
   }
 
@@ -444,8 +444,8 @@ class MacroAssembler: public Assembler {
   }
 
   // Jump, Call, and Ret pseudo instructions implementing inter-working.
-#define COND_ARGS Condition cond = al, Register rs = zero_reg, \
-  const Operand& rt = Operand(zero_reg)
+#define COND_ARGS Condition cond = al, Register rs = zero, \
+  const Operand& rt = Operand(zero)
 
   void Jump(Register target, COND_ARGS);
   void Jump(intptr_t target, RelocInfo::Mode rmode, COND_ARGS);
@@ -465,6 +465,7 @@ class MacroAssembler: public Assembler {
             COND_ARGS);
   void Ret(COND_ARGS);
 
+  void Jr(Label* L);
   void Branch(Label* L,
               Condition cond,
               Register rs,
@@ -497,10 +498,26 @@ class MacroAssembler: public Assembler {
 
   // Push two registers. Pushes leftmost register first (to highest address).
   void Push(Register src1, Register src2) {
-    addi(sp, sp, -kPointerSize);
-    st(sp, src1);
-    addi(sp, sp, -kPointerSize);
-    st(sp, src2);
+    Subu(sp, sp, Operand(2 * kPointerSize));
+    st(src1, MemOperand(sp, 1 * kPointerSize));
+    st(src2, MemOperand(sp, 0 * kPointerSize));
+  }
+
+  // Push three registers. Pushes leftmost register first (to highest address).
+  void Push(Register src1, Register src2, Register src3) {
+    Subu(sp, sp, Operand(3 * kPointerSize));
+    st(src1, MemOperand(sp, 2 * kPointerSize));
+    st(src2, MemOperand(sp, 1 * kPointerSize));
+    st(src3, MemOperand(sp, 0 * kPointerSize));
+  }
+
+  // Push four registers. Pushes leftmost register first (to highest address).
+  void Push(Register src1, Register src2, Register src3, Register src4) {
+    Subu(sp, sp, Operand(4 * kPointerSize));
+    st(src1, MemOperand(sp, 3 * kPointerSize));
+    st(src2, MemOperand(sp, 2 * kPointerSize));
+    st(src3, MemOperand(sp, 1 * kPointerSize));
+    st(src4, MemOperand(sp, 0 * kPointerSize));
   }
 
   // Check if the map of an object is equal to a specified map and branch to a
@@ -529,8 +546,8 @@ class MacroAssembler: public Assembler {
   void CallStub(CodeStub* stub,
                 TypeFeedbackId ast_id = TypeFeedbackId::None(),
                 Condition cond = cc_always,
-                Register r1 = zero_reg,
-                const Operand& r2 = Operand(zero_reg));
+                Register r1 = zero,
+                const Operand& r2 = Operand(zero));
   // Tail call a code stub (jump).
   void TailCallStub(CodeStub* stub);
 
@@ -731,6 +748,12 @@ class MacroAssembler: public Assembler {
                                     Register scratch);
 
 
+  void InitializeRootRegister() {
+    ExternalReference roots_array_start =
+        ExternalReference::roots_array_start(isolate());
+    li(kRootRegister, Operand(roots_array_start));
+  }
+
   // Load an object from the root table.
   void LoadRoot(Register destination,
                 Heap::RootListIndex index);
@@ -856,6 +879,8 @@ class MacroAssembler: public Assembler {
 #endif
 
  private:
+  void BranchShort(Label* L, Condition cond, Register rs, const Operand& rt);
+
   bool generating_stub_;
   bool allow_stub_calls_;
   bool has_frame_;

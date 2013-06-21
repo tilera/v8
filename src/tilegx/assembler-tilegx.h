@@ -37,12 +37,236 @@
 #define V8_TILEGX_ASSEMBLER_TILEGX_H_
 
 #include <stdio.h>
+#include <arch/opcode.h>
 #include "assembler.h"
 #include "constants-tilegx.h"
 #include "serialize.h"
 
 namespace v8 {
 namespace internal {
+
+/* Opcode Helper Macros */
+#define TILEGX_X_MODE 0
+
+#define FNOP_X0                                                                \
+  create_Opcode_X0(RRR_0_OPCODE_X0) |                                          \
+      create_RRROpcodeExtension_X0(UNARY_RRR_0_OPCODE_X0) |                    \
+      create_UnaryOpcodeExtension_X0(FNOP_UNARY_OPCODE_X0)
+
+#define FNOP_X1                                                                \
+  create_Opcode_X1(RRR_0_OPCODE_X1) |                                          \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(FNOP_UNARY_OPCODE_X1)
+
+#define NOP create_Mode(TILEGX_X_MODE) | FNOP_X0 | FNOP_X1
+
+#define ADD_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(ADD_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define SUB_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SUB_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define NOR_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(NOR_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define OR_X1                                                                  \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(OR_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define AND_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(AND_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define XOR_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(XOR_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define CMOVNEZ_X0                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(CMOVNEZ_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define CMOVEQZ_X0                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(CMOVEQZ_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define ADDLI_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(ADDLI_OPCODE_X1) | FNOP_X0
+
+#define MOVELI_X1                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(ADDLI_OPCODE_X1) |             \
+	create_SrcA_X1(0x3F) | FNOP_X0
+
+#define ADDI_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(ADDI_IMM8_OPCODE_X1) | FNOP_X0
+
+#define V4INT_L_X1                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(V4INT_L_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define BFEXTU_X0                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(BF_OPCODE_X0) |                \
+      create_BFOpcodeExtension_X0(BFEXTU_BF_OPCODE_X0) | FNOP_X1
+
+#define BFEXTS_X0                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(BF_OPCODE_X0) |                \
+      create_BFOpcodeExtension_X0(BFEXTS_BF_OPCODE_X0) | FNOP_X1
+
+#define SHL16INSLI_X1                                                          \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHL16INSLI_OPCODE_X1) | FNOP_X0
+
+#define ST_X1                                                                  \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(ST_RRR_0_OPCODE_X1) | create_Dest_X1(0x0) | \
+      FNOP_X0
+
+#define LD_X1                                                                  \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(LD_UNARY_OPCODE_X1) | FNOP_X0
+
+#define JR_X1                                                                  \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(JR_UNARY_OPCODE_X1) | FNOP_X0
+
+#define JALR_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(JALR_UNARY_OPCODE_X1) | FNOP_X0
+
+#define CLZ_X0                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(UNARY_RRR_0_OPCODE_X0) |                    \
+      create_UnaryOpcodeExtension_X0(CNTLZ_UNARY_OPCODE_X0) | FNOP_X1
+
+#define CMPEQ_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(CMPEQ_RRR_0_OPCODE_X1) |                    \
+      FNOP_X0
+
+#define CMPNE_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(CMPNE_RRR_0_OPCODE_X1) |                    \
+      FNOP_X0
+
+#define CMPLTS_X1                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(CMPLTS_RRR_0_OPCODE_X1) |                   \
+      FNOP_X0
+
+#define CMPLES_X1                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(CMPLES_RRR_0_OPCODE_X1) |                   \
+      FNOP_X0
+
+#define CMPLTU_X1                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(CMPLTU_RRR_0_OPCODE_X1) |                   \
+      FNOP_X0
+
+#define CMPLEU_X1                                                              \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(CMPLEU_RRR_0_OPCODE_X1) |                   \
+      FNOP_X0
+
+#define CMPLTSI_X1                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(CMPLTSI_IMM8_OPCODE_X1) |                  \
+      FNOP_X0
+
+#define CMPLTUI_X1                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(CMPLTUI_IMM8_OPCODE_X1) |                  \
+      FNOP_X0
+
+#define XORI_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(XORI_IMM8_OPCODE_X1) |                     \
+      FNOP_X0
+
+#define ORI_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(ORI_IMM8_OPCODE_X1) |                      \
+      FNOP_X0
+
+#define ANDI_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(ANDI_IMM8_OPCODE_X1) |                     \
+      FNOP_X0
+
+#define SHLI_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHIFT_OPCODE_X1) |             \
+      create_ShiftOpcodeExtension_X1(SHLI_SHIFT_OPCODE_X1) | FNOP_X0
+
+#define SHL_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SHL_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define SHRSI_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHIFT_OPCODE_X1) |             \
+      create_ShiftOpcodeExtension_X1(SHRSI_SHIFT_OPCODE_X1) | FNOP_X0
+
+#define SHRS_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SHRS_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define SHRUI_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHIFT_OPCODE_X1) |             \
+      create_ShiftOpcodeExtension_X1(SHRUI_SHIFT_OPCODE_X1) | FNOP_X0
+
+#define SHRU_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SHRU_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define BEQZ_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
+      create_BrType_X1(BEQZ_BRANCH_OPCODE_X1) | FNOP_X0
+
+#define BNEZ_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
+      create_BrType_X1(BNEZ_BRANCH_OPCODE_X1) | FNOP_X0
+
+#define BGTZ_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
+      create_BrType_X1(BGTZ_BRANCH_OPCODE_X1) | FNOP_X0
+
+#define BGEZ_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
+      create_BrType_X1(BGEZ_BRANCH_OPCODE_X1) | FNOP_X0
+
+#define BLTZ_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
+      create_BrType_X1(BLTZ_BRANCH_OPCODE_X1) | FNOP_X0
+
+#define BLEZ_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
+      create_BrType_X1(BLEZ_BRANCH_OPCODE_X1) | FNOP_X0
+
+#define J_X1                                                                   \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(JUMP_OPCODE_X1) |              \
+      create_JumpOpcodeExtension_X1(J_JUMP_OPCODE_X1) | FNOP_X0
+
+#define JAL_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(JUMP_OPCODE_X1) |              \
+      create_JumpOpcodeExtension_X1(JAL_JUMP_OPCODE_X1) | FNOP_X0
+
+#define DEST_X0(x) create_Dest_X0(x)
+#define SRCA_X0(x) create_SrcA_X0(x)
+#define SRCB_X0(x) create_SrcB_X0(x)
+#define DEST_X1(x) create_Dest_X1(x)
+#define SRCA_X1(x) create_SrcA_X1(x)
+#define SRCB_X1(x) create_SrcB_X1(x)
+#define IMM16_X1(x) create_Imm16_X1(x)
+#define IMM8_X1(x) create_Imm8_X1(x)
+#define BFSTART_X0(x) create_BFStart_X0(x)
+#define BFEND_X0(x) create_BFEnd_X0(x)
+#define SHIFTIMM_X1(x) create_ShAmt_X1(x)
+#define JOFF_X1(x) create_JumpOff_X1(x)
+#define BOFF_X1(x) create_BrOff_X1(x)
 
 // TileGX has 64 64bit registers.
 struct Register {
@@ -219,6 +443,14 @@ REGISTER(r63, 63);
 
 #undef REGISTER
 
+
+const int kRegister_t0_Code = 25;
+const int kRegister_t1_Code = 26;
+const int kRegister_t2_Code = 27;
+const int kRegister_t3_Code = 28;
+const int kRegister_t4_Code = 29;
+
+const int kRegister_tt_Code = 49;
 const int kRegister_pc_Code = 50;
 const int kRegister_gp_Code = 51;
 const int kRegister_fp_Code = 52;
@@ -228,13 +460,21 @@ const int kRegister_lr_Code = 55;
 const int kRegister_zero_Code = 55;
 const int kRegister_no_reg_Code = -1;
 
+const Register t0  = { kRegister_t0_Code };
+const Register t1  = { kRegister_t1_Code };
+const Register t2  = { kRegister_t2_Code };
+const Register t3  = { kRegister_t3_Code };
+const Register t4  = { kRegister_t4_Code };
+// 'tt' is treated as TileGX temp register,
+// like 'at' in MIPS.
+const Register tt  = { kRegister_tt_Code };
 const Register pc  = { kRegister_pc_Code };
 const Register gp  = { kRegister_gp_Code };
 const Register fp  = { kRegister_fp_Code };
 const Register tp  = { kRegister_tp_Code };
 const Register sp  = { kRegister_sp_Code };
 const Register lr  = { kRegister_lr_Code };
-const Register zero_reg = { kRegister_zero_Code };
+const Register zero = { kRegister_zero_Code };
 const Register no_reg = { kRegister_no_reg_Code };
 
 // Register aliases.
@@ -242,10 +482,10 @@ const Register no_reg = { kRegister_no_reg_Code };
 // Defined using #define instead of "static const Register&" because Clang
 // complains otherwise when a compilation unit that includes this header
 // doesn't use the variables.
-#define kRootRegister r0
-#define cp r1
-#define kLithiumScratchReg r2
-#define kLithiumScratchReg2 r3
+#define kRootRegister r45
+#define cp r46
+#define kLithiumScratchReg r47
+#define kLithiumScratchReg2 r48
 
 // Class Operand represents a shifter operand in data processing instructions.
 class Operand BASE_EMBEDDED {
@@ -253,7 +493,7 @@ class Operand BASE_EMBEDDED {
 
   // Immediate.
   INLINE(explicit Operand(int64_t immediate,
-         RelocInfo::Mode rmode = RelocInfo::NONE32));
+         RelocInfo::Mode rmode = RelocInfo::NONE64));
   INLINE(explicit Operand(const ExternalReference& f));
   INLINE(explicit Operand(const char* s));
   INLINE(explicit Operand(Object** opp));
@@ -283,9 +523,12 @@ typedef Register DoubleRegister;
 
 class MemOperand : public Operand {
  public:
-  explicit MemOperand(Register rn);
+  explicit MemOperand(Register rn, int64_t offset = 0);
+  int32_t offset() const { return offset_; }
 
  private:
+  int64_t offset_;
+
   friend class Assembler;
 };
 
@@ -344,10 +587,32 @@ class Assembler : public AssemblerBase {
   void GetCode(CodeDesc* desc);
 
   void bind(Label* L);  // Binds an unbound label L to current code position.
+  void bind_to(Label* L, int pos);
+  void next(Label* L);
+  void print(Label* L);
+
+  // Returns the branch offset to the given label from the current code
+  // position. Links the label to the current position if it is still unbound.
+  // Manages the jump elimination optimization if the second parameter is true.
+  int32_t branch_offset(Label* L, bool jump_elimination_allowed);
+  int32_t shifted_branch_offset(Label* L, bool jump_elimination_allowed) {
+    int32_t o = branch_offset(L, jump_elimination_allowed);
+    ASSERT((o & 7) == 0);   // Assert the offset is aligned.
+    return o >> 3;
+  }
 
   static const int kInstrSize = sizeof(Instr);
 
   static Instr instr_at(byte* pc) { return *reinterpret_cast<Instr*>(pc); }
+  static void instr_at_put(byte* pc, Instr instr) {
+    *reinterpret_cast<Instr*>(pc) = instr;
+  }
+  Instr instr_at(int pos) { return *reinterpret_cast<Instr*>(buffer_ + pos); }
+  void instr_at_put(int pos, Instr instr) {
+    *reinterpret_cast<Instr*>(buffer_ + pos) = instr;
+  }
+
+
   // Return the code target address at a call site from the return address
   // of that call in the instruction stream.
   inline static Address target_address_from_return_address(Address pc);
@@ -412,13 +677,49 @@ class Assembler : public AssemblerBase {
   // ---------------------------------------------------------------------------
   // Instruction Encoding
   
-  void st(Register rd, Register rs);
-  void ld(Register rd, Register rs);
-  void addi(Register rd, Register rs, int8_t imm);
-  void move(Register rt, Register rs);
+  void j(int64_t target);
+  void jr(Register target);
+
+  void b(int32_t offset);
+  void b(Label* L) { b(branch_offset(L, false)>>3); }
+  void beqz(const Register& rs, int32_t offset);
+  void beqz(const Register& rs, Label* L) {
+    beqz(rs, branch_offset(L, false) >> 3);
+  }
+  void bnez(const Register& rs, int32_t offset);
+  void bnez(const Register& rs, Label* L) {
+    bnez(rs, branch_offset(L, false)>>3);
+  }
+  void bgez(const Register& rs, int32_t offset);
+  void bgtz(const Register& rs, int32_t offset);
+  void blez(const Register& rs, int32_t offset);
+  void bltz(const Register& rs, int32_t offset);
+
+  void cmpeq(const Register& rd, const Register& rsa, const Register& rsb);
+  void cmpne(const Register& rd, const Register& rsa, const Register& rsb);
+  void cmplts(const Register& rd, const Register& rsa, const Register& rsb);
+  void cmpltsi(const Register& rd, const Register& rsa, int8_t imm);
+  void cmples(const Register& rd, const Register& rsa, const Register& rsb);
+  void cmpltu(const Register& rd, const Register& rsa, const Register& rsb);
+  void cmpltui(const Register& rd, const Register& rsa, int8_t imm);
+  void cmpleu(const Register& rd, const Register& rsa, const Register& rsb);
+
+  void st(const Register& rd, const MemOperand& rs);
+  void st(const Register& rd, const Register& rs);
+  void ld(const Register& rd, const MemOperand& rs);
+  void ld(const Register& rd, const Register& rs);
+  void add(const Register& rd, const Register& rsa, const Register& rsb);
+  void sub(const Register& rd, const Register& rsa, const Register& rsb);
+  void addi(const Register& rd, const Register& rs, int8_t imm);
+  void addli(const Register& rd, const Register& rs, int16_t imm);
+  void moveli(const Register& rd, int16_t imm);
+  void shl16insli(const Register& rd, const Register& rs, int16_t imm);
+  void move(const Register& rt, const Register& rs);
 
   // Check if an instruction is a branch of some kind.
   static bool IsNop(Instr instr, unsigned int type);
+
+  bool is_near(Label* L);
 
  protected:
 
@@ -435,6 +736,7 @@ class Assembler : public AssemblerBase {
 
   inline void CheckBuffer();
   void GrowBuffer();
+  inline void emit(Instr x);
 
   PositionsRecorder positions_recorder_;
 

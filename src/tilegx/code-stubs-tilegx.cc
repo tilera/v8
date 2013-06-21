@@ -3693,35 +3693,20 @@ void CEntryStub::Generate(MacroAssembler* masm) {
 }
 
 void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
-#if 0
   Label invoke, handler_entry, exit;
   Isolate* isolate = masm->isolate();
 
   // Registers:
-  // a0: entry address
-  // a1: function
-  // a2: receiver
-  // a3: argc
-  //
-  // Stack:
-  // 4 args slots
-  // args
+  // r0: entry address
+  // r1: function
+  // r2: receiver
+  // r3: argc
+  // r4: args
 
   // Save callee saved registers on the stack.
-  __ MultiPush(kCalleeSaved | ra.bit());
-
-  // Save callee-saved FPU registers.
-  __ MultiPushFPU(kCalleeSavedFPU);
-  // Set up the reserved register for 0.0.
-  __ Move(kDoubleRegZero, 0.0);
-
-
-  // Load argv in s0 register.
-  int offset_to_argv = (kNumCalleeSaved + 1) * kPointerSize;
-  offset_to_argv += kNumCalleeSavedFPU * kDoubleSize;
+  __ MultiPush(kCalleeSaved | lr.bit());
 
   __ InitializeRootRegister();
-  __ lw(s0, MemOperand(sp, offset_to_argv + kCArgsSlotsSize));
 
   // We build an EntryFrame.
   __ li(t3, Operand(-1));  // Push a bad frame pointer to fail if it is used.
@@ -3733,35 +3718,32 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ lw(t0, MemOperand(t0));
   __ Push(t3, t2, t1, t0);
   // Set up frame pointer for the frame to be pushed.
-  __ addiu(fp, sp, -EntryFrameConstants::kCallerFPOffset);
+  __ addi(fp, sp, -EntryFrameConstants::kCallerFPOffset);
 
   // Registers:
-  // a0: entry_address
-  // a1: function
-  // a2: receiver_pointer
-  // a3: argc
-  // s0: argv
+  // r0: entry_address
+  // r1: function
+  // r2: receiver_pointer
+  // r3: argc
+  // r4/r30: argv
   //
   // Stack:
   // caller fp          |
   // function slot      | entry frame
   // context slot       |
   // bad fp (0xff...f)  |
-  // callee saved registers + ra
-  // 4 args slots
-  // args
+  // callee saved registers + lr
 
   // If this is the outermost JS call, set js_entry_sp value.
   Label non_outermost_js;
   ExternalReference js_entry_sp(Isolate::kJSEntrySPAddress, isolate);
   __ li(t1, Operand(ExternalReference(js_entry_sp)));
-  __ lw(t2, MemOperand(t1));
+  __ ld(t2, MemOperand(t1));
   __ Branch(&non_outermost_js, ne, t2, Operand(zero_reg));
-  __ sw(fp, MemOperand(t1));
+  __ st(fp, MemOperand(t1));
   __ li(t0, Operand(Smi::FromInt(StackFrame::OUTERMOST_JSENTRY_FRAME)));
   Label cont;
   __ b(&cont);
-  __ nop();   // Branch delay slot nop.
   __ bind(&non_outermost_js);
   __ li(t0, Operand(Smi::FromInt(StackFrame::INNER_JSENTRY_FRAME)));
   __ bind(&cont);
@@ -3778,10 +3760,9 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   // signal the existence of the JSEntry frame.
   __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
-  __ sw(v0, MemOperand(t0));  // We come back from 'invoke'. result is in v0.
-  __ li(v0, Operand(reinterpret_cast<int32_t>(Failure::Exception())));
+  __ st(r0, MemOperand(t0));  // We come back from 'invoke'. result is in v0.
+  __ li(r0, Operand(reinterpret_cast<int32_t>(Failure::Exception())));
   __ b(&exit);  // b exposes branch delay slot.
-  __ nop();   // Branch delay slot nop.
 
   // Invoke: Link this frame into the handler chain.  There's only one
   // handler block in this code object, so its index is 0.
@@ -3796,7 +3777,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ LoadRoot(t1, Heap::kTheHoleValueRootIndex);
   __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
-  __ sw(t1, MemOperand(t0));
+  __ st(t1, MemOperand(t0));
 
   // Invoke the function by calling through JS entry trampoline builtin.
   // Notice that we cannot store a reference to the trampoline code directly in
@@ -3824,11 +3805,11 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
     ExternalReference entry(Builtins::kJSEntryTrampoline, masm->isolate());
     __ li(t0, Operand(entry));
   }
-  __ lw(t9, MemOperand(t0));  // Deref address.
+  __ ld(t0, MemOperand(t0));  // Deref address.
 
   // Call JSEntryTrampoline.
-  __ addiu(t9, t9, Code::kHeaderSize - kHeapObjectTag);
-  __ Call(t9);
+  __ addli(t0, t0, Code::kHeaderSize - kHeapObjectTag);
+  __ Call(t0);
 
   // Unlink this frame from the handler chain.
   __ PopTryHandler();
@@ -3842,29 +3823,22 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
             t1,
             Operand(Smi::FromInt(StackFrame::OUTERMOST_JSENTRY_FRAME)));
   __ li(t1, Operand(ExternalReference(js_entry_sp)));
-  __ sw(zero_reg, MemOperand(t1));
+  __ st(zero, MemOperand(t1));
   __ bind(&non_outermost_js_2);
 
   // Restore the top frame descriptors from the stack.
   __ pop(t1);
   __ li(t0, Operand(ExternalReference(Isolate::kCEntryFPAddress,
                                       isolate)));
-  __ sw(t1, MemOperand(t0));
+  __ st(t1, MemOperand(t0));
 
   // Reset the stack to the callee saved registers.
-  __ addiu(sp, sp, -EntryFrameConstants::kCallerFPOffset);
-
-  // Restore callee-saved fpu registers.
-  __ MultiPopFPU(kCalleeSavedFPU);
+  __ addi(sp, sp, -EntryFrameConstants::kCallerFPOffset);
 
   // Restore callee saved registers from the stack.
-  __ MultiPop(kCalleeSaved | ra.bit());
+  __ MultiPop(kCalleeSaved | lr.bit());
   // Return.
-  __ Jump(ra);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
+  __ Jump(lr);
 }
 
 #if 0
