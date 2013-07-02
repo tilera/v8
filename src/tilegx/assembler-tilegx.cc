@@ -321,10 +321,10 @@ int Assembler::target_at(int32_t pos) {
   }
   // Check we have a branch or jump instruction.
   ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
-  // Do NOT change this to <<2. We rely on arithmetic shifts here, assuming
+  // Do NOT change this to << 3. We rely on arithmetic shifts here, assuming
   // the compiler uses arithmectic shifts for signed integers.
   if (IsBranch(instr)) {
-    int32_t imm20 = get_BrOff_X1(instr) << 3;
+    int32_t imm20 = (((int)get_BrOff_X1(instr)) << 15) >> 12;
 
     if (imm20 == kEndOfChain) {
       // EndOfChain sentinel is returned directly, not relative to pc or pos.
