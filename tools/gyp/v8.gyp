@@ -624,6 +624,7 @@
             '../../src/tilegx/cpu-tilegx.cc',
             '../../src/tilegx/disasm-tilegx.cc',
             '../../src/tilegx/full-codegen-tilegx.cc',
+            '../../src/tilegx/deoptimizer-tilegx.cc',
           ],
         }],
         ['v8_target_arch=="x64" or v8_target_arch=="mac" or OS=="mac"', {

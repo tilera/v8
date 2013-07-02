@@ -38,13 +38,8 @@ namespace internal {
 
 
 int Deoptimizer::patch_size() {
-#if 0
   const int kCallInstructionSizeInWords = 4;
   return kCallInstructionSizeInWords * Assembler::kInstrSize;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -120,8 +115,7 @@ void Deoptimizer::DeoptimizeFunctionWithPreparedFunctionList(
 #endif
   }
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
@@ -168,8 +162,7 @@ void Deoptimizer::PatchInterruptCodeAt(Code* unoptimized_code,
   unoptimized_code->GetHeap()->incremental_marking()->RecordCodeTargetPatch(
       unoptimized_code, pc_after - 4 * kInstrSize, replacement_code);
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
@@ -194,17 +187,17 @@ void Deoptimizer::RevertInterruptCodeAt(Code* unoptimized_code,
   interrupt_code->GetHeap()->incremental_marking()->RecordCodeTargetPatch(
       unoptimized_code, pc_after - 4 * kInstrSize, interrupt_code);
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
-#if 0
+
 #ifdef DEBUG
 bool Deoptimizer::InterruptCodeIsPatched(Code* unoptimized_code,
                                          Address pc_after,
                                          Code* interrupt_code,
                                          Code* replacement_code) {
+#if 0
   static const int kInstrSize = Assembler::kInstrSize;
   ASSERT(Assembler::IsBeq(Assembler::instr_at(pc_after - 5 * kInstrSize)));
   if (Assembler::IsAddImmediate(
@@ -219,11 +212,17 @@ bool Deoptimizer::InterruptCodeIsPatched(Code* unoptimized_code,
         reinterpret_cast<uint32_t>(interrupt_code->entry()));
     return false;
   }
+#else
+  UNIMPLEMENTED();
+  return false;
+#endif
 }
 #endif  // DEBUG
 
 
+#if 0
 static int LookupBailoutId(DeoptimizationInputData* data, BailoutId ast_id) {
+#if 0
   ByteArray* translations = data->TranslationByteArray();
   int length = data->DeoptCount();
   for (int i = 0; i < length; i++) {
@@ -238,9 +237,13 @@ static int LookupBailoutId(DeoptimizationInputData* data, BailoutId ast_id) {
   }
   UNREACHABLE();
   return -1;
-}
-
+#else
+  UNIMPLEMENTED();
+  return -1;
 #endif
+}
+#endif
+
 
 void Deoptimizer::DoComputeOsrOutputFrame() {
 #if 0
@@ -386,8 +389,7 @@ void Deoptimizer::DoComputeOsrOutputFrame() {
     PrintF(" => pc=0x%0x]\n", output_[0]->GetPc());
   }
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
@@ -412,8 +414,7 @@ void Deoptimizer::FillInputFrame(Address tos, JavaScriptFrame* frame) {
     input_->SetFrameSlot(i, Memory::uint32_at(tos + i));
   }
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
@@ -432,8 +433,7 @@ void Deoptimizer::SetPlatformCompiledStubRegisters(
   output_frame->SetRegister(s1.code(), (params - 1) * kPointerSize);
   output_frame->SetRegister(s2.code(), handler);
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
@@ -445,8 +445,7 @@ void Deoptimizer::CopyDoubleRegisters(FrameDescription* output_frame) {
     output_frame->SetDoubleRegister(i, double_value);
   }
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
@@ -667,10 +666,10 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ Jump(at);
   __ stop("Unreachable.");
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
+
 
 // Maximum size of a table entry generated below.
 const int Deoptimizer::table_entry_size_ = 9 * Assembler::kInstrSize;
@@ -714,11 +713,11 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
   ASSERT_EQ(masm()->SizeOfCodeGeneratedSince(&table_start),
       count() * table_entry_size_);
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNIMPLEMENTED();
 #endif
 }
 
 #undef __
+
 
 } }  // namespace v8::internal

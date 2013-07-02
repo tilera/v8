@@ -63,7 +63,31 @@ class RecordWriteStub: public PlatformCodeStub {
 
   static void PatchBranchIntoNop(MacroAssembler* masm, int pos);
   static void PatchNopIntoBranch(MacroAssembler* masm, int pos);
-  static Mode GetMode(Code* stub);
+  static Mode GetMode(Code* stub) {
+#if 0
+    Instr first_instruction = Assembler::instr_at(stub->instruction_start());
+    Instr second_instruction = Assembler::instr_at(stub->instruction_start() +
+                                                   2 * Assembler::kInstrSize);
+
+    if (Assembler::IsBeq(first_instruction)) {
+      return INCREMENTAL;
+    }
+
+    ASSERT(Assembler::IsBne(first_instruction));
+
+    if (Assembler::IsBeq(second_instruction)) {
+      return INCREMENTAL_COMPACTION;
+    }
+
+    ASSERT(Assembler::IsBne(second_instruction));
+
+    return STORE_BUFFER_ONLY;
+#else
+	  UNIMPLEMENTED();
+          return STORE_BUFFER_ONLY;
+#endif
+  }
+
   static void Patch(Code* stub, Mode mode) {
 	  UNIMPLEMENTED();
   }

@@ -39,6 +39,8 @@ namespace internal {
 const int kNumRegs = 64;
 
 const RegList kJSCallerSaved =
+  1L << 0  |  // r0
+  1L << 1  |  // r1
   1L << 2  |  // r2
   1L << 3  |  // r3
   1L << 4  |  // r4

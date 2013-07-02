@@ -625,6 +625,9 @@ class Assembler : public AssemblerBase {
   static bool IsMOVELI(Instr instr);
   static bool IsSHL16INSLI(Instr instr);
 
+  static uint32_t GetLabelConst(Instr instr);
+  static bool IsEmittedConstant(Instr instr);
+
   // Return the code target address at a call site from the return address
   // of that call in the instruction stream.
   inline static Address target_address_from_return_address(Address pc);
@@ -662,6 +665,7 @@ class Assembler : public AssemblerBase {
 
   PositionsRecorder* positions_recorder() { return &positions_recorder_; }
 
+  static const int kMaxRelocSize = RelocInfoWriter::kMaxSize;
   RelocInfoWriter reloc_info_writer;
 
   static const int kPatchReturnSequenceAddressOffset = 0;

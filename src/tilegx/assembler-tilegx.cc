@@ -409,7 +409,7 @@ void Assembler::target_at_put(int32_t pos, int32_t target_pos) {
                  instr_shl16insli_1 | create_Imm16_X1(imm));
   } else {
     uint32_t imm30 = reinterpret_cast<uint64_t>(buffer_) + target_pos;
-    ASSERT((imm28 & 7) == 0);
+    ASSERT((imm30 & 7) == 0);
 
     instr &= ~create_JumpOff_X1(-1);
     uint32_t imm27 = imm30 >> 3;
@@ -830,6 +830,15 @@ int32_t Assembler::get_trampoline_entry(int32_t pos) {
     }
   }
   return trampoline_entry;
+}
+
+uint32_t Assembler::GetLabelConst(Instr instr) {
+  return instr & ~kImm16Mask;
+}
+
+bool Assembler::IsEmittedConstant(Instr instr) {
+  uint32_t label_constant = GetLabelConst(instr);
+  return label_constant == 0;  // Emitted label const in reg-exp engine.
 }
 
 } }  // namespace v8::internal
