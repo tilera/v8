@@ -190,88 +190,88 @@ Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
   unbound_labels_count_ = 0;
 }
 
-void Assembler::st(const Register& rd, const MemOperand& rs) {
+void Assembler::st(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
     Instr instr = ADDLI_X1 | DEST_X1(tt.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
-    emit(instr);
+    emit(instr, line);
     instr = ST_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
-    emit(instr);
+    emit(instr, line);
   } else
-    st(rd, rs.rm());
+    st(rd, rs.rm(), line);
 }
 
-void Assembler::st(const Register& rd, const Register& rs) {
+void Assembler::st(const Register& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = ST_X1 | SRCA_X1(rs.code()) | SRCB_X1(rd.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::ld(const Register& rd, const MemOperand& rs) {
+void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
     Instr instr = ADDLI_X1 | DEST_X1(tt.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
-    emit(instr);
+    emit(instr, line);
     instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
-    emit(instr);
+    emit(instr, line);
   } else
-    ld(rd, rs.rm());
+    ld(rd, rs.rm(), line);
 }
 
-void Assembler::ld(const Register& rd, const Register& rs) {
+void Assembler::ld(const Register& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::add(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::add(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = ADD_X1 | DEST_X1(rd.code())
 	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::sub(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::sub(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = SUB_X1 | DEST_X1(rd.code())
 	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::addi(const Register& rd, const Register& rs, int8_t imm) {
+void Assembler::addi(const Register& rd, const Register& rs, int8_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && is_int8(imm));
   Instr instr = ADDI_X1 | DEST_X1(rd.code())
 	                | SRCA_X1(rs.code()) | IMM8_X1(imm);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::addli(const Register& rd, const Register& rs, int16_t imm) {
+void Assembler::addli(const Register& rd, const Register& rs, int16_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && is_int16(imm));
   Instr instr = ADDLI_X1 | DEST_X1(rd.code())
 	                 | SRCA_X1(rs.code()) | IMM16_X1(imm);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::shl16insli(const Register& rd, const Register& rs, int16_t imm) {
+void Assembler::shl16insli(const Register& rd, const Register& rs, int16_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && is_int16(imm));
   Instr instr = SHL16INSLI_X1 | DEST_X1(rd.code())
 	                      | SRCA_X1(rs.code()) | IMM16_X1(imm);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::moveli(const Register& rd, int16_t imm) {
+void Assembler::moveli(const Register& rd, int16_t imm, int line) {
   ASSERT(rd.is_valid() && is_int16(imm));
   Instr instr = MOVELI_X1 | DEST_X1(rd.code()) | IMM16_X1(imm);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::move(const Register& rd, const Register& rs) {
+void Assembler::move(const Register& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = ADD_X1 | DEST_X1(rd.code())
 	               | SRCA_X1(zero.code()) | SRCB_X1(rs.code());
-  emit(instr);
+  emit(instr, line);
 }
 
 void Assembler::GetCode(CodeDesc* desc) {
@@ -320,6 +320,8 @@ int Assembler::target_at(int32_t pos) {
      }
   }
   // Check we have a branch or jump instruction.
+  printf("==> ");
+  print_insn_tilegx((unsigned char *)&instr);
   ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
   // Do NOT change this to << 3. We rely on arithmetic shifts here, assuming
   // the compiler uses arithmectic shifts for signed integers.
@@ -571,92 +573,92 @@ void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {
 }
 
 
-void Assembler::b(int32_t offset) {
-  beqz(zero, offset);
+void Assembler::b(int32_t offset, int line) {
+  beqz(zero, offset, line);
 }
 
-void Assembler::beqz(const Register& rs, int32_t offset) {
+void Assembler::beqz(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BEQZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::bnez(const Register& rs, int32_t offset) {
+void Assembler::bnez(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BNEZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::bgez(const Register& rs, int32_t offset) {
+void Assembler::bgez(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BGEZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::bgtz(const Register& rs, int32_t offset) {
+void Assembler::bgtz(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BGTZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::blez(const Register& rs, int32_t offset) {
+void Assembler::blez(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BLEZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::bltz(const Register& rs, int32_t offset) {
+void Assembler::bltz(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BLTZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmpeq(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPEQ_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmpne(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::cmpne(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPNE_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmplts(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::cmplts(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPLTS_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmpltsi(const Register& rd, const Register& rsa, int8_t imm) {
+void Assembler::cmpltsi(const Register& rd, const Register& rsa, int8_t imm, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && is_int8(imm));
   Instr instr = CMPLTSI_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | IMM8_X1(imm);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmples(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::cmples(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPLES_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmpltu(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::cmpltu(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPLTU_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmpltui(const Register& rd, const Register& rsa, int8_t imm) {
+void Assembler::cmpltui(const Register& rd, const Register& rsa, int8_t imm, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && is_int8(imm));
   Instr instr = CMPLTUI_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | IMM8_X1(imm);
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::cmpleu(const Register& rd, const Register& rsa, const Register& rsb) {
+void Assembler::cmpleu(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPLEU_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
-  emit(instr);
+  emit(instr, line);
 }
 
 int32_t Assembler::branch_offset(Label* L, bool jump_elimination_allowed) {
@@ -713,19 +715,19 @@ uint32_t Assembler::jump_address(Label* L) {
   return imm;
 }
 
-void Assembler::jr(Register rs) {
+void Assembler::jr(Register rs, int line) {
   if (rs.is(lr)) {
     positions_recorder()->WriteRecordedPositions();
   }
 
   Instr instr = JR_X1 | SRCA_X1(rs.code());
-  emit(instr);
+  emit(instr, line);
 }
 
-void Assembler::jalr(Register rs) {
+void Assembler::jalr(Register rs, int line) {
   positions_recorder()->WriteRecordedPositions();
   Instr instr = JALR_X1 | SRCA_X1(rs.code());
-  emit(instr);
+  emit(instr, line);
 }
 
 // We have to use a temporary register for things that can be relocated even

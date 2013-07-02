@@ -341,9 +341,11 @@ bool Operand::is_reg() const {
   return rm_.is_valid();
 }
 
-void Assembler::emit(Instr x) {
+void Assembler::emit(Instr x, int line) {
   CheckBuffer();
   *reinterpret_cast<Instr*>(pc_) = x;
+  printf("[%05d]", line);
+  print_insn_tilegx((unsigned char *)pc_);
   pc_ += kInstrSize;
 }
 

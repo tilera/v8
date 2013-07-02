@@ -45,6 +45,8 @@
 namespace v8 {
 namespace internal {
 
+int print_insn_tilegx (unsigned char * memaddr);
+
 /* Opcode Helper Macros */
 #define TILEGX_X_MODE 0
 
@@ -690,45 +692,45 @@ class Assembler : public AssemblerBase {
   // ---------------------------------------------------------------------------
   // Instruction Encoding
   
-  void j(int64_t target);
-  void jr(Register target);
-  void jalr(Register target);
+  void j(int64_t target, int line = 0);
+  void jr(Register target, int line = 0);
+  void jalr(Register target, int line = 0);
 
-  void b(int32_t offset);
-  void b(Label* L) { b(branch_offset(L, false)>>3); }
-  void beqz(const Register& rs, int32_t offset);
-  void beqz(const Register& rs, Label* L) {
-    beqz(rs, branch_offset(L, false) >> 3);
+  void b(int32_t offset, int line = 0);
+  void b(Label* L, int line = 0) { b(branch_offset(L, false)>>3, line); }
+  void beqz(const Register& rs, int32_t offset, int line = 0);
+  void beqz(const Register& rs, Label* L, int line = 0) {
+    beqz(rs, branch_offset(L, false) >> 3, line);
   }
-  void bnez(const Register& rs, int32_t offset);
-  void bnez(const Register& rs, Label* L) {
-    bnez(rs, branch_offset(L, false)>>3);
+  void bnez(const Register& rs, int32_t offset, int line = 0);
+  void bnez(const Register& rs, Label* L, int line = 0) {
+    bnez(rs, branch_offset(L, false)>>3, line);
   }
-  void bgez(const Register& rs, int32_t offset);
-  void bgtz(const Register& rs, int32_t offset);
-  void blez(const Register& rs, int32_t offset);
-  void bltz(const Register& rs, int32_t offset);
+  void bgez(const Register& rs, int32_t offset, int line = 0);
+  void bgtz(const Register& rs, int32_t offset, int line = 0);
+  void blez(const Register& rs, int32_t offset, int line = 0);
+  void bltz(const Register& rs, int32_t offset, int line = 0);
 
-  void cmpeq(const Register& rd, const Register& rsa, const Register& rsb);
-  void cmpne(const Register& rd, const Register& rsa, const Register& rsb);
-  void cmplts(const Register& rd, const Register& rsa, const Register& rsb);
-  void cmpltsi(const Register& rd, const Register& rsa, int8_t imm);
-  void cmples(const Register& rd, const Register& rsa, const Register& rsb);
-  void cmpltu(const Register& rd, const Register& rsa, const Register& rsb);
-  void cmpltui(const Register& rd, const Register& rsa, int8_t imm);
-  void cmpleu(const Register& rd, const Register& rsa, const Register& rsb);
+  void cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void cmpne(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void cmplts(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void cmpltsi(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
+  void cmples(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void cmpltu(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void cmpltui(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
+  void cmpleu(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 
-  void st(const Register& rd, const MemOperand& rs);
-  void st(const Register& rd, const Register& rs);
-  void ld(const Register& rd, const MemOperand& rs);
-  void ld(const Register& rd, const Register& rs);
-  void add(const Register& rd, const Register& rsa, const Register& rsb);
-  void sub(const Register& rd, const Register& rsa, const Register& rsb);
-  void addi(const Register& rd, const Register& rs, int8_t imm);
-  void addli(const Register& rd, const Register& rs, int16_t imm);
-  void moveli(const Register& rd, int16_t imm);
-  void shl16insli(const Register& rd, const Register& rs, int16_t imm);
-  void move(const Register& rt, const Register& rs);
+  void st(const Register& rd, const MemOperand& rs, int line = 0);
+  void st(const Register& rd, const Register& rs, int line = 0);
+  void ld(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld(const Register& rd, const Register& rs, int line = 0);
+  void add(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void sub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void addi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
+  void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void moveli(const Register& rd, int16_t imm, int line = 0);
+  void shl16insli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void move(const Register& rt, const Register& rs, int line = 0);
 
   // Check if an instruction is a branch of some kind.
   static bool IsNop(Instr instr, unsigned int type);
@@ -799,7 +801,7 @@ class Assembler : public AssemblerBase {
 
   inline void CheckBuffer();
   void GrowBuffer();
-  inline void emit(Instr x);
+  inline void emit(Instr x, int line = 0);
 
   PositionsRecorder positions_recorder_;
 

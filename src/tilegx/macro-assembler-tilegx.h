@@ -408,13 +408,13 @@ class MacroAssembler: public Assembler {
   void mov(Register rd, Register rt) { UNREACHABLE(); }
 
   // Load int32 in the rd register.
-  void li(Register rd, Operand j, LiFlags mode = CONSTANT_SIZE);
-  inline void li(Register rd, int64_t j, LiFlags mode = CONSTANT_SIZE) {
-    li(rd, Operand(j), mode);
+  void li(Register rd, Operand j, int line = 0, LiFlags mode = CONSTANT_SIZE);
+  inline void li(Register rd, int64_t j, int line = 0, LiFlags mode = CONSTANT_SIZE) {
+    li(rd, Operand(j), line, mode);
   }
   inline void li(Register dst, Handle<Object> value,
-                 LiFlags mode = CONSTANT_SIZE) {
-    li(dst, Operand(value), mode);
+                 int line = 0, LiFlags mode = CONSTANT_SIZE) {
+    li(dst, Operand(value), line, mode);
   }
 
   // Push multiple registers on the stack.

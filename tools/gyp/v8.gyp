@@ -623,6 +623,7 @@
             '../../src/tilegx/deoptimizer-tilegx.cc',
             '../../src/tilegx/cpu-tilegx.cc',
             '../../src/tilegx/disasm-tilegx.cc',
+            '../../src/tilegx/disasm-tilegx-inl.cc',
             '../../src/tilegx/full-codegen-tilegx.cc',
             '../../src/tilegx/deoptimizer-tilegx.cc',
           ],

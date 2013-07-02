@@ -239,17 +239,17 @@ void MacroAssembler::Ror(Register rd, Register rs, const Operand& rt) { UNREACHA
 
 //------------Pseudo-instructions-------------
 
-void MacroAssembler::li(Register rd, Operand j, LiFlags mode) {
+void MacroAssembler::li(Register rd, Operand j, int line, LiFlags mode) {
   ASSERT(!j.is_reg());
   if (MustUseReg(j.rmode_)) {
     RecordRelocInfo(j.rmode_, j.imm64_);
   }
   // We always need the same number of instructions as we may need to patch
   // this code to load another value which may need 2 instructions to load.
-  moveli(rd, (j.imm64_ >> 48) & 0xFFFF);
-  shl16insli(rd, rd, (j.imm64_ >> 32) & 0xFFFF);
-  shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF);
-  shl16insli(rd, rd, j.imm64_ & 0xFFFF);
+  moveli(rd, (j.imm64_ >> 48) & 0xFFFF, line);
+  shl16insli(rd, rd, (j.imm64_ >> 32) & 0xFFFF, line);
+  shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF, line);
+  shl16insli(rd, rd, j.imm64_ & 0xFFFF, line);
 }
 
 

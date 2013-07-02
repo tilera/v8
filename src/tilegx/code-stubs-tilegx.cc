@@ -3715,10 +3715,10 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ li(t1, Operand(Smi::FromInt(marker)));
   __ li(t0, Operand(ExternalReference(Isolate::kCEntryFPAddress,
                                       isolate)));
-  __ ld(t0, MemOperand(t0));
+  __ ld(t0, MemOperand(t0), __LINE__);
   __ Push(t3, t2, t1, t0);
   // Set up frame pointer for the frame to be pushed.
-  __ addi(fp, sp, -EntryFrameConstants::kCallerFPOffset);
+  __ addi(fp, sp, -EntryFrameConstants::kCallerFPOffset, __LINE__);
 
   // Registers:
   // r0: entry_address
@@ -3737,10 +3737,10 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   // If this is the outermost JS call, set js_entry_sp value.
   Label non_outermost_js;
   ExternalReference js_entry_sp(Isolate::kJSEntrySPAddress, isolate);
-  __ li(t1, Operand(ExternalReference(js_entry_sp)));
-  __ ld(t2, MemOperand(t1));
+  __ li(t1, Operand(ExternalReference(js_entry_sp)), __LINE__);
+  __ ld(t2, MemOperand(t1), __LINE__);
   __ Branch(&non_outermost_js, ne, t2, Operand(zero));
-  __ st(fp, MemOperand(t1));
+  __ st(fp, MemOperand(t1), __LINE__);
   __ li(t0, Operand(Smi::FromInt(StackFrame::OUTERMOST_JSENTRY_FRAME)));
   Label cont;
   __ b(&cont);
@@ -3761,8 +3761,8 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
   __ st(r0, MemOperand(t0));  // We come back from 'invoke'. result is in v0.
-  __ li(r0, Operand(reinterpret_cast<int64_t>(Failure::Exception())));
-  __ b(&exit);  // b exposes branch delay slot.
+  __ li(r0, Operand(reinterpret_cast<int64_t>(Failure::Exception())), __LINE__);
+  __ b(&exit, __LINE__);  // b exposes branch delay slot.
 
   // Invoke: Link this frame into the handler chain.  There's only one
   // handler block in this code object, so its index is 0.
@@ -3777,7 +3777,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ LoadRoot(t1, Heap::kTheHoleValueRootIndex);
   __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
-  __ st(t1, MemOperand(t0));
+  __ st(t1, MemOperand(t0), __LINE__);
 
   // Invoke the function by calling through JS entry trampoline builtin.
   // Notice that we cannot store a reference to the trampoline code directly in
@@ -3800,15 +3800,15 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   if (is_construct) {
     ExternalReference construct_entry(Builtins::kJSConstructEntryTrampoline,
                                       isolate);
-    __ li(t0, Operand(construct_entry));
+    __ li(t0, Operand(construct_entry), __LINE__);
   } else {
     ExternalReference entry(Builtins::kJSEntryTrampoline, masm->isolate());
-    __ li(t0, Operand(entry));
+    __ li(t0, Operand(entry), __LINE__);
   }
-  __ ld(t0, MemOperand(t0));  // Deref address.
+  __ ld(t0, MemOperand(t0), __LINE__);  // Deref address.
 
   // Call JSEntryTrampoline.
-  __ addli(t0, t0, Code::kHeaderSize - kHeapObjectTag);
+  __ addli(t0, t0, Code::kHeaderSize - kHeapObjectTag, __LINE__);
   __ Call(t0);
 
   // Unlink this frame from the handler chain.
