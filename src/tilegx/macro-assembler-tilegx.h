@@ -879,6 +879,7 @@ class MacroAssembler: public Assembler {
 #endif
 
  private:
+  void BranchShort(Label* L);
   void BranchShort(Label* L, Condition cond, Register rs, const Operand& rt);
 
   bool generating_stub_;

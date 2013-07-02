@@ -487,6 +487,10 @@ const Register no_reg = { kRegister_no_reg_Code };
 #define kLithiumScratchReg r47
 #define kLithiumScratchReg2 r48
 
+int ToNumber(Register reg);
+
+Register ToRegister(int num);
+
 // Class Operand represents a shifter operand in data processing instructions.
 class Operand BASE_EMBEDDED {
  public:
@@ -601,6 +605,8 @@ class Assembler : public AssemblerBase {
     return o >> 3;
   }
 
+  uint32_t jump_address(Label* L);
+
   static const int kInstrSize = sizeof(Instr);
 
   static Instr instr_at(byte* pc) { return *reinterpret_cast<Instr*>(pc); }
@@ -612,6 +618,12 @@ class Assembler : public AssemblerBase {
     *reinterpret_cast<Instr*>(buffer_ + pos) = instr;
   }
 
+  static bool IsBranch(Instr instr);
+  static bool IsJ(Instr instr);
+  static bool IsJR(Instr instr);
+  static bool IsJAL(Instr instr);
+  static bool IsMOVELI(Instr instr);
+  static bool IsSHL16INSLI(Instr instr);
 
   // Return the code target address at a call site from the return address
   // of that call in the instruction stream.
@@ -647,9 +659,6 @@ class Assembler : public AssemblerBase {
         instruction_payload - kInstructionsFor32BitConstant * kInstrSize,
         target);
   }
-
-  int64_t buffer_space() const { return reloc_info_writer.pos() - pc_; }
-
 
   PositionsRecorder* positions_recorder() { return &positions_recorder_; }
 
@@ -726,6 +735,17 @@ class Assembler : public AssemblerBase {
   // Record reloc info for current pc_.
   void RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data = 0);
 
+  int64_t buffer_space() const { return reloc_info_writer.pos() - pc_; }
+
+  // Decode branch instruction at pos and return branch target pos.
+  int target_at(int32_t pos);
+
+  // Patch branch instruction at pos to branch to given branch target pos.
+  void target_at_put(int32_t pos, int32_t target_pos);
+
+  // Say if we need to relocate with this mode.
+  bool MustUseReg(RelocInfo::Mode rmode);
+
  private:
   // Code generation
   // The relocation writer's position is at least kGap bytes below the end of
@@ -739,6 +759,88 @@ class Assembler : public AssemblerBase {
   inline void emit(Instr x);
 
   PositionsRecorder positions_recorder_;
+
+  int next_buffer_check_;  // pc offset of next buffer check.
+
+  // Emission of the trampoline pool may be blocked in some code sequences.
+  int trampoline_pool_blocked_nesting_;  // Block emission if this is not zero.
+  int no_trampoline_pool_before_;  // Block emission before this pc offset.
+
+  // Keep track of the last emitted pool to guarantee a maximal distance.
+  int last_trampoline_pool_end_;  // pc offset of the end of the last pool.
+
+  // Automatic growth of the assembly buffer may be blocked for some sequences.
+  bool block_buffer_growth_;  // Block growth when true.
+
+  // The bound position, before this we cannot do instruction elimination.
+  int last_bound_pos_;
+
+  // One trampoline consists of:
+  // - space for trampoline slots,
+  // - space for labels.
+  //
+  // Space for trampoline slots is equal to slot_count * 2 * kInstrSize.
+  // Space for trampoline slots preceeds space for labels. Each label is of one
+  // instruction size, so total amount for labels is equal to
+  // label_count *  kInstrSize.
+  class Trampoline {
+   public:
+    Trampoline() {
+      start_ = 0;
+      next_slot_ = 0;
+      free_slot_count_ = 0;
+      end_ = 0;
+    }
+    Trampoline(int start, int slot_count) {
+      start_ = start;
+      next_slot_ = start;
+      free_slot_count_ = slot_count;
+      end_ = start + slot_count * kTrampolineSlotsSize;
+    }
+    int start() {
+      return start_;
+    }
+    int end() {
+      return end_;
+    }
+    int take_slot() {
+      int trampoline_slot = kInvalidSlotPos;
+      if (free_slot_count_ <= 0) {
+        // We have run out of space on trampolines.
+        // Make sure we fail in debug mode, so we become aware of each case
+        // when this happens.
+        ASSERT(0);
+        // Internal exception will be caught.
+      } else {
+        trampoline_slot = next_slot_;
+        free_slot_count_--;
+        next_slot_ += kTrampolineSlotsSize;
+      }
+      return trampoline_slot;
+    }
+
+   private:
+    int start_;
+    int end_;
+    int next_slot_;
+    int free_slot_count_;
+  };
+
+  int32_t get_trampoline_entry(int32_t pos);
+  int unbound_labels_count_;
+  // If trampoline is emitted, generated code is becoming large. As this is
+  // already a slow case which can possibly break our code generation for the
+  // extreme case, we use this information to trigger different mode of
+  // branch instruction generation, where we use jump instructions rather
+  // than regular branch instructions.
+  bool trampoline_emitted_;
+  static const int kTrampolineSlotsSize = 4 * kInstrSize;
+  static const int kMaxBranchOffset = (1 << 18) - 1;
+  static const int kInvalidSlotPos = -1;
+
+  Trampoline trampoline_;
+  bool internal_trampoline_exception_;
+
 
   friend class EnsureSpace;
   friend class CodePatcher;

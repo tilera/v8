@@ -280,16 +280,15 @@ void MacroAssembler::FlushICache(Register address, unsigned instructions) { UNRE
 
 void MacroAssembler::Jr(Label* L) {
 
-  uint64_t imm64;
-  imm64 = jump_address(L);
+  uint64_t imm64 = jump_address(L);
   {
     // Buffer growth (and relocation) must be blocked for internal references
     // until associated instructions are emitted and available to be patched.
     RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
-    moveli(tt, (imm64_ >> 48) & 0xFFFF);
-    shl16insli(tt, tt, (imm64_ >> 32) & 0xFFFF);
-    shl16insli(tt, tt, (imm64_ >> 16) & 0xFFFF);
-    shl16insli(tt, tt, imm64_ & 0xFFFF);
+    moveli(tt, (imm64 >> 48) & 0xFFFF);
+    shl16insli(tt, tt, (imm64 >> 32) & 0xFFFF);
+    shl16insli(tt, tt, (imm64 >> 16) & 0xFFFF);
+    shl16insli(tt, tt, imm64 & 0xFFFF);
   }
   jr(tt);
 }
@@ -327,16 +326,16 @@ void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
                             const Operand& rt) {
   if (L->is_bound()) {
     if (is_near(L)) {
-      BranchShort(L, cond, rs, rt, bdslot);
+      BranchShort(L, cond, rs, rt);
     } else {
       Label skip;
       Condition neg_cond = NegateCondition(cond);
       BranchShort(&skip, neg_cond, rs, rt);
-      Jr(L, bdslot);
+      Jr(L);
       bind(&skip);
     }
   } else
-    BranchShort(L, cond, rs, rt, bdslot);
+    BranchShort(L, cond, rs, rt);
 }
 
 void MacroAssembler::BranchShort(Label* L) {
@@ -796,7 +795,7 @@ void MacroAssembler::PopTryHandler() {
   pop(r1);
   Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
   li(tt, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
-  st(a1, MemOperand(tt));
+  st(r1, MemOperand(tt));
 }
 
 

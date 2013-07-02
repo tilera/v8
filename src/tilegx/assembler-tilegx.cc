@@ -75,10 +75,119 @@ void CpuFeatures::Probe() {
   // No further probing currently, may be extended in future.
 }
 
+// Determines the end of the Jump chain (a subset of the label link chain).
+const int kEndOfJumpChain = 0;
+
+bool Assembler::IsBranch(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X1_OPC = get_Opcode_X1(instr);
+
+  // Checks if the instruction is a branch.
+  return X1_OPC == BRANCH_OPCODE_X1;
+}
+
+bool Assembler::IsJ(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1, X1_SUB_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X1_OPC = get_Opcode_X1(instr);
+  X1_SUB_OPC = get_JumpOpcodeExtension_X1(instr);
+
+  // Checks if the instruction is a jump.
+  return X1_OPC == JUMP_OPCODE_X1 && X1_SUB_OPC == J_JUMP_OPCODE_X1;
+}
+
+bool Assembler::IsJAL(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1, X1_SUB_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X1_OPC = get_Opcode_X1(instr);
+  X1_SUB_OPC = get_JumpOpcodeExtension_X1(instr);
+
+  // Checks if the instruction is a jal.
+  return X1_OPC == JUMP_OPCODE_X1 && X1_SUB_OPC == JAL_JUMP_OPCODE_X1;
+}
+
+bool Assembler::IsJR(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1, X1_SUB1_OPC = -1, X1_SUB2_OPC = -1;
+  int32_t Y1_OPC = -1, Y1_SUB1_OPC = -1, Y1_SUB2_OPC = -1;
+
+  if (mode != 0) {
+    Y1_OPC = get_Opcode_Y1(instr);
+    Y1_SUB1_OPC = get_RRROpcodeExtension_Y1(instr);
+    Y1_SUB2_OPC = get_UnaryOpcodeExtension_Y1(instr);
+  } else {
+    X1_OPC = get_Opcode_X1(instr);
+    X1_SUB1_OPC = get_RRROpcodeExtension_X1(instr);
+    X1_SUB2_OPC = get_UnaryOpcodeExtension_X1(instr);
+  }
+
+  // Checks if the instruction is a jr.
+  return (X1_OPC == RRR_0_OPCODE_X1 && X1_SUB1_OPC == UNARY_RRR_0_OPCODE_X1
+          && X1_SUB2_OPC == JR_UNARY_OPCODE_X1)
+         || (Y1_OPC == RRR_1_OPCODE_Y1 && Y1_SUB1_OPC == UNARY_RRR_1_OPCODE_Y1
+             && Y1_SUB2_OPC == JR_UNARY_OPCODE_Y1);
+}
+
+bool Assembler::IsSHL16INSLI(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X0_OPC = -1, X1_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X0_OPC = get_Opcode_X0(instr);
+  X1_OPC = get_Opcode_X1(instr);
+
+  // Checks if the instruction is a shl16insli which
+  // is used for constant loading.
+  return X0_OPC == SHL16INSLI_OPCODE_X0 || X1_OPC == SHL16INSLI_OPCODE_X1;
+}
+
+bool Assembler::IsMOVELI(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X0_OPC = -1, X1_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X0_OPC = get_Opcode_X0(instr);
+  X1_OPC = get_Opcode_X1(instr);
+
+  // Checks if the instruction is a moveli which is
+  // used for constant loading and is actually alias
+  // of addli.
+  return X0_OPC == ADDLI_OPCODE_X0 || X1_OPC == ADDLI_OPCODE_X1;
+}
+
 Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
     : AssemblerBase(isolate, buffer, buffer_size),
       positions_recorder_(this) {
   reloc_info_writer.Reposition(buffer_ + buffer_size_, pc_);
+
+  last_trampoline_pool_end_ = 0;
+  no_trampoline_pool_before_ = 0;
+  trampoline_pool_blocked_nesting_ = 0;
+  // We leave space (16 * kTrampolineSlotsSize)
+  // for BlockTrampolinePoolScope buffer.
+  next_buffer_check_ = kMaxBranchOffset - kTrampolineSlotsSize * 16;
+  internal_trampoline_exception_ = false;
+  last_bound_pos_ = 0;
+
+  trampoline_emitted_ = false;
+  unbound_labels_count_ = 0;
 }
 
 void Assembler::st(const Register& rd, const MemOperand& rs) {
@@ -197,6 +306,120 @@ void Assembler::print(Label* L) {
   }
 }
 
+const int kEndOfChain = -8;
+
+int Assembler::target_at(int32_t pos) {
+  Instr instr = instr_at(pos);
+  if ((instr & ~kImm16Mask) == 0) {
+    // Emitted label constant, not part of a branch.
+    if (instr == 0) {
+       return kEndOfChain;
+     } else {
+       int32_t imm18 =((instr & static_cast<int32_t>(kImm16Mask)) << 16) >> 14;
+       return (imm18 + pos);
+     }
+  }
+  // Check we have a branch or jump instruction.
+  ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
+  // Do NOT change this to <<2. We rely on arithmetic shifts here, assuming
+  // the compiler uses arithmectic shifts for signed integers.
+  if (IsBranch(instr)) {
+    int32_t imm20 = get_BrOff_X1(instr) << 3;
+
+    if (imm20 == kEndOfChain) {
+      // EndOfChain sentinel is returned directly, not relative to pc or pos.
+      return kEndOfChain;
+    } else {
+      return pos + imm20;
+    }
+  } else if (IsMOVELI(instr)) {
+    Instr instr_moveli = instr_at(pos + 0 * Assembler::kInstrSize);
+    Instr instr_shl16insli_0 = instr_at(pos + 1 * Assembler::kInstrSize);
+    Instr instr_shl16insli_1 = instr_at(pos + 2 * Assembler::kInstrSize);
+    ASSERT(IsMOVELI(instr_moveli));
+    ASSERT(IsMOVELI(instr_shl16insli_0));
+    ASSERT(IsMOVELI(instr_shl16insli_1));
+    int64_t imm = ((int64_t)get_Imm16_X1(instr_moveli)) << 32; 
+    imm |= get_Imm16_X1(instr_shl16insli_0) << 16;
+    imm |= get_Imm16_X1(instr_shl16insli_1);
+
+    if (imm == kEndOfJumpChain) {
+      // EndOfChain sentinel is returned directly, not relative to pc or pos.
+      return kEndOfChain;
+    } else {
+      uint64_t instr_address = reinterpret_cast<int64_t>(buffer_ + pos);
+      int64_t delta = instr_address - imm;
+      ASSERT(pos > delta);
+      return pos - delta;
+    }
+  } else {
+    int64_t imm30 = get_JumpOff_X1(instr) << 3;
+    if (imm30 == kEndOfJumpChain) {
+      // EndOfChain sentinel is returned directly, not relative to pc or pos.
+      return kEndOfChain;
+    } else {
+      uint64_t instr_address = reinterpret_cast<int64_t>(buffer_ + pos);
+      int64_t delta = instr_address - imm30;
+      ASSERT(pos > delta);
+      return pos - delta;
+    }
+  }
+}
+
+void Assembler::target_at_put(int32_t pos, int32_t target_pos) {
+  Instr instr = instr_at(pos);
+  if ((instr & ~kImm16Mask) == 0) {
+    ASSERT(target_pos == kEndOfChain || target_pos >= 0);
+    // Emitted label constant, not part of a branch.
+    // Make label relative to Code* of generated Code object.
+    instr_at_put(pos, target_pos + (Code::kHeaderSize - kHeapObjectTag));
+    return;
+  }
+
+  ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
+  if (IsBranch(instr)) {
+    int32_t imm20 = target_pos - pos;
+    ASSERT((imm20 & 7) == 0);
+
+    instr &= ~kImm16Mask;
+    int32_t imm17 = imm20 >> 3;
+    ASSERT(is_intn(imm17, 17));
+
+    instr_at_put(pos, (instr & (~create_BrOff_X1(-1))) | create_BrOff_X1(imm17));
+  } else if (IsMOVELI(instr)) {
+    // TileGX userspace address space is less than 48bit, although
+    // we support 64bit in theory.
+    Instr instr_moveli = instr_at(pos + 0 * Assembler::kInstrSize);
+    Instr instr_shl16insli_0 = instr_at(pos + 1 * Assembler::kInstrSize);
+    Instr instr_shl16insli_1 = instr_at(pos + 2 * Assembler::kInstrSize);
+    ASSERT(IsSHL16INSLI(instr_shl16insli_0));
+    ASSERT(IsSHL16INSLI(instr_shl16insli_1));
+    uint64_t imm = reinterpret_cast<uint64_t>(buffer_) + target_pos;
+    ASSERT((imm & 7) == 0);
+
+    instr_moveli &= ~create_Imm16_X1(-1);
+    instr_shl16insli_0 &= ~create_Imm16_X1(-1);
+    instr_shl16insli_1 &= ~create_Imm16_X1(-1);
+
+    instr_at_put(pos + 0 * Assembler::kInstrSize,
+                 instr_moveli | create_Imm16_X1(imm >> 32));
+    instr_at_put(pos + 1 * Assembler::kInstrSize,
+                 instr_shl16insli_0 | create_Imm16_X1(imm >> 16));
+    instr_at_put(pos + 2 * Assembler::kInstrSize,
+                 instr_shl16insli_1 | create_Imm16_X1(imm));
+  } else {
+    uint32_t imm30 = reinterpret_cast<uint64_t>(buffer_) + target_pos;
+    ASSERT((imm28 & 7) == 0);
+
+    instr &= ~create_JumpOff_X1(-1);
+    uint32_t imm27 = imm30 >> 3;
+    ASSERT(is_uintn(imm27, 27));
+
+    instr_at_put(pos, instr | create_JumpOff_X1(imm27));
+  }
+}
+
+// Returns the next free trampoline entry.
 void Assembler::bind_to(Label* L, int pos) {
   ASSERT(0 <= pos && pos <= pc_offset());  // Must have valid binding position.
   int32_t trampoline_pos = kInvalidSlotPos;
@@ -223,7 +446,7 @@ void Assembler::bind_to(Label* L, int pos) {
       }
       target_at_put(fixup_pos, pos);
     } else {
-      ASSERT(IsJ(instr) || IsLui(instr) || IsEmittedConstant(instr));
+      ASSERT(IsJ(instr) || IsMOVELI(instr) || IsEmittedConstant(instr));
       target_at_put(fixup_pos, pos);
     }
   }
@@ -295,6 +518,25 @@ MemOperand::MemOperand(Register rm, int64_t offset) : Operand(rm) {
   offset_ = offset;
 }
 
+Operand::Operand(Handle<Object> handle) {
+#ifdef DEBUG
+  Isolate* isolate = Isolate::Current();
+#endif
+  ALLOW_HANDLE_DEREF(isolate, "using and embedding raw address");
+  rm_ = no_reg;
+  // Verify all Objects referred by code are NOT in new space.
+  Object* obj = *handle;
+  ASSERT(!isolate->heap()->InNewSpace(obj));
+  if (obj->IsHeapObject()) {
+    imm64_ = reinterpret_cast<intptr_t>(handle.location());
+    rmode_ = RelocInfo::EMBEDDED_OBJECT;
+  } else {
+    // No relocation needed.
+    imm64_ = reinterpret_cast<intptr_t>(obj);
+    rmode_ = RelocInfo::NONE32;
+  }
+}
+
 bool RelocInfo::IsCodedSpecially() {
   // The deserializer needs to know whether a pointer is specially coded.  Being
   // specially coded on MIPS means that it is a lui/ori instruction, and that is
@@ -328,43 +570,42 @@ void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {
 
 }
 
-const int kEndOfChain = -8;
 
 void Assembler::b(int32_t offset) {
   beqz(zero, offset);
 }
 
-void Assembler::beqz(Register rs, int32_t offset) {
+void Assembler::beqz(const Register& rs, int32_t offset) {
   ASSERT(rs.is_valid());
   Instr instr = BEQZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
   emit(instr);
 }
 
-void Assembler::bnez(Register rs, int32_t offset) {
+void Assembler::bnez(const Register& rs, int32_t offset) {
   ASSERT(rs.is_valid());
   Instr instr = BNEZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
   emit(instr);
 }
 
-void Assembler::bgez(Register rs, int32_t offset) {
+void Assembler::bgez(const Register& rs, int32_t offset) {
   ASSERT(rs.is_valid());
   Instr instr = BGEZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
   emit(instr);
 }
 
-void Assembler::bgtz(Register rs, int32_t offset) {
+void Assembler::bgtz(const Register& rs, int32_t offset) {
   ASSERT(rs.is_valid());
   Instr instr = BGTZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
   emit(instr);
 }
 
-void Assembler::blez(Register rs, int32_t offset) {
+void Assembler::blez(const Register& rs, int32_t offset) {
   ASSERT(rs.is_valid());
   Instr instr = BLEZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
   emit(instr);
 }
 
-void Assembler::bltz(Register rs, int32_t offset) {
+void Assembler::bltz(const Register& rs, int32_t offset) {
   ASSERT(rs.is_valid());
   Instr instr = BLTZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
   emit(instr);
@@ -446,7 +687,7 @@ void Assembler::GrowBuffer() {
 
 bool Assembler::is_near(Label* L) {
   if (L->is_bound()) {
-    return (pc_offset() - L->pos()) < (1 << 18 - 1);
+    return (pc_offset() - L->pos()) < ((1 << 18) - 1);
   }
   return false;
 }
@@ -479,6 +720,116 @@ void Assembler::jr(Register rs) {
 
   Instr instr = JR_X1 | SRCA_X1(rs.code());
   emit(instr);
+}
+
+// We have to use a temporary register for things that can be relocated even
+// if they can be encoded in the MIPS's 16 bits of immediate-offset instruction
+// space.  There is no guarantee that the relocated location can be similarly
+// encoded.
+bool Assembler::MustUseReg(RelocInfo::Mode rmode) {
+  return !RelocInfo::IsNone(rmode);
+}
+
+int ToNumber(Register reg) {
+  ASSERT(reg.is_valid());
+  const int kNumbers[] = {
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+  };
+  return kNumbers[reg.code()];
+}
+
+Register ToRegister(int num) {
+  ASSERT(num >= 0 && num < kNumRegisters);
+  const Register kRegisters[] = {
+    r0, r1, r2, r3, r4, r5, r6, r7,
+    r8, r9, r10, r11, r12, r13, r14, r15,
+    r16, r17, r18, r19, r20, r21, r22, r23,
+    r24, r25, r26, r27, r28, r29, r30, r31,
+    r32, r33, r34, r35, r36, r37, r38, r39,
+    r40, r41, r42, r43, r44, r45, r46, r47,
+    r48, r49, r50, r51, r52, r53, r54, r55,
+    r56, r57, r58, r59, r60, r61, r62, r63
+  };
+  return kRegisters[num];
+}
+
+// Returns the next free trampoline entry.
+int32_t Assembler::get_trampoline_entry(int32_t pos) {
+  int32_t trampoline_entry = kInvalidSlotPos;
+
+  if (!internal_trampoline_exception_) {
+    if (trampoline_.start() > pos) {
+     trampoline_entry = trampoline_.take_slot();
+    }
+
+    if (kInvalidSlotPos == trampoline_entry) {
+      internal_trampoline_exception_ = true;
+    }
+  }
+  return trampoline_entry;
 }
 
 } }  // namespace v8::internal

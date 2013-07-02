@@ -3715,7 +3715,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ li(t1, Operand(Smi::FromInt(marker)));
   __ li(t0, Operand(ExternalReference(Isolate::kCEntryFPAddress,
                                       isolate)));
-  __ lw(t0, MemOperand(t0));
+  __ ld(t0, MemOperand(t0));
   __ Push(t3, t2, t1, t0);
   // Set up frame pointer for the frame to be pushed.
   __ addi(fp, sp, -EntryFrameConstants::kCallerFPOffset);
@@ -3739,7 +3739,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   ExternalReference js_entry_sp(Isolate::kJSEntrySPAddress, isolate);
   __ li(t1, Operand(ExternalReference(js_entry_sp)));
   __ ld(t2, MemOperand(t1));
-  __ Branch(&non_outermost_js, ne, t2, Operand(zero_reg));
+  __ Branch(&non_outermost_js, ne, t2, Operand(zero));
   __ st(fp, MemOperand(t1));
   __ li(t0, Operand(Smi::FromInt(StackFrame::OUTERMOST_JSENTRY_FRAME)));
   Label cont;
@@ -3761,7 +3761,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
   __ st(r0, MemOperand(t0));  // We come back from 'invoke'. result is in v0.
-  __ li(r0, Operand(reinterpret_cast<int32_t>(Failure::Exception())));
+  __ li(r0, Operand(reinterpret_cast<int64_t>(Failure::Exception())));
   __ b(&exit);  // b exposes branch delay slot.
 
   // Invoke: Link this frame into the handler chain.  There's only one
