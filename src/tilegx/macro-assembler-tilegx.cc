@@ -168,8 +168,20 @@ void MacroAssembler::LoadFromNumberDictionary(Label* miss,
 // ---------------------------------------------------------------------------
 // Instruction macros.
 
-void MacroAssembler::Addu(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
-
+void MacroAssembler::Addu(Register rd, Register rs, const Operand& rt) {
+  if (rt.is_reg()) {
+    add(rd, rs, rt.rm());
+  } else {
+    if (is_int16(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+      addli(rd, rs, rt.imm64_);
+    } else {
+      // li handles the relocation.
+      ASSERT(!rs.is(tt));
+      li(tt, rt);
+      add(rd, rs, tt);
+    }
+  }
+}
 
 void MacroAssembler::Subu(Register rd, Register rs, const Operand& rt) 
 {
