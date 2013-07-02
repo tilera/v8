@@ -285,8 +285,7 @@ void MacroAssembler::Jr(Label* L) {
     // Buffer growth (and relocation) must be blocked for internal references
     // until associated instructions are emitted and available to be patched.
     RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
-    moveli(tt, (imm64 >> 48) & 0xFFFF);
-    shl16insli(tt, tt, (imm64 >> 32) & 0xFFFF);
+    moveli(tt, (imm64 >> 32) & 0xFFFF);
     shl16insli(tt, tt, (imm64 >> 16) & 0xFFFF);
     shl16insli(tt, tt, imm64 & 0xFFFF);
   }
@@ -689,14 +688,37 @@ void MacroAssembler::Jump(Handle<Code> code,
 int MacroAssembler::CallSize(Register target,
                              Condition cond,
                              Register rs,
-                             const Operand& rt) { UNREACHABLE(); return -1; }
+                             const Operand& rt) {
+  int size = 0;
+
+  if (cond == cc_always) {
+    size += 1;
+  } else {
+    size += 2;
+  }
+
+  return size * kInstrSize;
+}
 
 
 void MacroAssembler::Call(Register target,
                           Condition cond,
                           Register rs,
-                          const Operand& rt) { UNREACHABLE(); }
+                          const Operand& rt) {
+  BlockTrampolinePoolScope block_trampoline_pool(this);
+  Label start;
+  bind(&start);
+  if (cond == cc_always) {
+    jalr(target);
+  } else {
+    BRANCH_ARGS_CHECK(cond, rs, rt);
+    Branch(2, NegateCondition(cond), rs, rt);
+    jalr(target);
+  }
 
+  ASSERT_EQ(CallSize(target, cond, rs, rt),
+            SizeOfCodeGeneratedSince(&start));
+}
 
 int MacroAssembler::CallSize(Address target,
                              RelocInfo::Mode rmode,

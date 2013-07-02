@@ -692,6 +692,7 @@ class Assembler : public AssemblerBase {
   
   void j(int64_t target);
   void jr(Register target);
+  void jalr(Register target);
 
   void b(int32_t offset);
   void b(Label* L) { b(branch_offset(L, false)>>3); }
@@ -734,7 +735,45 @@ class Assembler : public AssemblerBase {
 
   bool is_near(Label* L);
 
+  // Check the code size generated from label to here.
+  int SizeOfCodeGeneratedSince(Label* label) {
+    return pc_offset() - label->pos();
+  }
+
+  // Check the number of instructions generated from label to here.
+  int InstructionsGeneratedSince(Label* label) {
+    return SizeOfCodeGeneratedSince(label) / kInstrSize;
+  }
+
+  // Class for scoping postponing the trampoline pool generation.
+  class BlockTrampolinePoolScope {
+   public:
+    explicit BlockTrampolinePoolScope(Assembler* assem) : assem_(assem) {
+      assem_->StartBlockTrampolinePool();
+    }
+    ~BlockTrampolinePoolScope() {
+      assem_->EndBlockTrampolinePool();
+    }
+
+   private:
+    Assembler* assem_;
+
+    DISALLOW_IMPLICIT_CONSTRUCTORS(BlockTrampolinePoolScope);
+  };
+
  protected:
+
+  void StartBlockTrampolinePool() {
+    trampoline_pool_blocked_nesting_++;
+  }
+
+  void EndBlockTrampolinePool() {
+    trampoline_pool_blocked_nesting_--;
+  }
+
+  bool is_trampoline_pool_blocked() const {
+    return trampoline_pool_blocked_nesting_ > 0;
+  }
 
   // Record reloc info for current pc_.
   void RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data = 0);

@@ -722,6 +722,12 @@ void Assembler::jr(Register rs) {
   emit(instr);
 }
 
+void Assembler::jalr(Register rs) {
+  positions_recorder()->WriteRecordedPositions();
+  Instr instr = JALR_X1 | SRCA_X1(rs.code());
+  emit(instr);
+}
+
 // We have to use a temporary register for things that can be relocated even
 // if they can be encoded in the MIPS's 16 bits of immediate-offset instruction
 // space.  There is no guarantee that the relocated location can be similarly
