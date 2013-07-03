@@ -244,8 +244,14 @@ void MacroAssembler::li(Register rd, Operand j, int line, LiFlags mode) {
   if (MustUseReg(j.rmode_)) {
     RecordRelocInfo(j.rmode_, j.imm64_);
   }
-  // We always need the same number of instructions as we may need to patch
-  // this code to load another value which may need 2 instructions to load.
+
+  if (j.rmode_ == RelocInfo::EMBEDDED_OBJECT) {
+    moveli(rd, (j.imm64_ >> 32) & 0xFFFF, line);
+    shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF, line);
+    shl16insli(rd, rd, j.imm64_ & 0xFFFF, line);
+    return;
+  }
+
   moveli(rd, (j.imm64_ >> 48) & 0xFFFF, line);
   shl16insli(rd, rd, (j.imm64_ >> 32) & 0xFFFF, line);
   shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF, line);
@@ -810,8 +816,8 @@ void MacroAssembler::PushTryHandler(StackHandler::Kind kind,
   unsigned state =
       StackHandler::IndexField::encode(handler_index) |
       StackHandler::KindField::encode(kind);
-  li(t1, Operand(CodeObject()), CONSTANT_SIZE);
-  li(t2, Operand(state));
+  li(t1, Operand(CodeObject()), __LINE__);
+  li(t2, Operand(state), __LINE__);
 
   // Push the frame pointer, context, state, and code object.
   if (kind == StackHandler::JS_ENTRY) {
@@ -829,7 +835,7 @@ void MacroAssembler::PushTryHandler(StackHandler::Kind kind,
   ld(t1, MemOperand(t2));
   push(t1);
   // Set this new handler as the current one.
-  st(sp, MemOperand(t2));
+  st(sp, MemOperand(t2), __LINE__);
 }
 
 
