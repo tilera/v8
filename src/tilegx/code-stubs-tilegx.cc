@@ -3822,8 +3822,8 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
             ne,
             t1,
             Operand(Smi::FromInt(StackFrame::OUTERMOST_JSENTRY_FRAME)));
-  __ li(t1, Operand(ExternalReference(js_entry_sp)));
-  __ st(zero, MemOperand(t1));
+  __ li(t1, Operand(ExternalReference(js_entry_sp)), __LINE__);
+  __ st(zero, MemOperand(t1), __LINE__);
   __ bind(&non_outermost_js_2);
 
   // Restore the top frame descriptors from the stack.

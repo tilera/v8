@@ -270,8 +270,17 @@ void MacroAssembler::MultiPush(RegList regs) {
 void MacroAssembler::MultiPushReversed(RegList regs) { UNREACHABLE(); }
 
 
-void MacroAssembler::MultiPop(RegList regs) { UNREACHABLE(); }
+void MacroAssembler::MultiPop(RegList regs) {
+  int16_t stack_offset = 0;
 
+  for (int16_t i = 0; i < kNumRegisters; i++) {
+    if ((regs & (1L << i)) != 0) {
+      ld(ToRegister(i), MemOperand(sp, stack_offset));
+      stack_offset += kPointerSize;
+    }
+  }
+  addi(sp, sp, stack_offset);
+}
 
 void MacroAssembler::MultiPopReversed(RegList regs) { UNREACHABLE(); }
 
@@ -507,8 +516,8 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
-          offset = shifted_branch_offset(L, false);
 	  cmpne(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
           bnez(scratch, offset);
 	}
         break;
