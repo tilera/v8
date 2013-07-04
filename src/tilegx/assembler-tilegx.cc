@@ -247,6 +247,27 @@ void Assembler::addi(const Register& rd, const Register& rs, int8_t imm, int lin
   emit(instr, line);
 }
 
+void Assembler::and_(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = AND_X1 | DEST_X1(rd.code())
+	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
+void Assembler::or_(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = OR_X1 | DEST_X1(rd.code())
+	              | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
+void Assembler::andi(const Register& rd, const Register& rs, int8_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && is_int8(imm));
+  Instr instr = ANDI_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | IMM8_X1(imm);
+  emit(instr, line);
+}
+
 void Assembler::addli(const Register& rd, const Register& rs, int16_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && is_int16(imm));
   Instr instr = ADDLI_X1 | DEST_X1(rd.code())
@@ -271,6 +292,34 @@ void Assembler::move(const Register& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = ADD_X1 | DEST_X1(rd.code())
 	               | SRCA_X1(zero.code()) | SRCB_X1(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::movn(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = CMOVNEZ_X0 | DEST_X0(rd.code())
+	                   | SRCA_X0(rt.code()) | SRCB_X0(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::movz(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = CMOVEQZ_X0 | DEST_X0(rd.code())
+	                   | SRCA_X0(rt.code()) | SRCB_X0(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::srl(const Register& rd, const Register& rs, int16_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHRUI_X1 | DEST_X1(rd.code())
+	                 | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::sll(const Register& rd, const Register& rs, int16_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHLI_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
   emit(instr, line);
 }
 

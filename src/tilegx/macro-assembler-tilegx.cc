@@ -214,7 +214,20 @@ void MacroAssembler::Div(Register rs, const Operand& rt) { UNREACHABLE(); }
 void MacroAssembler::Divu(Register rs, const Operand& rt) { UNREACHABLE(); }
 
 
-void MacroAssembler::And(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
+void MacroAssembler::And(Register rd, Register rs, const Operand& rt) {
+  if (rt.is_reg()) {
+    and_(rd, rs, rt.rm());
+  } else {
+    if (is_int8(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+      andi(rd, rs, rt.imm64_);
+    } else {
+      // li handles the relocation.
+      ASSERT(!rs.is(tt));
+      li(tt, rt);
+      and_(rd, rs, tt);
+    }
+  }
+}
 
 
 void MacroAssembler::Or(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
@@ -1197,7 +1210,19 @@ void MacroAssembler::LeaveExitFrame(bool save_doubles,
                                     bool do_return) { UNREACHABLE(); }
 
 
-int MacroAssembler::ActivationFrameAlignment() { UNREACHABLE(); return -1;}
+int MacroAssembler::ActivationFrameAlignment() {
+#if defined(V8_HOST_ARCH_TILEGX)
+  // Running on the real platform. Use the alignment as mandated by the local
+  // environment.
+  // Note: This will break if we ever start generating snapshots on one TileGX
+  // platform for another TileGX platform with a different alignment.
+  return OS::ActivationFrameAlignment();
+#else  // defined(V8_HOST_ARCH_TILEGX)
+  // No Simulator support for TileGX
+  UNREACHABLE();
+  return -1;
+#endif  // defined(V8_HOST_ARCH_TILEGX)
+}
 
 
 void MacroAssembler::AssertStackIsAligned() { UNREACHABLE(); }
@@ -1266,13 +1291,37 @@ void MacroAssembler::JumpIfInstanceTypeIsNotSequentialAscii(Register type,
                                                             Register scratch,
                                                             Label* failure) { UNREACHABLE(); }
 
-void MacroAssembler::PrepareCallCFunction(int num_reg_arguments,
-                                          int num_double_arguments,
-                                          Register scratch) { UNREACHABLE(); }
+static const int kRegisterPassedArguments = 10;
 
+int MacroAssembler::CalculateStackPassedWords(int num_reg_arguments) {
+  int stack_passed_words = 0;
+
+  // Up to ten simple arguments are passed in registers r0..r9.
+  if (num_reg_arguments > kRegisterPassedArguments) {
+    stack_passed_words += num_reg_arguments - kRegisterPassedArguments;
+  }
+  return stack_passed_words;
+}
 
 void MacroAssembler::PrepareCallCFunction(int num_reg_arguments,
-                                          Register scratch) { UNREACHABLE(); }
+                                          Register scratch) {
+  int frame_alignment = ActivationFrameAlignment();
+
+  // Up to ten simple arguments are passed in registers r0..r9.
+  // Remaining arguments are pushed on the stack.
+  int stack_passed_arguments = CalculateStackPassedWords(num_reg_arguments);
+  if (frame_alignment > kPointerSize) {
+    // Make stack end at alignment and make room for num_arguments - 4 words
+    // and the original value of sp.
+    mov(scratch, sp);
+    Subu(sp, sp, Operand((stack_passed_arguments + 1) * kPointerSize));
+    ASSERT(IsPowerOf2(frame_alignment));
+    And(sp, sp, Operand(-frame_alignment));
+    st(scratch, MemOperand(sp, stack_passed_arguments * kPointerSize));
+  } else {
+    Subu(sp, sp, Operand(stack_passed_arguments * kPointerSize));
+  }
+}
 
 
 void MacroAssembler::CallCFunction(ExternalReference function,

@@ -59,6 +59,11 @@ enum RAStatus { kRAHasNotBeenSaved, kRAHasBeenSaved };
 
 bool AreAliased(Register r1, Register r2, Register r3, Register r4);
 
+// Generate a MemOperand for loading a field from an object.
+inline MemOperand FieldMemOperand(Register object, int offset) {
+  return MemOperand(object, offset - kHeapObjectTag);
+}
+
 // MacroAssembler implements a collection of frequently used macros.
 class MacroAssembler: public Assembler {
  public:
@@ -559,6 +564,8 @@ class MacroAssembler: public Assembler {
 
   // Convenience function: Same as above, but takes the fid instead.
   void CallRuntime(Runtime::FunctionId fid, int num_arguments);
+
+  int CalculateStackPassedWords(int num_reg_arguments);
 
   // Convenience function: call an external reference.
   void CallExternalReference(const ExternalReference& ext,

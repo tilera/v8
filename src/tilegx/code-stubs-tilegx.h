@@ -385,6 +385,52 @@ class RegExpCEntryStub: public PlatformCodeStub {
   bool NeedsImmovableCode() { return true; }
 };
 
+// This stub can convert a signed int32 to a heap number (double).  It does
+// not work for int32s that are in Smi range!  No GC occurs during this stub
+// so you don't have to set up the frame.
+class WriteInt32ToHeapNumberStub : public PlatformCodeStub {
+ public:
+  WriteInt32ToHeapNumberStub(Register the_int,
+                             Register the_heap_number,
+                             Register scratch,
+                             Register scratch2)
+      : the_int_(the_int),
+        the_heap_number_(the_heap_number),
+        scratch_(scratch),
+        sign_(scratch2) {
+    ASSERT(IntRegisterBits::is_valid(the_int_.code()));
+    ASSERT(HeapNumberRegisterBits::is_valid(the_heap_number_.code()));
+    ASSERT(ScratchRegisterBits::is_valid(scratch_.code()));
+    ASSERT(SignRegisterBits::is_valid(sign_.code()));
+  }
+
+  bool IsPregenerated();
+  static void GenerateFixedRegStubsAheadOfTime(Isolate* isolate);
+
+ private:
+  Register the_int_;
+  Register the_heap_number_;
+  Register scratch_;
+  Register sign_;
+
+  // Minor key encoding in 16 bits.
+  class IntRegisterBits: public BitField<int, 0, 4> {};
+  class HeapNumberRegisterBits: public BitField<int, 4, 4> {};
+  class ScratchRegisterBits: public BitField<int, 8, 4> {};
+  class SignRegisterBits: public BitField<int, 12, 4> {};
+
+  Major MajorKey() { return WriteInt32ToHeapNumber; }
+  int MinorKey() {
+    // Encode the parameters in a unique 16 bit value.
+    return IntRegisterBits::encode(the_int_.code())
+           | HeapNumberRegisterBits::encode(the_heap_number_.code())
+           | ScratchRegisterBits::encode(scratch_.code())
+           | SignRegisterBits::encode(sign_.code());
+  }
+
+  void Generate(MacroAssembler* masm);
+};
+
 } }  // namespace v8::internal
 
 #endif  // V8_TILEGX_CODE_STUBS_ARM_H_

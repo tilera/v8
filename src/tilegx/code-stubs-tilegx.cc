@@ -929,20 +929,21 @@ void FloatingPointHelper::CallCCodeForDoubleOperation(
   __ Ret(USE_DELAY_SLOT);
   __ mov(v0, heap_number_result);
 }
+#endif
 
 
 bool WriteInt32ToHeapNumberStub::IsPregenerated() {
   // These variants are compiled ahead of time.  See next method.
-  if (the_int_.is(a1) &&
-      the_heap_number_.is(v0) &&
-      scratch_.is(a2) &&
-      sign_.is(a3)) {
+  if (the_int_.is(r1) &&
+      the_heap_number_.is(r0) &&
+      scratch_.is(r2) &&
+      sign_.is(r3)) {
     return true;
   }
-  if (the_int_.is(a2) &&
-      the_heap_number_.is(v0) &&
-      scratch_.is(a3) &&
-      sign_.is(a0)) {
+  if (the_int_.is(r2) &&
+      the_heap_number_.is(r0) &&
+      scratch_.is(r3) &&
+      sign_.is(r4)) {
     return true;
   }
   // Other register combinations are generated as and when they are needed,
@@ -954,12 +955,11 @@ bool WriteInt32ToHeapNumberStub::IsPregenerated() {
 
 void WriteInt32ToHeapNumberStub::GenerateFixedRegStubsAheadOfTime(
     Isolate* isolate) {
-  WriteInt32ToHeapNumberStub stub1(a1, v0, a2, a3);
-  WriteInt32ToHeapNumberStub stub2(a2, v0, a3, a0);
+  WriteInt32ToHeapNumberStub stub1(r1, r0, r2, r3);
+  WriteInt32ToHeapNumberStub stub2(r2, r0, r3, r4);
   stub1.GetCode(isolate)->set_is_pregenerated(true);
   stub2.GetCode(isolate)->set_is_pregenerated(true);
 }
-
 
 // See comment for class, this does NOT work for int32's that are in Smi range.
 void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
@@ -979,20 +979,20 @@ void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
   // Set the sign bit in scratch_ if the value was negative.
   __ or_(scratch_, scratch_, sign_);
   // Subtract from 0 if the value was negative.
-  __ subu(at, zero_reg, the_int_);
-  __ Movn(the_int_, at, sign_);
+  __ sub(tt, zero, the_int_);
+  __ movn(the_int_, tt, sign_);
   // We should be masking the implict first digit of the mantissa away here,
   // but it just ends up combining harmlessly with the last digit of the
   // exponent that happens to be 1.  The sign bit is 0 so we shift 10 to get
   // the most significant 1 to hit the last bit of the 12 bit sign and exponent.
   ASSERT(((1 << HeapNumber::kExponentShift) & non_smi_exponent) != 0);
   const int shift_distance = HeapNumber::kNonMantissaBitsInTopWord - 2;
-  __ srl(at, the_int_, shift_distance);
-  __ or_(scratch_, scratch_, at);
-  __ sw(scratch_, FieldMemOperand(the_heap_number_,
+  __ srl(tt, the_int_, shift_distance);
+  __ or_(scratch_, scratch_, tt);
+  __ st(scratch_, FieldMemOperand(the_heap_number_,
                                    HeapNumber::kExponentOffset));
   __ sll(scratch_, the_int_, 32 - shift_distance);
-  __ sw(scratch_, FieldMemOperand(the_heap_number_,
+  __ st(scratch_, FieldMemOperand(the_heap_number_,
                                    HeapNumber::kMantissaOffset));
   __ Ret();
 
@@ -1003,15 +1003,16 @@ void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
   // significant 1 bit is not stored.
   non_smi_exponent += 1 << HeapNumber::kExponentShift;
   __ li(scratch_, Operand(HeapNumber::kSignMask | non_smi_exponent));
-  __ sw(scratch_,
+  __ st(scratch_,
         FieldMemOperand(the_heap_number_, HeapNumber::kExponentOffset));
-  __ mov(scratch_, zero_reg);
-  __ sw(scratch_,
+  __ move(scratch_, zero);
+  __ st(scratch_,
         FieldMemOperand(the_heap_number_, HeapNumber::kMantissaOffset));
   __ Ret();
 }
 
 
+#if 0
 // Handle the case where the lhs and rhs are the same object.
 // Equality is almost reflexive (everything but NaN), so this is a test
 // for "identity and not NaN".
@@ -1706,34 +1707,22 @@ void ToBooleanStub::GenerateTypeTransition(MacroAssembler* masm) {
 
 
 void StoreBufferOverflowStub::Generate(MacroAssembler* masm) {
-#if 0
   // We don't allow a GC during a store buffer overflow so there is no need to
   // store the registers in any particular way, but we do have to store and
   // restore them.
-  __ MultiPush(kJSCallerSaved | ra.bit());
-  if (save_doubles_ == kSaveFPRegs) {
-    __ MultiPushFPU(kCallerSavedFPU);
-  }
+  __ MultiPush(kJSCallerSaved | lr.bit());
   const int argument_count = 1;
-  const int fp_argument_count = 0;
-  const Register scratch = a1;
+  const Register scratch = r1;
 
   AllowExternalCallThatCantCauseGC scope(masm);
-  __ PrepareCallCFunction(argument_count, fp_argument_count, scratch);
-  __ li(a0, Operand(ExternalReference::isolate_address(masm->isolate())));
+  __ PrepareCallCFunction(argument_count, scratch);
+  __ li(r0, Operand(ExternalReference::isolate_address(masm->isolate())));
   __ CallCFunction(
       ExternalReference::store_buffer_overflow_function(masm->isolate()),
       argument_count);
-  if (save_doubles_ == kSaveFPRegs) {
-    __ MultiPopFPU(kCallerSavedFPU);
-  }
+  __ MultiPop(kJSCallerSaved | lr.bit());
 
-  __ MultiPop(kJSCallerSaved | ra.bit());
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -3652,7 +3641,6 @@ bool CEntryStub::IsPregenerated() {
 
 
 void CodeStub::GenerateStubsAheadOfTime(Isolate* isolate) {
-#if 0
   CEntryStub::GenerateAheadOfTime(isolate);
   WriteInt32ToHeapNumberStub::GenerateFixedRegStubsAheadOfTime(isolate);
   StoreBufferOverflowStub::GenerateFixedRegStubsAheadOfTime(isolate);
@@ -3661,10 +3649,6 @@ void CodeStub::GenerateStubsAheadOfTime(Isolate* isolate) {
   if (FLAG_optimize_constructed_arrays) {
     ArrayConstructorStubBase::GenerateStubsAheadOfTime(isolate);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -7388,13 +7372,8 @@ bool RecordWriteStub::IsPregenerated() {
 
 void StoreBufferOverflowStub::GenerateFixedRegStubsAheadOfTime(
     Isolate* isolate) {
-#if 0
   StoreBufferOverflowStub stub1(kDontSaveFPRegs);
   stub1.GetCode(isolate)->set_is_pregenerated(true);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -7711,23 +7690,18 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
 
 
 void StubFailureTrampolineStub::Generate(MacroAssembler* masm) {
-#if 0
   CEntryStub ces(1, fp_registers_ ? kSaveFPRegs : kDontSaveFPRegs);
   __ Call(ces.GetCode(masm->isolate()), RelocInfo::CODE_TARGET);
   int parameter_count_offset =
       StubFailureTrampolineFrame::kCallerStackParameterCountFrameOffset;
-  __ lw(a1, MemOperand(fp, parameter_count_offset));
+  __ ld(r1, MemOperand(fp, parameter_count_offset));
   if (function_mode_ == JS_FUNCTION_STUB_MODE) {
-    __ Addu(a1, a1, Operand(1));
+    __ Addu(r1, r1, Operand(1));
   }
   masm->LeaveFrame(StackFrame::STUB_FAILURE_TRAMPOLINE);
-  __ sll(a1, a1, kPointerSizeLog2);
-  __ Addu(sp, sp, a1);
+  __ sll(r1, r1, kPointerSizeLog2);
+  __ Addu(sp, sp, r1);
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

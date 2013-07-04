@@ -728,9 +728,16 @@ class Assembler : public AssemblerBase {
   void sub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void addi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
   void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void srl(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void sll(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void moveli(const Register& rd, int16_t imm, int line = 0);
   void shl16insli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void move(const Register& rt, const Register& rs, int line = 0);
+  void and_(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void or_(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void andi(const Register& rd, const Register& rs, int8_t j, int line = 0);
+  void movn(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void movz(const Register& rd, const Register& rs, const Register& rt, int line = 0);
 
   // Check if an instruction is a branch of some kind.
   static bool IsNop(Instr instr, unsigned int type);
