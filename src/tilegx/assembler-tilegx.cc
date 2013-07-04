@@ -388,8 +388,8 @@ int Assembler::target_at(int32_t pos) {
     Instr instr_shl16insli_0 = instr_at(pos + 1 * Assembler::kInstrSize);
     Instr instr_shl16insli_1 = instr_at(pos + 2 * Assembler::kInstrSize);
     ASSERT(IsMOVELI(instr_moveli));
-    ASSERT(IsMOVELI(instr_shl16insli_0));
-    ASSERT(IsMOVELI(instr_shl16insli_1));
+    ASSERT(IsSHL16INSLI(instr_shl16insli_0));
+    ASSERT(IsSHL16INSLI(instr_shl16insli_1));
     int64_t imm = ((int64_t)get_Imm16_X1(instr_moveli)) << 32; 
     imm |= get_Imm16_X1(instr_shl16insli_0) << 16;
     imm |= get_Imm16_X1(instr_shl16insli_1);
