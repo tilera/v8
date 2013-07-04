@@ -130,6 +130,21 @@ int print_insn_tilegx (unsigned char * memaddr);
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
       create_UnaryOpcodeExtension_X1(LD_UNARY_OPCODE_X1) | FNOP_X0
 
+#define LD1U_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(LD1U_UNARY_OPCODE_X1) | FNOP_X0
+
+#define LD2U_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(LD2U_UNARY_OPCODE_X1) | FNOP_X0
+
+#define LD4U_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(LD4U_UNARY_OPCODE_X1) | FNOP_X0
+
 #define JR_X1                                                                  \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
@@ -452,11 +467,27 @@ REGISTER(r63, 63);
 #undef REGISTER
 
 
-const int kRegister_t0_Code = 25;
-const int kRegister_t1_Code = 26;
-const int kRegister_t2_Code = 27;
-const int kRegister_t3_Code = 28;
-const int kRegister_t4_Code = 29;
+const int kRegister_a0_Code = 0;
+const int kRegister_a1_Code = 1;
+const int kRegister_a2_Code = 2;
+const int kRegister_a3_Code = 3;
+
+const int kRegister_t0_Code = 22;
+const int kRegister_t1_Code = 23;
+const int kRegister_t2_Code = 24;
+const int kRegister_t3_Code = 25;
+const int kRegister_t4_Code = 26;
+const int kRegister_t5_Code = 27;
+const int kRegister_t6_Code = 28;
+const int kRegister_t7_Code = 29;
+
+const int kRegister_t8_Code = 20;
+const int kRegister_t9_Code = 21;
+
+const int kRegister_s0_Code = 40;
+const int kRegister_s1_Code = 41;
+const int kRegister_s2_Code = 42;
+const int kRegister_s3_Code = 43;
 
 const int kRegister_tt_Code = 49;
 const int kRegister_pc_Code = 50;
@@ -468,13 +499,28 @@ const int kRegister_lr_Code = 55;
 const int kRegister_zero_Code = 55;
 const int kRegister_no_reg_Code = -1;
 
+const Register a0  = { kRegister_a0_Code };
+const Register a1  = { kRegister_a1_Code };
+const Register a2  = { kRegister_a2_Code };
+const Register a3  = { kRegister_a3_Code };
+
 const Register t0  = { kRegister_t0_Code };
 const Register t1  = { kRegister_t1_Code };
 const Register t2  = { kRegister_t2_Code };
 const Register t3  = { kRegister_t3_Code };
 const Register t4  = { kRegister_t4_Code };
+const Register t5  = { kRegister_t5_Code };
+const Register t6  = { kRegister_t6_Code };
+const Register t7  = { kRegister_t7_Code };
+const Register t8  = { kRegister_t8_Code };
+const Register t9  = { kRegister_t9_Code };
 // 'tt' is treated as TileGX temp register,
 // like 'at' in MIPS.
+const Register s0  = { kRegister_s0_Code };
+const Register s1  = { kRegister_s1_Code };
+const Register s2  = { kRegister_s2_Code };
+const Register s3  = { kRegister_s3_Code };
+
 const Register tt  = { kRegister_tt_Code };
 const Register pc  = { kRegister_pc_Code };
 const Register gp  = { kRegister_gp_Code };
@@ -583,6 +629,20 @@ class Assembler : public AssemblerBase {
   // of m. m must be a power of 2 (>= 8).
   void Align(int m);
 
+  // Record the AST id of the CallIC being compiled, so that it can be placed
+  // in the relocation information.
+  void SetRecordedAstId(TypeFeedbackId ast_id) {
+    ASSERT(recorded_ast_id_.IsNone());
+    recorded_ast_id_ = ast_id;
+  }
+
+  TypeFeedbackId RecordedAstId() {
+    ASSERT(!recorded_ast_id_.IsNone());
+    return recorded_ast_id_;
+  }
+
+  void ClearRecordedAstId() { recorded_ast_id_ = TypeFeedbackId::None(); }
+
   // Record a comment relocation entry that can be used by a disassembler.
   // Use --code-comments to enable.
   void RecordComment(const char* msg);
@@ -632,6 +692,8 @@ class Assembler : public AssemblerBase {
   static bool IsJAL(Instr instr);
   static bool IsMOVELI(Instr instr);
   static bool IsSHL16INSLI(Instr instr);
+  static bool IsBeqz(Instr instr);
+  static bool IsBnez(Instr instr);
 
   static uint32_t GetLabelConst(Instr instr);
   static bool IsEmittedConstant(Instr instr);
@@ -730,12 +792,20 @@ class Assembler : public AssemblerBase {
   void st(const Register& rd, const Register& rs, int line = 0);
   void ld(const Register& rd, const MemOperand& rs, int line = 0);
   void ld(const Register& rd, const Register& rs, int line = 0);
+  void ld1u(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld1u(const Register& rd, const Register& rs, int line = 0);
+  void ld2u(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld2u(const Register& rd, const Register& rs, int line = 0);
+  void ld4u(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld4u(const Register& rd, const Register& rs, int line = 0);
   void add(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void sub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void addi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
   void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void srl(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void sra(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void sll(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void sll(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void moveli(const Register& rd, int16_t imm, int line = 0);
   void shl16insli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void move(const Register& rt, const Register& rs, int line = 0);
@@ -780,6 +850,7 @@ class Assembler : public AssemblerBase {
   };
 
  protected:
+  TypeFeedbackId recorded_ast_id_;
 
   void StartBlockTrampolinePool() {
     trampoline_pool_blocked_nesting_++;

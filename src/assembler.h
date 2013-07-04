@@ -986,6 +986,10 @@ inline bool is_intn(int x, int n)  {
   return -(1 << (n-1)) <= x && x < (1 << (n-1));
 }
 
+inline bool is_lintn(long x, long n)  {
+  return -(1L << (n-1)) <= x && x < (1L << (n-1));
+}
+
 inline bool is_int8(int x)  { return is_intn(x, 8); }
 inline bool is_int16(int x)  { return is_intn(x, 16); }
 inline bool is_int18(int x)  { return is_intn(x, 18); }

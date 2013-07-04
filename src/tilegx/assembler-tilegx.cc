@@ -172,8 +172,41 @@ bool Assembler::IsMOVELI(Instr instr) {
   return X0_OPC == ADDLI_OPCODE_X0 || X1_OPC == ADDLI_OPCODE_X1;
 }
 
+bool Assembler::IsBeqz(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1, BrType = -1;
+
+  if (mode != 0)
+    return false;
+
+  X1_OPC = get_Opcode_X1(instr);
+  BrType = get_BrType_X1(instr);
+
+  // Checks if the instruction is a moveli which is
+  // used for constant loading and is actually alias
+  // of addli.
+  return X1_OPC == BRANCH_OPCODE_X1 || BrType == BEQZ_BRANCH_OPCODE_X1;
+}
+
+bool Assembler::IsBnez(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1, BrType = -1;
+
+  if (mode != 0)
+    return false;
+
+  X1_OPC = get_Opcode_X1(instr);
+  BrType = get_BrType_X1(instr);
+
+  // Checks if the instruction is a moveli which is
+  // used for constant loading and is actually alias
+  // of addli.
+  return X1_OPC == BRANCH_OPCODE_X1 || BrType == BNEZ_BRANCH_OPCODE_X1;
+}
+
 Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
     : AssemblerBase(isolate, buffer, buffer_size),
+      recorded_ast_id_(TypeFeedbackId::None()),
       positions_recorder_(this) {
   reloc_info_writer.Reposition(buffer_ + buffer_size_, pc_);
 
@@ -188,6 +221,8 @@ Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
 
   trampoline_emitted_ = false;
   unbound_labels_count_ = 0;
+
+  ClearRecordedAstId();
 }
 
 void Assembler::st(const Register& rd, const MemOperand& rs, int line) {
@@ -223,6 +258,61 @@ void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
 void Assembler::ld(const Register& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
+  emit(instr, line);
+}
+
+
+void Assembler::ld1u(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = LD1U_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    emit(instr, line);
+  } else
+    ld1u(rd, rs.rm(), line);
+}
+
+void Assembler::ld1u(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = LD1U_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::ld2u(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = LD2U_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    emit(instr, line);
+  } else
+    ld2u(rd, rs.rm(), line);
+}
+
+void Assembler::ld2u(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = LD2U_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::ld4u(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = LD4U_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    emit(instr, line);
+  } else
+    ld4u(rd, rs.rm(), line);
+}
+
+void Assembler::ld4u(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = LD4U_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
   emit(instr, line);
 }
 
@@ -316,10 +406,24 @@ void Assembler::srl(const Register& rd, const Register& rs, int16_t imm, int lin
   emit(instr, line);
 }
 
+void Assembler::sra(const Register& rd, const Register& rs, int16_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHRSI_X1 | DEST_X1(rd.code())
+	                 | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
+  emit(instr, line);
+}
+
 void Assembler::sll(const Register& rd, const Register& rs, int16_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = SHLI_X1 | DEST_X1(rd.code())
 	                | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::sll(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHL_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
   emit(instr, line);
 }
 
@@ -658,8 +762,52 @@ const int RelocInfo::kApplyMask = RelocInfo::kCodeTargetMask |
                                   1 << RelocInfo::INTERNAL_REFERENCE;
 
 int Assembler::RelocateInternalReference(byte* pc, intptr_t pc_delta) {
-	UNIMPLEMENTED();
-	return -1;
+  Instr instr = instr_at(pc);
+  ASSERT(IsJ(instr) || IsMOVELI(instr));
+  if (IsMOVELI(instr)) {
+    Instr instr_moveli = instr_at(pc + 0 * Assembler::kInstrSize);
+    Instr instr_shl16insli0 = instr_at(pc + 1 * Assembler::kInstrSize);
+    Instr instr_shl16insli1 = instr_at(pc + 2 * Assembler::kInstrSize);
+    Instr instr_shl16insli2 = instr_at(pc + 3 * Assembler::kInstrSize);
+    ASSERT(IsSHL16INSLI(instr_shl16insli0));
+    ASSERT(IsSHL16INSLI(instr_shl16insli1));
+    ASSERT(!IsSHL16INSLI(instr_shl16insli2));
+    int64_t imm = ((long)get_Imm16_X1(instr_moveli) << 32 )
+                   | (get_Imm16_X1(instr_shl16insli0) << 16) | get_Imm16_X1(instr_shl16insli1);
+
+    if (imm == kEndOfJumpChain) {
+      return 0;  // Number of instructions patched.
+    }
+
+    imm += pc_delta;
+    ASSERT((imm & 7) == 0);
+
+    instr_moveli &= ~get_Imm16_X1(-1);
+    instr_shl16insli0 &= ~get_Imm16_X1(-1);
+    instr_shl16insli1 &= ~get_Imm16_X1(-1);
+
+    instr_at_put(pc + 0 * Assembler::kInstrSize,
+                 instr_moveli | get_Imm16_X1(imm >> 32));
+    instr_at_put(pc + 1 * Assembler::kInstrSize,
+                 instr_shl16insli0 | get_Imm16_X1(imm >> 16));
+    instr_at_put(pc + 2 * Assembler::kInstrSize,
+                 instr_shl16insli1 | get_Imm16_X1(imm));
+    return 3;  // Number of instructions patched.
+  } else {
+    uint64_t imm30 = get_JumpOff_X1(instr) << 3;
+    if (static_cast<int32_t>(imm30) == kEndOfJumpChain) {
+      return 0;  // Number of instructions patched.
+    }
+    imm30 += pc_delta;
+    ASSERT((imm30 & 7) == 0);
+
+    instr &= ~get_JumpOff_X1(-1);
+    uint32_t imm27 = imm30 >> 3;
+    ASSERT(is_uintn(imm27, 27));
+
+    instr_at_put(pc, instr | get_JumpOff_X1(imm27));
+    return 1;  // Number of instructions patched.
+  }
 }
 
 void Assembler::RecordComment(const char* msg) {

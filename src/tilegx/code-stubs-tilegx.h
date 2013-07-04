@@ -61,8 +61,18 @@ class RecordWriteStub: public PlatformCodeStub {
   static void GenerateFixedRegStubsAheadOfTime(Isolate* isolate);
   virtual bool SometimesSetsUpAFrame() { return false; }
 
-  static void PatchBranchIntoNop(MacroAssembler* masm, int pos);
-  static void PatchNopIntoBranch(MacroAssembler* masm, int pos);
+  static void PatchBranchIntoNop(MacroAssembler* masm, int pos) {
+    ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
+    masm->instr_at_put(pos, (masm->instr_at(pos) & (~get_BrType_X1(-1))) | get_BrType_X1(BNEZ_BRANCH_OPCODE_X1));
+    ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
+  }
+
+  static void PatchNopIntoBranch(MacroAssembler* masm, int pos) {
+    ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
+    masm->instr_at_put(pos, (masm->instr_at(pos) & (~get_BrType_X1(-1))) | get_BrType_X1(BEQZ_BRANCH_OPCODE_X1));
+    ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
+  }
+
   static Mode GetMode(Code* stub) {
 #if 0
     Instr first_instruction = Assembler::instr_at(stub->instruction_start());
@@ -179,11 +189,11 @@ class RecordWriteStub: public PlatformCodeStub {
     code->GetHeap()->incremental_marking()->ActivateGeneratedStub(code);
   }
 
-  class ObjectBits: public BitField<int, 0, 5> {};
-  class ValueBits: public BitField<int, 5, 5> {};
-  class AddressBits: public BitField<int, 10, 5> {};
-  class RememberedSetActionBits: public BitField<RememberedSetAction, 15, 1> {};
-  class SaveFPRegsModeBits: public BitField<SaveFPRegsMode, 16, 1> {};
+  class ObjectBits: public BitField<int, 0, 6> {};
+  class ValueBits: public BitField<int, 6, 6> {};
+  class AddressBits: public BitField<int, 12, 6> {};
+  class RememberedSetActionBits: public BitField<RememberedSetAction, 18, 1> {};
+  class SaveFPRegsModeBits: public BitField<SaveFPRegsMode, 19, 1> {};
 
   Register object_;
   Register value_;

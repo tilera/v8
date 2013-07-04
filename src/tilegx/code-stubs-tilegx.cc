@@ -3688,7 +3688,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
   if (do_gc) {
     __ PrepareCallCFunction(1, r1);
-    __ CallCFunction(ExternalReference::perform_gc_function(isolate), 1, 0);
+    __ CallCFunction(ExternalReference::perform_gc_function(isolate), 1);
   }
 
   ExternalReference scope_depth =
@@ -7514,7 +7514,6 @@ void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
 }
 
 
-#if 0
 struct AheadOfTimeWriteBarrierStubList {
   Register object, value, address;
   RememberedSetAction action;
@@ -7560,7 +7559,6 @@ static const AheadOfTimeWriteBarrierStubList kAheadOfTime[] = {
 };
 
 #undef REG
-#endif
 
 
 bool RecordWriteStub::IsPregenerated() {
@@ -7592,7 +7590,6 @@ void StoreBufferOverflowStub::GenerateFixedRegStubsAheadOfTime(
 
 
 void RecordWriteStub::GenerateFixedRegStubsAheadOfTime(Isolate* isolate) {
-#if 0
   for (const AheadOfTimeWriteBarrierStubList* entry = kAheadOfTime;
        !entry->object.is(no_reg);
        entry++) {
@@ -7603,10 +7600,6 @@ void RecordWriteStub::GenerateFixedRegStubsAheadOfTime(Isolate* isolate) {
                          kDontSaveFPRegs);
     stub.GetCode(isolate)->set_is_pregenerated(true);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -7620,7 +7613,6 @@ bool CodeStub::CanUseFPRegisters() {
 // we keep the GC informed.  The word in the object where the value has been
 // written is in the address register.
 void RecordWriteStub::Generate(MacroAssembler* masm) {
-#if 0
   Label skip_to_incremental_noncompacting;
   Label skip_to_incremental_compacting;
 
@@ -7630,10 +7622,8 @@ void RecordWriteStub::Generate(MacroAssembler* masm) {
   // position) and the "beq zero_reg, zero_reg, ..." when we start and stop
   // incremental heap marking.
   // See RecordWriteStub::Patch for details.
-  __ beq(zero_reg, zero_reg, &skip_to_incremental_noncompacting);
-  __ nop();
-  __ beq(zero_reg, zero_reg, &skip_to_incremental_compacting);
-  __ nop();
+  __ beqz(zero, &skip_to_incremental_noncompacting);
+  __ beqz(zero, &skip_to_incremental_compacting);
 
   if (remembered_set_action_ == EMIT_REMEMBERED_SET) {
     __ RememberedSetHelper(object_,
@@ -7654,22 +7644,17 @@ void RecordWriteStub::Generate(MacroAssembler* masm) {
   // Will be checked in IncrementalMarking::ActivateGeneratedStub.
 
   PatchBranchIntoNop(masm, 0);
-  PatchBranchIntoNop(masm, 2 * Assembler::kInstrSize);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
+  PatchBranchIntoNop(masm, 1 * Assembler::kInstrSize);
 }
 
 
 void RecordWriteStub::GenerateIncremental(MacroAssembler* masm, Mode mode) {
-#if 0
   regs_.Save(masm);
 
   if (remembered_set_action_ == EMIT_REMEMBERED_SET) {
     Label dont_need_remembered_set;
 
-    __ lw(regs_.scratch0(), MemOperand(regs_.address(), 0));
+    __ ld(regs_.scratch0(), MemOperand(regs_.address(), 0));
     __ JumpIfNotInNewSpace(regs_.scratch0(),  // Value.
                            regs_.scratch0(),
                            &dont_need_remembered_set);
@@ -7700,10 +7685,6 @@ void RecordWriteStub::GenerateIncremental(MacroAssembler* masm, Mode mode) {
   InformIncrementalMarker(masm, mode);
   regs_.Restore(masm);
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -7746,20 +7727,19 @@ void RecordWriteStub::CheckNeedsToInformIncrementalMarker(
     MacroAssembler* masm,
     OnNoNeedToInformIncrementalMarker on_no_need,
     Mode mode) {
-#if 0
   Label on_black;
   Label need_incremental;
   Label need_incremental_pop_scratch;
 
   __ And(regs_.scratch0(), regs_.object(), Operand(~Page::kPageAlignmentMask));
-  __ lw(regs_.scratch1(),
+  __ ld(regs_.scratch1(),
         MemOperand(regs_.scratch0(),
                    MemoryChunk::kWriteBarrierCounterOffset));
   __ Subu(regs_.scratch1(), regs_.scratch1(), Operand(1));
-  __ sw(regs_.scratch1(),
+  __ st(regs_.scratch1(),
          MemOperand(regs_.scratch0(),
                     MemoryChunk::kWriteBarrierCounterOffset));
-  __ Branch(&need_incremental, lt, regs_.scratch1(), Operand(zero_reg));
+  __ Branch(&need_incremental, lt, regs_.scratch1(), Operand(zero));
 
   // Let's look at the color of the object:  If it is not black we don't have
   // to inform the incremental marker.
@@ -7779,7 +7759,7 @@ void RecordWriteStub::CheckNeedsToInformIncrementalMarker(
   __ bind(&on_black);
 
   // Get the value from the slot.
-  __ lw(regs_.scratch0(), MemOperand(regs_.address(), 0));
+  __ ld(regs_.scratch0(), MemOperand(regs_.address(), 0));
 
   if (mode == INCREMENTAL_COMPACTION) {
     Label ensure_not_white;
@@ -7826,10 +7806,6 @@ void RecordWriteStub::CheckNeedsToInformIncrementalMarker(
   __ bind(&need_incremental);
 
   // Fall through when we need to inform the incremental marker.
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

@@ -194,12 +194,6 @@ class MacroAssembler: public Assembler {
   // function).
   void CallCFunction(ExternalReference function, int num_arguments);
   void CallCFunction(Register function, int num_arguments);
-  void CallCFunction(ExternalReference function,
-                     int num_reg_arguments,
-                     int num_double_arguments);
-  void CallCFunction(Register function,
-                     int num_reg_arguments,
-                     int num_double_arguments);
 
   // Detects conservatively whether an object is data-only, i.e. it does need to
   // be scanned by the garbage collector.
@@ -407,8 +401,6 @@ class MacroAssembler: public Assembler {
   // ---------------------------------------------------------------------------
   // Pseudo-instructions.
 
-  void mov(Register rd, Register rt) { UNREACHABLE(); }
-
   // Load int32 in the rd register.
   void li(Register rd, Operand j, int line = 0, LiFlags mode = CONSTANT_SIZE);
   inline void li(Register rd, int64_t j, int line = 0, LiFlags mode = CONSTANT_SIZE) {
@@ -492,6 +484,26 @@ class MacroAssembler: public Assembler {
   void pop(Register dst) {
     ld(dst, sp);
     addi(sp, sp, kPointerSize);
+  }
+
+  // Pop two registers. Pops rightmost register first (from lower address).
+  void Pop(Register src1, Register src2) {
+    ASSERT(!src1.is(src2));
+    ld(src2, MemOperand(sp, 0 * kPointerSize));
+    ld(src1, MemOperand(sp, 1 * kPointerSize));
+    Addu(sp, sp, 2 * kPointerSize);
+  }
+
+  // Pop three registers. Pops rightmost register first (from lower address).
+  void Pop(Register src1, Register src2, Register src3) {
+    ld(src3, MemOperand(sp, 0 * kPointerSize));
+    ld(src2, MemOperand(sp, 1 * kPointerSize));
+    ld(src1, MemOperand(sp, 2 * kPointerSize));
+    Addu(sp, sp, 3 * kPointerSize);
+  }
+
+  void Pop(uint32_t count = 1) {
+    Addu(sp, sp, Operand(count * kPointerSize));
   }
 
   // Push a handle.
@@ -864,6 +876,21 @@ class MacroAssembler: public Assembler {
                           Register scratch,
                           Label* if_deprecated);
 
+  // Check if object is in new space.  Jumps if the object is not in new space.
+  // The register scratch can be object itself, but it will be clobbered.
+  void JumpIfNotInNewSpace(Register object,
+                           Register scratch,
+                           Label* branch) {
+    InNewSpace(object, scratch, ne, branch);
+  }
+
+  // Check if object is in new space.  Jumps if the object is in new space.
+  // The register scratch can be object itself, but scratch will be clobbered.
+  void JumpIfInNewSpace(Register object,
+                        Register scratch,
+                        Label* branch) {
+    InNewSpace(object, scratch, eq, branch);
+  }
 
   // ---------------------------------------------------------------------------
   // Inline caching support.
@@ -893,8 +920,12 @@ class MacroAssembler: public Assembler {
 #endif
 
  private:
+  void CallCFunctionHelper(Register function,
+                           int num_reg_arguments);
   void BranchShort(Label* L);
   void BranchShort(Label* L, Condition cond, Register rs, const Operand& rt);
+  void BranchShort(int16_t offset);
+  void BranchShort(int16_t offset, Condition cond, Register rs, const Operand& rt);
 
   bool generating_stub_;
   bool allow_stub_calls_;
