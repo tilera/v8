@@ -1202,13 +1202,122 @@ void MacroAssembler::LeaveFrame(StackFrame::Type type) { UNREACHABLE(); }
 
 
 void MacroAssembler::EnterExitFrame(bool save_doubles,
-                                    int stack_space) { UNREACHABLE(); }
+                                    int stack_space) {
+  // Set up the frame structure on the stack.
+  STATIC_ASSERT(2 * kPointerSize == ExitFrameConstants::kCallerSPDisplacement);
+  STATIC_ASSERT(1 * kPointerSize == ExitFrameConstants::kCallerPCOffset);
+  STATIC_ASSERT(0 * kPointerSize == ExitFrameConstants::kCallerFPOffset);
 
+  // This is how the stack will look:
+  // fp + 2 (==kCallerSPDisplacement) - old stack's end
+  // [fp + 1 (==kCallerPCOffset)] - saved old ra
+  // [fp + 0 (==kCallerFPOffset)] - saved old fp
+  // [fp - 1 (==kSPOffset)] - sp of the called function
+  // [fp - 2 (==kCodeOffset)] - CodeObject
+  // fp - (2 + stack_space + alignment) == sp == [fp - kSPOffset] - top of the
+  //   new stack (will contain saved ra)
+
+  // Save registers.
+  addi(sp, sp, -4 * kPointerSize);
+  st(lr, MemOperand(sp, 3 * kPointerSize));
+  st(fp, MemOperand(sp, 2 * kPointerSize));
+  addi(fp, sp, 2 * kPointerSize);  // Set up new frame pointer.
+
+  if (emit_debug_code()) {
+    st(zero, MemOperand(fp, ExitFrameConstants::kSPOffset));
+  }
+
+  // Accessed from ExitFrame::code_slot.
+  li(r40, Operand(CodeObject()), CONSTANT_SIZE);
+  st(r40, MemOperand(fp, ExitFrameConstants::kCodeOffset));
+
+  // Save the frame pointer and the context in top.
+  li(r40, Operand(ExternalReference(Isolate::kCEntryFPAddress, isolate())));
+  st(fp, MemOperand(r40));
+  li(r40, Operand(ExternalReference(Isolate::kContextAddress, isolate())));
+  st(cp, MemOperand(r40));
+
+  const int frame_alignment = MacroAssembler::ActivationFrameAlignment();
+  if (save_doubles) {
+#if 0
+    // The stack  must be allign to 0 modulo 8 for stores with sdc1.
+    ASSERT(kDoubleSize == frame_alignment);
+    if (frame_alignment > 0) {
+      ASSERT(IsPowerOf2(frame_alignment));
+      And(sp, sp, Operand(-frame_alignment));  // Align stack.
+    }
+    int space = FPURegister::kMaxNumRegisters * kDoubleSize;
+    Subu(sp, sp, Operand(space));
+    // Remember: we only need to save every 2nd double FPU value.
+    for (int i = 0; i < FPURegister::kMaxNumRegisters; i+=2) {
+      FPURegister reg = FPURegister::from_code(i);
+      sdc1(reg, MemOperand(sp, i * kDoubleSize));
+    }
+#else
+    UNREACHABLE();
+#endif
+  }
+
+  // Reserve place for the return address, stack space and an optional slot
+  // (used by the DirectCEntryStub to hold the return value if a struct is
+  // returned) and align the frame preparing for calling the runtime function.
+  ASSERT(stack_space >= 0);
+  Subu(sp, sp, Operand((stack_space + 2) * kPointerSize));
+  if (frame_alignment > 0) {
+    ASSERT(IsPowerOf2(frame_alignment));
+    And(sp, sp, Operand(-frame_alignment));  // Align stack.
+  }
+
+  // Set the exit frame sp value to point just before the return address
+  // location.
+  addi(tt, sp, kPointerSize);
+  st(tt, MemOperand(fp, ExitFrameConstants::kSPOffset));
+}
 
 void MacroAssembler::LeaveExitFrame(bool save_doubles,
                                     Register argument_count,
-                                    bool do_return) { UNREACHABLE(); }
+                                    bool do_return) {
+  // Optionally restore all double registers.
+  if (save_doubles) {
+#if 0
+    // Remember: we only need to restore every 2nd double FPU value.
+    lw(t8, MemOperand(fp, ExitFrameConstants::kSPOffset));
+    for (int i = 0; i < FPURegister::kMaxNumRegisters; i+=2) {
+      FPURegister reg = FPURegister::from_code(i);
+      ldc1(reg, MemOperand(t8, i  * kDoubleSize + kPointerSize));
+    }
+#else
+    UNREACHABLE();
+#endif
+  }
 
+  // Clear top frame.
+  li(r40, Operand(ExternalReference(Isolate::kCEntryFPAddress, isolate())));
+  st(zero, MemOperand(r40));
+
+  // Restore current context from top and clear it in debug mode.
+  li(r40, Operand(ExternalReference(Isolate::kContextAddress, isolate())));
+  ld(cp, MemOperand(r40));
+#ifdef DEBUG
+  st(r3, MemOperand(r40));
+#endif
+
+  // Pop the arguments, restore registers, and return.
+  move(sp, fp);  // Respect ABI stack constraint.
+  ld(fp, MemOperand(sp, ExitFrameConstants::kCallerFPOffset));
+  ld(lr, MemOperand(sp, ExitFrameConstants::kCallerPCOffset));
+
+  if (argument_count.is_valid()) {
+    sll(r40, argument_count, kPointerSizeLog2);
+    add(sp, sp, r40);
+  }
+
+  if (do_return) {
+    Ret();
+    // If returning, the instruction in the delay slot will be the addiu below.
+  }
+  addi(sp, sp, 8);
+}
 
 int MacroAssembler::ActivationFrameAlignment() {
 #if defined(V8_HOST_ARCH_TILEGX)

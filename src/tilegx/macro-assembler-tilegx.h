@@ -167,9 +167,6 @@ class MacroAssembler: public Assembler {
   void JumpIfEitherSmi(Register reg1, Register reg2, Label* on_either_smi);
 
   void PrepareCallCFunction(int num_reg_arguments,
-                            int num_double_registers,
-                            Register scratch);
-  void PrepareCallCFunction(int num_reg_arguments,
                             Register scratch);
 
   // Helper for finding the mark bits for an address.  Afterwards, the
@@ -546,6 +543,16 @@ class MacroAssembler: public Assembler {
                                Register scratch,
                                Label* miss,
                                bool miss_on_bound_function = false);
+
+  // See comments at the beginning of CEntryStub::Generate.
+  inline void PrepareCEntryArgs(int num_args) {
+    li(r30, num_args);
+    li(r31, (num_args - 1) * kPointerSize);
+  }
+
+  inline void PrepareCEntryFunction(const ExternalReference& ref) {
+    li(r32, Operand(ref));
+  }
 
   // Call a code stub.
   void CallStub(CodeStub* stub,
