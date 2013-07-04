@@ -1334,7 +1334,22 @@ int MacroAssembler::ActivationFrameAlignment() {
 }
 
 
-void MacroAssembler::AssertStackIsAligned() { UNREACHABLE(); }
+void MacroAssembler::AssertStackIsAligned() {
+  if (emit_debug_code()) {
+    const int frame_alignment = ActivationFrameAlignment();
+    const int frame_alignment_mask = frame_alignment - 1;
+
+    if (frame_alignment > kPointerSize) {
+      Label alignment_as_expected;
+      ASSERT(IsPowerOf2(frame_alignment));
+      andi(tt, sp, frame_alignment_mask);
+      Branch(&alignment_as_expected, eq, tt, Operand(zero));
+      // Don't use Check here, as it will call Runtime_Abort re-entering here.
+      stop("Unexpected stack alignment");
+      bind(&alignment_as_expected);
+    }
+  }
+}
 
 void MacroAssembler::UntagAndJumpIfSmi(Register dst,
                                        Register src,

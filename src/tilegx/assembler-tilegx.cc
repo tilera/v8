@@ -999,6 +999,39 @@ bool Assembler::IsEmittedConstant(Instr instr) {
   return label_constant == 0;  // Emitted label const in reg-exp engine.
 }
 
+void Assembler::break_(uint32_t code, bool break_as_stop) {
+  ASSERT((code & ~0xfffff) == 0);
+  // We need to invalidate breaks that could be stops as well because the
+  // simulator expects a char pointer after the stop instruction.
+  // See constants-mips.h for explanation.
+  ASSERT((break_as_stop &&
+          code <= kMaxStopCode &&
+          code > kMaxWatchpointCode) ||
+         (!break_as_stop &&
+          (code > kMaxStopCode ||
+           code <= kMaxWatchpointCode)));
+  Instr break_instr = BPT_X1;
+  emit(break_instr);
+}
+
+void Assembler::stop(const char* msg, uint32_t code) {
+  ASSERT(code > kMaxWatchpointCode);
+  ASSERT(code <= kMaxStopCode);
+#if defined(V8_HOST_ARCH_TILEGX)
+  break_(0x54321);
+#else  // V8_HOST_ARCH_TILEGX
+#if 0 // No Simulator Support for TileGX
+  BlockTrampolinePoolFor(2);
+  // The Simulator will handle the stop instruction and get the message address.
+  // On MIPS stop() is just a special kind of break_().
+  break_(code, true);
+  emit(reinterpret_cast<Instr>(msg));
+#else
+  UNREACHABLE();
+#endif
+#endif
+}
+
 } }  // namespace v8::internal
 
 #endif  // V8_TARGET_ARCH_TILEGX

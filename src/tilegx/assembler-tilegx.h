@@ -256,6 +256,12 @@ int print_insn_tilegx (unsigned char * memaddr);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(JUMP_OPCODE_X1) |              \
       create_JumpOpcodeExtension_X1(JAL_JUMP_OPCODE_X1) | FNOP_X0
 
+#define BPT_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(ILL_UNARY_OPCODE_X1) |                    \
+      create_Dest_X1(0x1C) | create_SrcA_X1(0x25) | FNOP_X0
+
 #define DEST_X0(x) create_Dest_X0(x)
 #define SRCA_X0(x) create_SrcA_X0(x)
 #define SRCB_X0(x) create_SrcB_X0(x)
@@ -738,6 +744,9 @@ class Assembler : public AssemblerBase {
   void andi(const Register& rd, const Register& rs, int8_t j, int line = 0);
   void movn(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void movz(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+
+  void break_(uint32_t code, bool break_as_stop = false);
+  void stop(const char* msg, uint32_t code = kMaxStopCode);
 
   // Check if an instruction is a branch of some kind.
   static bool IsNop(Instr instr, unsigned int type);

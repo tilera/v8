@@ -39,6 +39,10 @@ const int kImm16Shift = 0;
 const int kImm16Bits  = 16;
 const int  kImm16Mask    = ((1 << kImm16Bits) - 1) << kImm16Shift;
 
+const uint32_t kMaxWatchpointCode = 31;
+const uint32_t kMaxStopCode = 127;
+STATIC_ASSERT(kMaxWatchpointCode < kMaxStopCode);
+
 enum Condition {
   // Any value < 0 is considered no_condition.
   kNoCondition  = -1,
