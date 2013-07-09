@@ -493,6 +493,8 @@ const int kRegister_s0_Code = 40;
 const int kRegister_s1_Code = 41;
 const int kRegister_s2_Code = 42;
 const int kRegister_s3_Code = 43;
+const int kRegister_s4_Code = 44;
+const int kRegister_s5_Code = 45;
 
 const int kRegister_tt_Code = 49;
 const int kRegister_pc_Code = 50;
@@ -504,6 +506,7 @@ const int kRegister_lr_Code = 55;
 const int kRegister_zero_Code = 55;
 const int kRegister_no_reg_Code = -1;
 
+const Register v0  = { kRegister_a0_Code };
 const Register a0  = { kRegister_a0_Code };
 const Register a1  = { kRegister_a1_Code };
 const Register a2  = { kRegister_a2_Code };
@@ -525,7 +528,10 @@ const Register s0  = { kRegister_s0_Code };
 const Register s1  = { kRegister_s1_Code };
 const Register s2  = { kRegister_s2_Code };
 const Register s3  = { kRegister_s3_Code };
+const Register s4  = { kRegister_s4_Code };
+const Register s5  = { kRegister_s5_Code };
 
+const Register at  = { kRegister_tt_Code };
 const Register tt  = { kRegister_tt_Code };
 const Register pc  = { kRegister_pc_Code };
 const Register gp  = { kRegister_gp_Code };
@@ -696,6 +702,7 @@ class Assembler : public AssemblerBase {
   static bool IsJR(Instr instr);
   static bool IsJAL(Instr instr);
   static bool IsMOVELI(Instr instr);
+  static bool IsANDI(Instr instr);
   static bool IsSHL16INSLI(Instr instr);
   static bool IsBeqz(Instr instr);
   static bool IsBnez(Instr instr);
@@ -727,6 +734,10 @@ class Assembler : public AssemblerBase {
   // follows LUI/ORI pair is substituted with J/JAL, this constant equals
   // to 3 instructions (LUI+ORI+J/JAL/JR/JALR).
   static const int kInstructionsFor32BitConstant = 3;
+
+  // Distance between the instruction referring to the address of the call
+  // target and the return address.
+  static const int kCallTargetAddressOffset = 4 * kInstrSize;
 
   // This sets the branch destination (which gets loaded at the call address).
   // This is for calls and branches within generated code.  The serializer
@@ -767,6 +778,10 @@ class Assembler : public AssemblerBase {
   // ---------------------------------------------------------------------------
   // Instruction Encoding
   
+  void nop(int line = 0) {
+    sll(zero, zero, zero, line);
+  }
+
   void j(int64_t target, int line = 0);
   void jr(Register target, int line = 0);
   void jalr(Register target, int line = 0);

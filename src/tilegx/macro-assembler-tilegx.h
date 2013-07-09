@@ -280,6 +280,29 @@ class MacroAssembler: public Assembler {
   bool has_frame() { return has_frame_; }
   inline bool AllowThisStubCall(CodeStub* stub);
 
+  // -------------------------------------------------------------------------
+  // Smi utilities.
+
+  void SmiTag(Register reg) {
+    Addu(reg, reg, reg);
+  }
+
+  // Test for overflow < 0: use BranchOnOverflow() or BranchOnNoOverflow().
+  void SmiTagCheckOverflow(Register reg, Register overflow);
+  void SmiTagCheckOverflow(Register dst, Register src, Register overflow);
+
+  void SmiTag(Register dst, Register src) {
+    Addu(dst, src, src);
+  }
+
+  void SmiUntag(Register reg) {
+    sra(reg, reg, kSmiTagSize);
+  }
+
+  void SmiUntag(Register dst, Register src) {
+    sra(dst, src, kSmiTagSize);
+  }
+
   // Helper for throwing exceptions.  Compute a handler address and jump to
   // it.  See the implementation for register usage.
   void JumpToHandlerEntry();
@@ -551,6 +574,14 @@ class MacroAssembler: public Assembler {
                    Handle<Code> success,
                    SmiCheckType smi_check_type);
 
+  void DropAndRet(int drop);
+
+  void DropAndRet(int drop,
+                  Condition cond,
+                  Register reg,
+                  const Operand& op);
+
+  void Swap(Register reg1, Register reg2, Register scratch = no_reg);
   // Emit code to discard a non-negative number of pointer-sized elements
   // from the stack, clobbering only the sp register.
   void Drop(int count,

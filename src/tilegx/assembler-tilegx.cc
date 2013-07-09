@@ -172,6 +172,26 @@ bool Assembler::IsMOVELI(Instr instr) {
   return X0_OPC == ADDLI_OPCODE_X0 || X1_OPC == ADDLI_OPCODE_X1;
 }
 
+bool Assembler::IsANDI(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X0_OPC = -1, X1_OPC = -1;
+  int32_t X0_SUB_OPC = -1, X1_SUB_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X0_OPC = get_Opcode_X0(instr);
+  X1_OPC = get_Opcode_X1(instr);
+  X0_SUB_OPC = get_Imm8OpcodeExtension_X0(instr);
+  X1_SUB_OPC = get_Imm8OpcodeExtension_X1(instr);
+
+  // Checks if the instruction is a moveli which is
+  // used for constant loading and is actually alias
+  // of addli.
+  return (X0_OPC == IMM8_OPCODE_X0 && X0_SUB_OPC == ANDI_IMM8_OPCODE_X0)
+          || (X1_OPC == IMM8_OPCODE_X1 && X1_SUB_OPC == ANDI_IMM8_OPCODE_X1);
+}
+
 bool Assembler::IsBeqz(Instr instr) {
   uint32_t mode   = get_Mode(instr);
   int32_t X1_OPC = -1, BrType = -1;
@@ -850,7 +870,10 @@ int Assembler::RelocateInternalReference(byte* pc, intptr_t pc_delta) {
 }
 
 void Assembler::RecordComment(const char* msg) {
-	UNIMPLEMENTED();
+  if (FLAG_code_comments) {
+    CheckBuffer();
+    RecordRelocInfo(RelocInfo::COMMENT, reinterpret_cast<intptr_t>(msg));
+  }
 }
 
 MemOperand::MemOperand(Register rm, int64_t offset) : Operand(rm) {

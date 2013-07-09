@@ -1164,13 +1164,67 @@ void MacroAssembler::Ret(Condition cond,
 }
 
 
+void MacroAssembler::DropAndRet(int drop) {
+  Ret();
+  addli(sp, sp, drop * kPointerSize);
+}
+
+void MacroAssembler::DropAndRet(int drop,
+                                Condition cond,
+                                Register r1,
+                                const Operand& r2) {
+  // Both Drop and Ret need to be conditional.
+  Label skip;
+  if (cond != cc_always) {
+    Branch(&skip, NegateCondition(cond), r1, r2);
+  }
+
+  Drop(drop);
+  Ret();
+
+  if (cond != cc_always) {
+    bind(&skip);
+  }
+}
+
 void MacroAssembler::Drop(int count,
                           Condition cond,
                           Register reg,
-                          const Operand& op) { UNREACHABLE(); }
+                          const Operand& op) {
+  if (count <= 0) {
+    return;
+  }
 
-void MacroAssembler::Call(Label* target) { UNREACHABLE(); }
+  Label skip;
 
+  if (cond != al) {
+     Branch(&skip, NegateCondition(cond), reg, op);
+  }
+
+  addli(sp, sp, count * kPointerSize);
+
+  if (cond != al) {
+    bind(&skip);
+  }
+}
+
+void MacroAssembler::Swap(Register reg1,
+                          Register reg2,
+                          Register scratch) {
+  if (scratch.is(no_reg)) {
+    Xor(reg1, reg1, Operand(reg2));
+    Xor(reg2, reg2, Operand(reg1));
+    Xor(reg1, reg1, Operand(reg2));
+  } else {
+    move(scratch, reg1);
+    move(reg1, reg2);
+    move(reg2, scratch);
+  }
+}
+
+void MacroAssembler::Call(Label* target) {
+  BranchAndLink(target);
+}
 
 void MacroAssembler::Push(Handle<Object> handle) { UNREACHABLE(); }
 
@@ -1810,15 +1864,105 @@ void MacroAssembler::InvokePrologue(const ParameterCount& expected,
                                     bool* definitely_mismatches,
                                     InvokeFlag flag,
                                     const CallWrapper& call_wrapper,
-                                    CallKind call_kind) { UNREACHABLE(); }
+                                    CallKind call_kind) {
+  bool definitely_matches = false;
+  *definitely_mismatches = false;
+  Label regular_invoke;
 
+  // Check whether the expected and actual arguments count match. If not,
+  // setup registers according to contract with ArgumentsAdaptorTrampoline:
+  //  a0: actual arguments count
+  //  a1: function (passed through to callee)
+  //  a2: expected arguments count
+  //  a3: callee code entry
+
+  // The code below is made a lot easier because the calling code already sets
+  // up actual and expected registers according to the contract if values are
+  // passed in registers.
+  ASSERT(actual.is_immediate() || actual.reg().is(a0));
+  ASSERT(expected.is_immediate() || expected.reg().is(a2));
+  ASSERT((!code_constant.is_null() && code_reg.is(no_reg)) || code_reg.is(a3));
+
+  if (expected.is_immediate()) {
+    ASSERT(actual.is_immediate());
+    if (expected.immediate() == actual.immediate()) {
+      definitely_matches = true;
+    } else {
+      li(a0, Operand(actual.immediate()));
+      const int sentinel = SharedFunctionInfo::kDontAdaptArgumentsSentinel;
+      if (expected.immediate() == sentinel) {
+        // Don't worry about adapting arguments for builtins that
+        // don't want that done. Skip adaption code by making it look
+        // like we have a match between expected and actual number of
+        // arguments.
+        definitely_matches = true;
+      } else {
+        *definitely_mismatches = true;
+        li(a2, Operand(expected.immediate()));
+      }
+    }
+  } else if (actual.is_immediate()) {
+    Branch(&regular_invoke, eq, expected.reg(), Operand(actual.immediate()));
+    li(a0, Operand(actual.immediate()));
+  } else {
+    Branch(&regular_invoke, eq, expected.reg(), Operand(actual.reg()));
+  }
+
+  if (!definitely_matches) {
+    if (!code_constant.is_null()) {
+      li(a3, Operand(code_constant));
+      addli(a3, a3, Code::kHeaderSize - kHeapObjectTag);
+    }
+
+    Handle<Code> adaptor =
+        isolate()->builtins()->ArgumentsAdaptorTrampoline();
+    if (flag == CALL_FUNCTION) {
+      call_wrapper.BeforeCall(CallSize(adaptor));
+      SetCallKind(t1, call_kind);
+      Call(adaptor);
+      call_wrapper.AfterCall();
+      if (!*definitely_mismatches) {
+        Branch(done);
+      }
+    } else {
+      SetCallKind(t1, call_kind);
+      Jump(adaptor, RelocInfo::CODE_TARGET);
+    }
+    bind(&regular_invoke);
+  }
+}
 
 void MacroAssembler::InvokeCode(Register code,
                                 const ParameterCount& expected,
                                 const ParameterCount& actual,
                                 InvokeFlag flag,
                                 const CallWrapper& call_wrapper,
-                                CallKind call_kind) { UNREACHABLE(); }
+                                CallKind call_kind) {
+  // You can't call a function without a valid frame.
+  ASSERT(flag == JUMP_FUNCTION || has_frame());
+
+  Label done;
+
+  bool definitely_mismatches = false;
+  InvokePrologue(expected, actual, Handle<Code>::null(), code,
+                 &done, &definitely_mismatches, flag,
+                 call_wrapper, call_kind);
+  if (!definitely_mismatches) {
+    if (flag == CALL_FUNCTION) {
+      call_wrapper.BeforeCall(CallSize(code));
+      SetCallKind(t1, call_kind);
+      Call(code);
+      call_wrapper.AfterCall();
+    } else {
+      ASSERT(flag == JUMP_FUNCTION);
+      SetCallKind(t1, call_kind);
+      Jump(code);
+    }
+    // Continue here if InvokePrologue does handle the invocation due to
+    // mismatched parameter counts.
+    bind(&done);
+  }
+}
 
 
 void MacroAssembler::InvokeCode(Handle<Code> code,
@@ -1826,14 +1970,55 @@ void MacroAssembler::InvokeCode(Handle<Code> code,
                                 const ParameterCount& actual,
                                 RelocInfo::Mode rmode,
                                 InvokeFlag flag,
-                                CallKind call_kind) { UNREACHABLE(); }
+                                CallKind call_kind) {
+  // You can't call a function without a valid frame.
+  ASSERT(flag == JUMP_FUNCTION || has_frame());
+
+  Label done;
+
+  bool definitely_mismatches = false;
+  InvokePrologue(expected, actual, code, no_reg,
+                 &done, &definitely_mismatches, flag,
+                 NullCallWrapper(), call_kind);
+  if (!definitely_mismatches) {
+    if (flag == CALL_FUNCTION) {
+      SetCallKind(t1, call_kind);
+      Call(code, rmode);
+    } else {
+      SetCallKind(t1, call_kind);
+      Jump(code, rmode);
+    }
+    // Continue here if InvokePrologue does handle the invocation due to
+    // mismatched parameter counts.
+    bind(&done);
+  }
+}
 
 
 void MacroAssembler::InvokeFunction(Register function,
                                     const ParameterCount& actual,
                                     InvokeFlag flag,
                                     const CallWrapper& call_wrapper,
-                                    CallKind call_kind) { UNREACHABLE(); }
+                                    CallKind call_kind) {
+  // You can't call a function without a valid frame.
+  ASSERT(flag == JUMP_FUNCTION || has_frame());
+
+  // Contract with called JS functions requires that function is passed in a1.
+  ASSERT(function.is(a1));
+  Register expected_reg = a2;
+  Register code_reg = a3;
+
+  ld(code_reg, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
+  ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+  ld(expected_reg,
+      FieldMemOperand(code_reg,
+                      SharedFunctionInfo::kFormalParameterCountOffset));
+  sra(expected_reg, expected_reg, kSmiTagSize);
+  ld(code_reg, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
+
+  ParameterCount expected(expected_reg);
+  InvokeCode(code_reg, expected, actual, flag, call_wrapper, call_kind);
+}
 
 
 void MacroAssembler::InvokeFunction(Handle<JSFunction> function,
@@ -1841,22 +2026,88 @@ void MacroAssembler::InvokeFunction(Handle<JSFunction> function,
                                     const ParameterCount& actual,
                                     InvokeFlag flag,
                                     const CallWrapper& call_wrapper,
-                                    CallKind call_kind) { UNREACHABLE(); }
+                                    CallKind call_kind) {
+  // You can't call a function without a valid frame.
+  ASSERT(flag == JUMP_FUNCTION || has_frame());
+
+  // Get the function and setup the context.
+  LoadHeapObject(a1, function);
+  ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+
+  // We call indirectly through the code field in the function to
+  // allow recompilation to take effect without changing any of the
+  // call sites.
+  ld(a3, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
+  InvokeCode(a3, expected, actual, flag, call_wrapper, call_kind);
+}
 
 void MacroAssembler::IsObjectNameType(Register object,
                                       Register scratch,
-                                      Label* fail) { UNREACHABLE(); }
+                                      Label* fail) {
+  ld(scratch, FieldMemOperand(object, HeapObject::kMapOffset));
+  ld1u(scratch, FieldMemOperand(scratch, Map::kInstanceTypeOffset));
+  Branch(fail, hi, scratch, Operand(LAST_NAME_TYPE));
+}
 
 
 // ---------------------------------------------------------------------------
 // Support functions.
 
-
 void MacroAssembler::TryGetFunctionPrototype(Register function,
                                              Register result,
                                              Register scratch,
                                              Label* miss,
-                                             bool miss_on_bound_function) { UNREACHABLE(); }
+                                             bool miss_on_bound_function) {
+  // Check that the receiver isn't a smi.
+  JumpIfSmi(function, miss);
+
+  // Check that the function really is a function.  Load map into result reg.
+  GetObjectType(function, result, scratch);
+  Branch(miss, ne, scratch, Operand(JS_FUNCTION_TYPE));
+
+  if (miss_on_bound_function) {
+    ld(scratch,
+       FieldMemOperand(function, JSFunction::kSharedFunctionInfoOffset));
+    ld(scratch,
+       FieldMemOperand(scratch, SharedFunctionInfo::kCompilerHintsOffset));
+    And(scratch, scratch,
+        Operand(Smi::FromInt(1 << SharedFunctionInfo::kBoundFunction)));
+    Branch(miss, ne, scratch, Operand(zero));
+  }
+
+  // Make sure that the function has an instance prototype.
+  Label non_instance;
+  ld1u(scratch, FieldMemOperand(result, Map::kBitFieldOffset));
+  And(scratch, scratch, Operand(1 << Map::kHasNonInstancePrototype));
+  Branch(&non_instance, ne, scratch, Operand(zero));
+
+  // Get the prototype or initial map from the function.
+  ld(result,
+     FieldMemOperand(function, JSFunction::kPrototypeOrInitialMapOffset));
+
+  // If the prototype or initial map is the hole, don't return it and
+  // simply miss the cache instead. This will allow us to allocate a
+  // prototype object on-demand in the runtime system.
+  LoadRoot(t8, Heap::kTheHoleValueRootIndex);
+  Branch(miss, eq, result, Operand(t8));
+
+  // If the function does not have an initial map, we're done.
+  Label done;
+  GetObjectType(result, scratch, scratch);
+  Branch(&done, ne, scratch, Operand(MAP_TYPE));
+
+  // Get the prototype from the initial map.
+  ld(result, FieldMemOperand(result, Map::kPrototypeOffset));
+  jmp(&done);
+
+  // Non-instance prototype: Fetch prototype from constructor field
+  // in initial map.
+  bind(&non_instance);
+  ld(result, FieldMemOperand(result, Map::kConstructorOffset));
+
+  // All done.
+  bind(&done);
+}
 
 
 // -----------------------------------------------------------------------------
@@ -1927,18 +2178,33 @@ void MacroAssembler::CallRuntime(Runtime::FunctionId fid, int num_arguments) {
 }
 
 void MacroAssembler::CallExternalReference(const ExternalReference& ext,
-                                           int num_arguments) { UNREACHABLE(); }
+                                           int num_arguments) {
+  PrepareCEntryArgs(num_arguments);
+  PrepareCEntryFunction(ext);
+
+  CEntryStub stub(1);
+  CallStub(&stub, TypeFeedbackId::None(), al, zero, Operand(zero));
+}
 
 
 void MacroAssembler::TailCallExternalReference(const ExternalReference& ext,
                                                int num_arguments,
-                                               int result_size) { UNREACHABLE(); }
-
+                                               int result_size) {
+  // TODO(1236192): Most runtime routines don't need the number of
+  // arguments passed in because it is constant. At some point we
+  // should remove this need and make the runtime routine entry code
+  // smarter.
+  PrepareCEntryArgs(num_arguments);
+  JumpToExternalReference(ext);
+}
 
 void MacroAssembler::TailCallRuntime(Runtime::FunctionId fid,
                                      int num_arguments,
-                                     int result_size) { UNREACHABLE(); }
-
+                                     int result_size) {
+  TailCallExternalReference(ExternalReference(fid, isolate()),
+                            num_arguments,
+                            result_size);
+}
 
 void MacroAssembler::JumpToExternalReference(const ExternalReference& builtin) {
   PrepareCEntryFunction(builtin);
@@ -1953,27 +2219,71 @@ void MacroAssembler::JumpToExternalReference(const ExternalReference& builtin) {
 
 void MacroAssembler::InvokeBuiltin(Builtins::JavaScript id,
                                    InvokeFlag flag,
-                                   const CallWrapper& call_wrapper) { UNREACHABLE(); }
+                                   const CallWrapper& call_wrapper) {
+  // You can't call a builtin without a valid frame.
+  ASSERT(flag == JUMP_FUNCTION || has_frame());
+
+  GetBuiltinEntry(t9, id);
+  if (flag == CALL_FUNCTION) {
+    call_wrapper.BeforeCall(CallSize(t9));
+    SetCallKind(t1, CALL_AS_METHOD);
+    Call(t9);
+    call_wrapper.AfterCall();
+  } else {
+    ASSERT(flag == JUMP_FUNCTION);
+    SetCallKind(t1, CALL_AS_METHOD);
+    Jump(t9);
+  }
+}
 
 
 void MacroAssembler::GetBuiltinFunction(Register target,
-                                        Builtins::JavaScript id) { UNREACHABLE(); }
+                                        Builtins::JavaScript id) {
+  // Load the builtins object into target register.
+  ld(target, MemOperand(cp, Context::SlotOffset(Context::GLOBAL_OBJECT_INDEX)));
+  ld(target, FieldMemOperand(target, GlobalObject::kBuiltinsOffset));
+  // Load the JavaScript builtin function from the builtins object.
+  ld(target, FieldMemOperand(target,
+                          JSBuiltinsObject::OffsetOfFunctionWithId(id)));
+}
 
-
-void MacroAssembler::GetBuiltinEntry(Register target, Builtins::JavaScript id) { UNREACHABLE(); }
-
+void MacroAssembler::GetBuiltinEntry(Register target, Builtins::JavaScript id) {
+  ASSERT(!target.is(a1));
+  GetBuiltinFunction(a1, id);
+  // Load the code entry point from the builtins object.
+  ld(target, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
+}
 
 void MacroAssembler::SetCounter(StatsCounter* counter, int value,
-                                Register scratch1, Register scratch2) { UNREACHABLE(); }
-
+                                Register scratch1, Register scratch2) {
+  if (FLAG_native_code_counters && counter->Enabled()) {
+    li(scratch1, Operand(value));
+    li(scratch2, Operand(ExternalReference(counter)));
+    st(scratch1, MemOperand(scratch2));
+  }
+}
 
 void MacroAssembler::IncrementCounter(StatsCounter* counter, int value,
-                                      Register scratch1, Register scratch2) { UNREACHABLE(); }
-
+                                      Register scratch1, Register scratch2) {
+  ASSERT(value > 0);
+  if (FLAG_native_code_counters && counter->Enabled()) {
+    li(scratch2, Operand(ExternalReference(counter)));
+    ld(scratch1, MemOperand(scratch2));
+    Addu(scratch1, scratch1, Operand(value));
+    st(scratch1, MemOperand(scratch2));
+  }
+}
 
 void MacroAssembler::DecrementCounter(StatsCounter* counter, int value,
-                                      Register scratch1, Register scratch2) { UNREACHABLE(); }
-
+                                      Register scratch1, Register scratch2) {
+  ASSERT(value > 0);
+  if (FLAG_native_code_counters && counter->Enabled()) {
+    li(scratch2, Operand(ExternalReference(counter)));
+    ld(scratch1, MemOperand(scratch2));
+    Subu(scratch1, scratch1, Operand(value));
+    st(scratch1, MemOperand(scratch2));
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Debugging.
@@ -2022,8 +2332,52 @@ void MacroAssembler::Check(Condition cc, const char* msg,
   bind(&L);
 }
 
-void MacroAssembler::Abort(const char* msg) { UNREACHABLE(); }
+void MacroAssembler::Abort(const char* msg) {
+  Label abort_start;
+  bind(&abort_start);
+  // We want to pass the msg string like a smi to avoid GC
+  // problems, however msg is not guaranteed to be aligned
+  // properly. Instead, we pass an aligned pointer that is
+  // a proper v8 smi, but also pass the alignment difference
+  // from the real pointer as a smi.
+  intptr_t p1 = reinterpret_cast<intptr_t>(msg);
+  intptr_t p0 = (p1 & ~kSmiTagMask) + kSmiTag;
+  ASSERT(reinterpret_cast<Object*>(p0)->IsSmi());
+#ifdef DEBUG
+  if (msg != NULL) {
+    RecordComment("Abort message: ");
+    RecordComment(msg);
+  }
+#endif
 
+  li(a0, Operand(p0));
+  push(a0);
+  li(a0, Operand(Smi::FromInt(p1 - p0)));
+  push(a0);
+  // Disable stub call restrictions to always allow calls to abort.
+  if (!has_frame_) {
+    // We don't actually want to generate a pile of code for this, so just
+    // claim there is a stack frame, without generating one.
+    FrameScope scope(this, StackFrame::NONE);
+    CallRuntime(Runtime::kAbort, 2);
+  } else {
+    CallRuntime(Runtime::kAbort, 2);
+  }
+  // Will not return here.
+  if (is_trampoline_pool_blocked()) {
+    // If the calling code cares about the exact number of
+    // instructions generated, we insert padding here to keep the size
+    // of the Abort macro constant.
+    // Currently in debug mode with debug_code enabled the number of
+    // generated instructions is 14, so we use this as a maximum value.
+    static const int kExpectedAbortInstructions = 14;
+    int abort_instructions = InstructionsGeneratedSince(&abort_start);
+    ASSERT(abort_instructions <= kExpectedAbortInstructions);
+    while (abort_instructions++ < kExpectedAbortInstructions) {
+      nop();
+    }
+  }
+}
 
 void MacroAssembler::LoadContext(Register dst, int context_chain_length) {
   if (context_chain_length > 0) {
@@ -2725,6 +3079,29 @@ void MacroAssembler::GetObjectType(Register object,
                                    Register type_reg) {
   ld(map, FieldMemOperand(object, HeapObject::kMapOffset));
   ld1u(type_reg, FieldMemOperand(map, Map::kInstanceTypeOffset));
+}
+
+void MacroAssembler::SmiTagCheckOverflow(Register reg, Register overflow) {
+  ASSERT(!reg.is(overflow));
+  move(overflow, reg);  // Save original value.
+  SmiTag(reg);
+  xor_(overflow, overflow, reg);  // Overflow if (value ^ 2 * value) < 0.
+}
+
+
+void MacroAssembler::SmiTagCheckOverflow(Register dst,
+                                         Register src,
+                                         Register overflow) {
+  if (dst.is(src)) {
+    // Fall back to slower case.
+    SmiTagCheckOverflow(dst, overflow);
+  } else {
+    ASSERT(!dst.is(src));
+    ASSERT(!dst.is(overflow));
+    ASSERT(!src.is(overflow));
+    SmiTag(dst, src);
+    xor_(overflow, dst, src);  // Overflow if (value ^ 2 * value) < 0.
+  }
 }
 
 bool AreAliased(Register r1, Register r2, Register r3, Register r4) {

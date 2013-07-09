@@ -629,64 +629,593 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
   __ Jump(a3);
 }
 
-void Builtins::Generate_NotifyDeoptimized(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-}
-
 void Builtins::Generate_ParallelRecompile(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+
+    // Push a copy of the function onto the stack.
+    __ push(a1);
+    // Push call kind information.
+    __ push(t1);
+
+    __ push(a1);  // Function is also the parameter to the runtime call.
+    __ CallRuntime(Runtime::kParallelRecompile, 1);
+
+    // Restore call kind information.
+    __ pop(t1);
+    // Restore receiver.
+    __ pop(a1);
+
+    // Tear down internal frame.
+  }
+
+  GenerateTailCallToSharedCode(masm);
 }
 
 void Builtins::Generate_LazyRecompile(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  // Enter an internal frame.
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+
+    // Preserve the function.
+    __ push(a1);
+    // Push call kind information.
+    __ push(t1);
+
+    // Push the function on the stack as the argument to the runtime function.
+    __ push(a1);
+    __ CallRuntime(Runtime::kLazyRecompile, 1);
+    // Calculate the entry point.
+    __ Addu(t9, r0, Operand(Code::kHeaderSize - kHeapObjectTag));
+
+    // Restore call kind information.
+    __ pop(t1);
+    // Restore saved function.
+    __ pop(a1);
+
+    // Tear down temporary frame.
+  }
+
+  // Do a tail-call of the compiled function.
+  __ Jump(t9);
 }
 
 void Builtins::Generate_LazyCompile(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  // Enter an internal frame.
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+
+    // Preserve the function.
+    __ push(a1);
+    // Push call kind information.
+    __ push(t1);
+
+    // Push the function on the stack as the argument to the runtime function.
+    __ push(a1);
+    // Call the runtime function.
+    __ CallRuntime(Runtime::kLazyCompile, 1);
+    // Calculate the entry point.
+    __ addli(t9, r0, Code::kHeaderSize - kHeapObjectTag);
+
+    // Restore call kind information.
+    __ pop(t1);
+    // Restore saved function.
+    __ pop(a1);
+
+    // Tear down temporary frame.
+  }
+
+  // Do a tail-call of the compiled function.
+  __ Jump(t9);
+}
+
+static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
+                                             bool is_construct) {
+  // Called from JSEntryStub::GenerateBody
+
+  // ----------- S t a t e -------------
+  //  -- a0: code entry
+  //  -- a1: function
+  //  -- a2: receiver_pointer
+  //  -- a3: argc
+  //  -- s0: argv
+  // -----------------------------------
+
+  // Clear the context before we push it when entering the JS frame.
+  __ move(cp, zero);
+
+  // Enter an internal frame.
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+
+    // Set up the context from the function argument.
+    __ ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+
+    // Push the function and the receiver onto the stack.
+    __ Push(a1, a2);
+
+    // Copy arguments to the stack in a loop.
+    // a3: argc
+    // s0: argv, i.e. points to first arg
+    Label loop, entry;
+    __ sll(t0, a3, kPointerSizeLog2);
+    __ add(t2, s0, t0);
+    __ b(&entry);
+    // t2 points past last arg.
+    __ bind(&loop);
+    __ ld(t0, MemOperand(s0));  // Read next parameter.
+    __ addli(s0, s0, kPointerSize);
+    __ ld(t0, MemOperand(t0));  // Dereference handle.
+    __ push(t0);  // Push parameter.
+    __ bind(&entry);
+    __ Branch(&loop, ne, s0, Operand(t2));
+
+    // Initialize all JavaScript callee-saved registers, since they will be seen
+    // by the garbage collector as part of handlers.
+    __ LoadRoot(t0, Heap::kUndefinedValueRootIndex);
+    __ move(s1, t0);
+    __ move(s2, t0);
+    __ move(s3, t0);
+    __ move(s4, t0);
+    __ move(s5, t0);
+    // s6 holds the root address. Do not clobber.
+    // s7 is cp. Do not init.
+
+    // Invoke the code and pass argc as a0.
+    __ move(a0, a3);
+    if (is_construct) {
+      // No type feedback cell is available
+      Handle<Object> undefined_sentinel(
+          masm->isolate()->heap()->undefined_value(), masm->isolate());
+      __ li(a2, Operand(undefined_sentinel));
+      CallConstructStub stub(NO_CALL_FUNCTION_FLAGS);
+      __ CallStub(&stub);
+    } else {
+      ParameterCount actual(a0);
+      __ InvokeFunction(a1, actual, CALL_FUNCTION,
+                        NullCallWrapper(), CALL_AS_METHOD);
+    }
+
+    // Leave internal frame.
+  }
+
+  __ Jump(lr);
 }
 
 void Builtins::Generate_JSConstructEntryTrampoline(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  Generate_JSEntryTrampolineHelper(masm, true);
 }
 
 void Builtins::Generate_JSEntryTrampoline(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  Generate_JSEntryTrampolineHelper(masm, false);
+}
+
+static void Generate_NotifyDeoptimizedHelper(MacroAssembler* masm,
+                                             Deoptimizer::BailoutType type) {
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+    // Pass the function and deoptimization type to the runtime system.
+    __ li(a0, Operand(Smi::FromInt(static_cast<int>(type))));
+    __ push(a0);
+    __ CallRuntime(Runtime::kNotifyDeoptimized, 1);
+  }
+
+  // Get the full codegen state from the stack and untag it -> t2.
+  __ ld(t2, MemOperand(sp, 0 * kPointerSize));
+  __ SmiUntag(t2);
+  // Switch on the state.
+  Label with_tos_register, unknown_state;
+  __ Branch(&with_tos_register,
+            ne, t2, Operand(FullCodeGenerator::NO_REGISTERS));
+  __ Addu(sp, sp, Operand(1 * kPointerSize));  // Remove state.
+  __ Ret();
+
+  __ bind(&with_tos_register);
+  __ ld(r0, MemOperand(sp, 1 * kPointerSize));
+  __ Branch(&unknown_state, ne, t2, Operand(FullCodeGenerator::TOS_REG));
+
+  __ Addu(sp, sp, Operand(2 * kPointerSize));  // Remove state.
+  __ Ret();
+
+  __ bind(&unknown_state);
+  __ stop("no cases left");
+}
+
+void Builtins::Generate_NotifyDeoptimized(MacroAssembler* masm) {
+  Generate_NotifyDeoptimizedHelper(masm, Deoptimizer::EAGER);
 }
 
 void Builtins::Generate_NotifySoftDeoptimized(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  Generate_NotifyDeoptimizedHelper(masm, Deoptimizer::SOFT);
 }
 
 void Builtins::Generate_NotifyLazyDeoptimized(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  Generate_NotifyDeoptimizedHelper(masm, Deoptimizer::LAZY);
 }
 
 void Builtins::Generate_NotifyStubFailure(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+
+    // Preserve registers across notification, this is important for compiled
+    // stubs that tail call the runtime on deopts passing their parameters in
+    // registers.
+    __ MultiPush(kJSCallerSaved | kCalleeSaved);
+    // Pass the function and deoptimization type to the runtime system.
+    __ CallRuntime(Runtime::kNotifyStubFailure, 0);
+    __ MultiPop(kJSCallerSaved | kCalleeSaved);
+  }
+
+  __ Addu(sp, sp, Operand(kPointerSize));  // Ignore state
+  __ Jump(lr);  // Jump to miss handler
+
 }
 
 void Builtins::Generate_NotifyOSR(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  // For now, we are relying on the fact that Runtime::NotifyOSR
+  // doesn't do any garbage collection which allows us to save/restore
+  // the registers without worrying about which of them contain
+  // pointers. This seems a bit fragile.
+  RegList saved_regs =
+      (kJSCallerSaved | kCalleeSaved | lr.bit() | fp.bit()) & ~sp.bit();
+  __ MultiPush(saved_regs);
+  {
+    FrameScope scope(masm, StackFrame::INTERNAL);
+    __ CallRuntime(Runtime::kNotifyOSR, 0);
+  }
+  __ MultiPop(saved_regs);
+  __ Ret();
+
 }
 
 void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  // 1. Make sure we have at least one argument.
+  // a0: actual number of arguments
+  { Label done;
+    __ Branch(&done, ne, a0, Operand(zero));
+    __ LoadRoot(t2, Heap::kUndefinedValueRootIndex);
+    __ push(t2);
+    __ Addu(a0, a0, Operand(1));
+    __ bind(&done);
+  }
+
+  // 2. Get the function to call (passed as receiver) from the stack, check
+  //    if it is a function.
+  // a0: actual number of arguments
+  Label slow, non_function;
+  __ sll(at, a0, kPointerSizeLog2);
+  __ add(at, sp, at);
+  __ ld(a1, MemOperand(at));
+  __ JumpIfSmi(a1, &non_function);
+  __ GetObjectType(a1, a2, a2);
+  __ Branch(&slow, ne, a2, Operand(JS_FUNCTION_TYPE));
+
+  // 3a. Patch the first argument if necessary when calling a function.
+  // a0: actual number of arguments
+  // a1: function
+  Label shift_arguments;
+  __ li(t0, Operand(0, RelocInfo::NONE32));  // Indicate regular JS_FUNCTION.
+  { Label convert_to_object, use_global_receiver, patch_receiver;
+    // Change context eagerly in case we need the global receiver.
+    __ ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+
+    // Do not transform the receiver for strict mode functions.
+    __ ld(a2, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
+    __ ld(a3, FieldMemOperand(a2, SharedFunctionInfo::kCompilerHintsOffset));
+    __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kStrictModeFunction +
+                                 kSmiTagSize)));
+    __ Branch(&shift_arguments, ne, t3, Operand(zero));
+
+    // Do not transform the receiver for native (Compilerhints already in a3).
+    __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kNative + kSmiTagSize)));
+    __ Branch(&shift_arguments, ne, t3, Operand(zero));
+
+    // Compute the receiver in non-strict mode.
+    // Load first argument in a2. a2 = -kPointerSize(sp + n_args << 2).
+    __ sll(at, a0, kPointerSizeLog2);
+    __ add(a2, sp, at);
+    __ ld(a2, MemOperand(a2, -kPointerSize));
+    // a0: actual number of arguments
+    // a1: function
+    // a2: first argument
+    __ JumpIfSmi(a2, &convert_to_object, t2);
+
+    __ LoadRoot(a3, Heap::kUndefinedValueRootIndex);
+    __ Branch(&use_global_receiver, eq, a2, Operand(a3));
+    __ LoadRoot(a3, Heap::kNullValueRootIndex);
+    __ Branch(&use_global_receiver, eq, a2, Operand(a3));
+
+    STATIC_ASSERT(LAST_SPEC_OBJECT_TYPE == LAST_TYPE);
+    __ GetObjectType(a2, a3, a3);
+    __ Branch(&shift_arguments, ge, a3, Operand(FIRST_SPEC_OBJECT_TYPE));
+
+    __ bind(&convert_to_object);
+    // Enter an internal frame in order to preserve argument count.
+    {
+      FrameScope scope(masm, StackFrame::INTERNAL);
+      __ sll(a0, a0, kSmiTagSize);  // Smi tagged.
+      __ push(a0);
+
+      __ push(a2);
+      __ InvokeBuiltin(Builtins::TO_OBJECT, CALL_FUNCTION);
+      __ move(a2, r0);
+
+      __ pop(a0);
+      __ sra(a0, a0, kSmiTagSize);  // Un-tag.
+      // Leave internal frame.
+    }
+    // Restore the function to a1, and the flag to t0.
+    __ sll(at, a0, kPointerSizeLog2);
+    __ add(at, sp, at);
+    __ ld(a1, MemOperand(at));
+    __ li(t0, Operand(0, RelocInfo::NONE32));
+    __ Branch(&patch_receiver);
+
+    // Use the global receiver object from the called function as the
+    // receiver.
+    __ bind(&use_global_receiver);
+    const int kGlobalIndex =
+        Context::kHeaderSize + Context::GLOBAL_OBJECT_INDEX * kPointerSize;
+    __ ld(a2, FieldMemOperand(cp, kGlobalIndex));
+    __ ld(a2, FieldMemOperand(a2, GlobalObject::kNativeContextOffset));
+    __ ld(a2, FieldMemOperand(a2, kGlobalIndex));
+    __ ld(a2, FieldMemOperand(a2, GlobalObject::kGlobalReceiverOffset));
+
+    __ bind(&patch_receiver);
+    __ sll(at, a0, kPointerSizeLog2);
+    __ add(a3, sp, at);
+    __ st(a2, MemOperand(a3, -kPointerSize));
+
+    __ Branch(&shift_arguments);
+  }
+
+  // 3b. Check for function proxy.
+  __ bind(&slow);
+  __ li(t0, Operand(1, RelocInfo::NONE32));  // Indicate function proxy.
+  __ Branch(&shift_arguments, eq, a2, Operand(JS_FUNCTION_PROXY_TYPE));
+
+  __ bind(&non_function);
+  __ li(t0, Operand(2, RelocInfo::NONE32));  // Indicate non-function.
+
+  // 3c. Patch the first argument when calling a non-function.  The
+  //     CALL_NON_FUNCTION builtin expects the non-function callee as
+  //     receiver, so overwrite the first argument which will ultimately
+  //     become the receiver.
+  // a0: actual number of arguments
+  // a1: function
+  // t0: call type (0: JS function, 1: function proxy, 2: non-function)
+  __ sll(at, a0, kPointerSizeLog2);
+  __ add(a2, sp, at);
+  __ st(a1, MemOperand(a2, -kPointerSize));
+
+  // 4. Shift arguments and return address one slot down on the stack
+  //    (overwriting the original receiver).  Adjust argument count to make
+  //    the original first argument the new receiver.
+  // a0: actual number of arguments
+  // a1: function
+  // t0: call type (0: JS function, 1: function proxy, 2: non-function)
+  __ bind(&shift_arguments);
+  { Label loop;
+    // Calculate the copy start address (destination). Copy end address is sp.
+    __ sll(at, a0, kPointerSizeLog2);
+    __ add(a2, sp, at);
+
+    __ bind(&loop);
+    __ ld(at, MemOperand(a2, -kPointerSize));
+    __ st(at, MemOperand(a2));
+    __ Subu(a2, a2, Operand(kPointerSize));
+    __ Branch(&loop, ne, a2, Operand(sp));
+    // Adjust the actual number of arguments and remove the top element
+    // (which is a copy of the last argument).
+    __ Subu(a0, a0, Operand(1));
+    __ Pop();
+  }
+
+  // 5a. Call non-function via tail call to CALL_NON_FUNCTION builtin,
+  //     or a function proxy via CALL_FUNCTION_PROXY.
+  // a0: actual number of arguments
+  // a1: function
+  // t0: call type (0: JS function, 1: function proxy, 2: non-function)
+  { Label function, non_proxy;
+    __ Branch(&function, eq, t0, Operand(zero));
+    // Expected number of arguments is 0 for CALL_NON_FUNCTION.
+    __ move(a2, zero);
+    __ SetCallKind(t1, CALL_AS_METHOD);
+    __ Branch(&non_proxy, ne, t0, Operand(1));
+
+    __ push(a1);  // Re-add proxy object as additional argument.
+    __ Addu(a0, a0, Operand(1));
+    __ GetBuiltinEntry(a3, Builtins::CALL_FUNCTION_PROXY);
+    __ Jump(masm->isolate()->builtins()->ArgumentsAdaptorTrampoline(),
+            RelocInfo::CODE_TARGET);
+
+    __ bind(&non_proxy);
+    __ GetBuiltinEntry(a3, Builtins::CALL_NON_FUNCTION);
+    __ Jump(masm->isolate()->builtins()->ArgumentsAdaptorTrampoline(),
+            RelocInfo::CODE_TARGET);
+    __ bind(&function);
+  }
+
+  // 5b. Get the code to call from the function and check that the number of
+  //     expected arguments matches what we're providing.  If so, jump
+  //     (tail-call) to the code in register edx without checking arguments.
+  // a0: actual number of arguments
+  // a1: function
+  __ ld(a3, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
+  __ ld(a2,
+         FieldMemOperand(a3, SharedFunctionInfo::kFormalParameterCountOffset));
+  __ sra(a2, a2, kSmiTagSize);
+  __ ld(a3, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
+  __ SetCallKind(t1, CALL_AS_METHOD);
+  // Check formal and actual parameter counts.
+  __ Jump(masm->isolate()->builtins()->ArgumentsAdaptorTrampoline(),
+          RelocInfo::CODE_TARGET, ne, a2, Operand(a0));
+
+  ParameterCount expected(0);
+  __ InvokeCode(a3, expected, expected, JUMP_FUNCTION,
+                NullCallWrapper(), CALL_AS_METHOD);
+
 }
 
 void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  const int kIndexOffset    = -5 * kPointerSize;
+  const int kLimitOffset    = -4 * kPointerSize;
+  const int kArgsOffset     =  2 * kPointerSize;
+  const int kRecvOffset     =  3 * kPointerSize;
+  const int kFunctionOffset =  4 * kPointerSize;
+
+  {
+    FrameScope frame_scope(masm, StackFrame::INTERNAL);
+    __ ld(a0, MemOperand(fp, kFunctionOffset));  // Get the function.
+    __ push(a0);
+    __ ld(a0, MemOperand(fp, kArgsOffset));  // Get the args array.
+    __ push(a0);
+    // Returns (in v0) number of arguments to copy to stack as Smi.
+    __ InvokeBuiltin(Builtins::APPLY_PREPARE, CALL_FUNCTION);
+
+    // Check the stack for overflow. We are not trying to catch
+    // interruptions (e.g. debug break and preemption) here, so the "real stack
+    // limit" is checked.
+    Label okay;
+    __ LoadRoot(a2, Heap::kRealStackLimitRootIndex);
+    // Make a2 the space we have left. The stack might already be overflowed
+    // here which will cause a2 to become negative.
+    __ sub(a2, sp, a2);
+    // Check if the arguments will overflow the stack.
+    __ sll(t3, r0, kPointerSizeLog2 - kSmiTagSize);
+    __ Branch(&okay, gt, a2, Operand(t3));  // Signed comparison.
+
+    // Out of stack space.
+    __ ld(a1, MemOperand(fp, kFunctionOffset));
+    __ push(a1);
+    __ push(r0);
+    __ InvokeBuiltin(Builtins::APPLY_OVERFLOW, CALL_FUNCTION);
+    // End of stack check.
+
+    // Push current limit and index.
+    __ bind(&okay);
+    __ push(r0);  // Limit.
+    __ move(a1, zero);  // Initial index.
+    __ push(a1);
+
+    // Get the receiver.
+    __ ld(a0, MemOperand(fp, kRecvOffset));
+
+    // Check that the function is a JS function (otherwise it must be a proxy).
+    Label push_receiver;
+    __ ld(a1, MemOperand(fp, kFunctionOffset));
+    __ GetObjectType(a1, a2, a2);
+    __ Branch(&push_receiver, ne, a2, Operand(JS_FUNCTION_TYPE));
+
+    // Change context eagerly to get the right global object if necessary.
+    __ ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+    // Load the shared function info while the function is still in a1.
+    __ ld(a2, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
+
+    // Compute the receiver.
+    // Do not transform the receiver for strict mode functions.
+    Label call_to_object, use_global_receiver;
+    __ ld(a2, FieldMemOperand(a2, SharedFunctionInfo::kCompilerHintsOffset));
+    __ And(t3, a2, Operand(1 << (SharedFunctionInfo::kStrictModeFunction +
+                                 kSmiTagSize)));
+    __ Branch(&push_receiver, ne, t3, Operand(zero));
+
+    // Do not transform the receiver for native (Compilerhints already in a2).
+    __ And(t3, a2, Operand(1 << (SharedFunctionInfo::kNative + kSmiTagSize)));
+    __ Branch(&push_receiver, ne, t3, Operand(zero));
+
+    // Compute the receiver in non-strict mode.
+    __ JumpIfSmi(a0, &call_to_object);
+    __ LoadRoot(a1, Heap::kNullValueRootIndex);
+    __ Branch(&use_global_receiver, eq, a0, Operand(a1));
+    __ LoadRoot(a2, Heap::kUndefinedValueRootIndex);
+    __ Branch(&use_global_receiver, eq, a0, Operand(a2));
+
+    // Check if the receiver is already a JavaScript object.
+    // a0: receiver
+    STATIC_ASSERT(LAST_SPEC_OBJECT_TYPE == LAST_TYPE);
+    __ GetObjectType(a0, a1, a1);
+    __ Branch(&push_receiver, ge, a1, Operand(FIRST_SPEC_OBJECT_TYPE));
+
+    // Convert the receiver to a regular object.
+    // a0: receiver
+    __ bind(&call_to_object);
+    __ push(a0);
+    __ InvokeBuiltin(Builtins::TO_OBJECT, CALL_FUNCTION);
+    __ move(a0, r0);  // Put object in a0 to match other paths to push_receiver.
+    __ Branch(&push_receiver);
+
+    // Use the current global receiver object as the receiver.
+    __ bind(&use_global_receiver);
+    const int kGlobalOffset =
+        Context::kHeaderSize + Context::GLOBAL_OBJECT_INDEX * kPointerSize;
+    __ ld(a0, FieldMemOperand(cp, kGlobalOffset));
+    __ ld(a0, FieldMemOperand(a0, GlobalObject::kNativeContextOffset));
+    __ ld(a0, FieldMemOperand(a0, kGlobalOffset));
+    __ ld(a0, FieldMemOperand(a0, GlobalObject::kGlobalReceiverOffset));
+
+    // Push the receiver.
+    // a0: receiver
+    __ bind(&push_receiver);
+    __ push(a0);
+
+    // Copy all arguments from the array to the stack.
+    Label entry, loop;
+    __ ld(a0, MemOperand(fp, kIndexOffset));
+    __ Branch(&entry);
+
+    // Load the current argument from the arguments array and push it to the
+    // stack.
+    // a0: current argument index
+    __ bind(&loop);
+    __ ld(a1, MemOperand(fp, kArgsOffset));
+    __ push(a1);
+    __ push(a0);
+
+    // Call the runtime to access the property in the arguments array.
+    __ CallRuntime(Runtime::kGetProperty, 2);
+    __ push(r0);
+
+    // Use inline caching to access the arguments.
+    __ ld(a0, MemOperand(fp, kIndexOffset));
+    __ Addu(a0, a0, Operand(1 << kSmiTagSize));
+    __ st(a0, MemOperand(fp, kIndexOffset));
+
+    // Test if the copy loop has finished copying all the elements from the
+    // arguments object.
+    __ bind(&entry);
+    __ ld(a1, MemOperand(fp, kLimitOffset));
+    __ Branch(&loop, ne, a0, Operand(a1));
+
+    // Invoke the function.
+    Label call_proxy;
+    ParameterCount actual(a0);
+    __ sra(a0, a0, kSmiTagSize);
+    __ ld(a1, MemOperand(fp, kFunctionOffset));
+    __ GetObjectType(a1, a2, a2);
+    __ Branch(&call_proxy, ne, a2, Operand(JS_FUNCTION_TYPE));
+
+    __ InvokeFunction(a1, actual, CALL_FUNCTION,
+                      NullCallWrapper(), CALL_AS_METHOD);
+
+    frame_scope.GenerateLeaveFrame();
+    __ Ret();
+    __ Addu(sp, sp, Operand(3 * kPointerSize));  // In delay slot.
+
+    // Invoke the function proxy.
+    __ bind(&call_proxy);
+    __ push(a1);  // Add function proxy as last argument.
+    __ Addu(a0, a0, Operand(1));
+    __ li(a2, Operand(0, RelocInfo::NONE32));
+    __ SetCallKind(t1, CALL_AS_METHOD);
+    __ GetBuiltinEntry(a3, Builtins::CALL_FUNCTION_PROXY);
+    __ Call(masm->isolate()->builtins()->ArgumentsAdaptorTrampoline(),
+            RelocInfo::CODE_TARGET);
+    // Tear down the internal frame and remove function, receiver and args.
+  }
+
+  __ Ret();
+  __ Addu(sp, sp, Operand(3 * kPointerSize));  // In delay slot.
 }
 
 void Builtins::Generate_InternalArrayCode(MacroAssembler* masm) {

@@ -461,6 +461,160 @@ class WriteInt32ToHeapNumberStub : public PlatformCodeStub {
   void Generate(MacroAssembler* masm);
 };
 
+class StringHelper : public AllStatic {
+ public:
+  // Generate code for copying characters using a simple loop. This should only
+  // be used in places where the number of characters is small and the
+  // additional setup and checking in GenerateCopyCharactersLong adds too much
+  // overhead. Copying of overlapping regions is not supported.
+  // Dest register ends at the position after the last character written.
+  static void GenerateCopyCharacters(MacroAssembler* masm,
+                                     Register dest,
+                                     Register src,
+                                     Register count,
+                                     Register scratch,
+                                     bool ascii);
+
+  // Generate code for copying a large number of characters. This function
+  // is allowed to spend extra time setting up conditions to make copying
+  // faster. Copying of overlapping regions is not supported.
+  // Dest register ends at the position after the last character written.
+  static void GenerateCopyCharactersLong(MacroAssembler* masm,
+                                         Register dest,
+                                         Register src,
+                                         Register count,
+                                         Register scratch1,
+                                         Register scratch2,
+                                         Register scratch3,
+                                         Register scratch4,
+                                         Register scratch5,
+                                         int flags);
+
+
+  // Probe the string table for a two character string. If the string is
+  // not found by probing a jump to the label not_found is performed. This jump
+  // does not guarantee that the string is not in the string table. If the
+  // string is found the code falls through with the string in register r0.
+  // Contents of both c1 and c2 registers are modified. At the exit c1 is
+  // guaranteed to contain halfword with low and high bytes equal to
+  // initial contents of c1 and c2 respectively.
+  static void GenerateTwoCharacterStringTableProbe(MacroAssembler* masm,
+                                                   Register c1,
+                                                   Register c2,
+                                                   Register scratch1,
+                                                   Register scratch2,
+                                                   Register scratch3,
+                                                   Register scratch4,
+                                                   Register scratch5,
+                                                   Label* not_found);
+
+  // Generate string hash.
+  static void GenerateHashInit(MacroAssembler* masm,
+                               Register hash,
+                               Register character);
+
+  static void GenerateHashAddCharacter(MacroAssembler* masm,
+                                       Register hash,
+                                       Register character);
+
+  static void GenerateHashGetHash(MacroAssembler* masm,
+                                  Register hash);
+
+ private:
+  DISALLOW_IMPLICIT_CONSTRUCTORS(StringHelper);
+};
+
+
+// Flag that indicates how to generate code for the stub StringAddStub.
+enum StringAddFlags {
+  NO_STRING_ADD_FLAGS = 1 << 0,
+  // Omit left string check in stub (left is definitely a string).
+  NO_STRING_CHECK_LEFT_IN_STUB = 1 << 1,
+  // Omit right string check in stub (right is definitely a string).
+  NO_STRING_CHECK_RIGHT_IN_STUB = 1 << 2,
+  // Stub needs a frame before calling the runtime
+  ERECT_FRAME = 1 << 3,
+  // Omit both string checks in stub.
+  NO_STRING_CHECK_IN_STUB =
+      NO_STRING_CHECK_LEFT_IN_STUB | NO_STRING_CHECK_RIGHT_IN_STUB
+};
+
+
+class StringAddStub: public PlatformCodeStub {
+ public:
+  explicit StringAddStub(StringAddFlags flags) : flags_(flags) {}
+
+ private:
+  Major MajorKey() { return StringAdd; }
+  int MinorKey() { return flags_; }
+
+  void Generate(MacroAssembler* masm);
+
+  void GenerateConvertArgument(MacroAssembler* masm,
+                               int stack_offset,
+                               Register arg,
+                               Register scratch1,
+                               Register scratch2,
+                               Register scratch3,
+                               Register scratch4,
+                               Label* slow);
+
+  void GenerateRegisterArgsPush(MacroAssembler* masm);
+  void GenerateRegisterArgsPop(MacroAssembler* masm);
+
+  const StringAddFlags flags_;
+};
+
+
+class SubStringStub: public PlatformCodeStub {
+ public:
+  SubStringStub() {}
+
+ private:
+  Major MajorKey() { return SubString; }
+  int MinorKey() { return 0; }
+
+  void Generate(MacroAssembler* masm);
+};
+
+
+class StringCompareStub: public PlatformCodeStub {
+ public:
+  StringCompareStub() { }
+
+  // Compare two flat ASCII strings and returns result in v0.
+  static void GenerateCompareFlatAsciiStrings(MacroAssembler* masm,
+                                              Register left,
+                                              Register right,
+                                              Register scratch1,
+                                              Register scratch2,
+                                              Register scratch3,
+                                              Register scratch4);
+
+  // Compares two flat ASCII strings for equality and returns result
+  // in v0.
+  static void GenerateFlatAsciiStringEquals(MacroAssembler* masm,
+                                            Register left,
+                                            Register right,
+                                            Register scratch1,
+                                            Register scratch2,
+                                            Register scratch3);
+
+ private:
+  virtual Major MajorKey() { return StringCompare; }
+  virtual int MinorKey() { return 0; }
+  virtual void Generate(MacroAssembler* masm);
+
+  static void GenerateAsciiCharsCompareLoop(MacroAssembler* masm,
+                                            Register left,
+                                            Register right,
+                                            Register length,
+                                            Register scratch1,
+                                            Register scratch2,
+                                            Register scratch3,
+                                            Label* chars_not_equal);
+};
+
 } }  // namespace v8::internal
 
 #endif  // V8_TILEGX_CODE_STUBS_ARM_H_
