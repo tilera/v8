@@ -125,6 +125,11 @@ int print_insn_tilegx (unsigned char * memaddr);
       create_RRROpcodeExtension_X1(ST_RRR_0_OPCODE_X1) | create_Dest_X1(0x0) | \
       FNOP_X0
 
+#define ST1_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(ST1_RRR_0_OPCODE_X1) | create_Dest_X1(0x0) | \
+      FNOP_X0
+
 #define LD_X1                                                                  \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
@@ -735,6 +740,8 @@ class Assembler : public AssemblerBase {
 
   PositionsRecorder* positions_recorder() { return &positions_recorder_; }
 
+  inline bool overflow() const { return pc_ >= reloc_info_writer.pos() - kGap; }
+
   static const int kMaxRelocSize = RelocInfoWriter::kMaxSize;
   RelocInfoWriter reloc_info_writer;
 
@@ -779,6 +786,8 @@ class Assembler : public AssemblerBase {
   void blez(const Register& rs, int32_t offset, int line = 0);
   void bltz(const Register& rs, int32_t offset, int line = 0);
 
+  void bfextu(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line = 0);
+
   void cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmpne(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmplts(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
@@ -790,6 +799,8 @@ class Assembler : public AssemblerBase {
 
   void st(const Register& rd, const MemOperand& rs, int line = 0);
   void st(const Register& rd, const Register& rs, int line = 0);
+  void st1(const Register& rd, const MemOperand& rs, int line = 0);
+  void st1(const Register& rd, const Register& rs, int line = 0);
   void ld(const Register& rd, const MemOperand& rs, int line = 0);
   void ld(const Register& rd, const Register& rs, int line = 0);
   void ld1u(const Register& rd, const MemOperand& rs, int line = 0);
@@ -811,7 +822,10 @@ class Assembler : public AssemblerBase {
   void move(const Register& rt, const Register& rs, int line = 0);
   void and_(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void or_(const Register& rd, const Register& rs, const Register& rt, int line = 0);
-  void andi(const Register& rd, const Register& rs, int8_t j, int line = 0);
+  void xor_(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void ori(const Register& rd, const Register& rs, int8_t imm8, int line = 0);
+  void xori(const Register& rd, const Register& rs, int8_t imm8, int line = 0);
+  void andi(const Register& rd, const Register& rs, int8_t imm8, int line = 0);
   void movn(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void movz(const Register& rd, const Register& rs, const Register& rt, int line = 0);
 

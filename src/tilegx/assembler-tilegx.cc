@@ -185,7 +185,7 @@ bool Assembler::IsBeqz(Instr instr) {
   // Checks if the instruction is a moveli which is
   // used for constant loading and is actually alias
   // of addli.
-  return X1_OPC == BRANCH_OPCODE_X1 || BrType == BEQZ_BRANCH_OPCODE_X1;
+  return X1_OPC == BRANCH_OPCODE_X1 && BrType == BEQZ_BRANCH_OPCODE_X1;
 }
 
 bool Assembler::IsBnez(Instr instr) {
@@ -201,7 +201,7 @@ bool Assembler::IsBnez(Instr instr) {
   // Checks if the instruction is a moveli which is
   // used for constant loading and is actually alias
   // of addli.
-  return X1_OPC == BRANCH_OPCODE_X1 || BrType == BNEZ_BRANCH_OPCODE_X1;
+  return X1_OPC == BRANCH_OPCODE_X1 && BrType == BNEZ_BRANCH_OPCODE_X1;
 }
 
 Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
@@ -240,6 +240,24 @@ void Assembler::st(const Register& rd, const MemOperand& rs, int line) {
 void Assembler::st(const Register& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = ST_X1 | SRCA_X1(rs.code()) | SRCB_X1(rd.code());
+  emit(instr, line);
+}
+
+void Assembler::st1(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = ST1_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+    emit(instr, line);
+  } else
+    st1(rd, rs.rm(), line);
+}
+
+void Assembler::st1(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = ST1_X1 | SRCA_X1(rs.code()) | SRCB_X1(rd.code());
   emit(instr, line);
 }
 
@@ -351,9 +369,30 @@ void Assembler::or_(const Register& rd, const Register& rsa, const Register& rsb
   emit(instr, line);
 }
 
+void Assembler::xor_(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = XOR_X1 | DEST_X1(rd.code())
+	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
 void Assembler::andi(const Register& rd, const Register& rs, int8_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && is_int8(imm));
   Instr instr = ANDI_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | IMM8_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::ori(const Register& rd, const Register& rs, int8_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && is_int8(imm));
+  Instr instr = ORI_X1  | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | IMM8_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::xori(const Register& rd, const Register& rs, int8_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && is_int8(imm));
+  Instr instr = XORI_X1 | DEST_X1(rd.code())
 	                | SRCA_X1(rs.code()) | IMM8_X1(imm);
   emit(instr, line);
 }
@@ -911,6 +950,12 @@ void Assembler::bltz(const Register& rs, int32_t offset, int line) {
   emit(instr, line);
 }
 
+void Assembler::bfextu(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = BFEXTU_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFSTART_X0(offset2);
+  emit(instr, line);
+}
+
 void Assembler::cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPEQ_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
@@ -982,7 +1027,50 @@ int32_t Assembler::branch_offset(Label* L, bool jump_elimination_allowed) {
 }
 
 void Assembler::GrowBuffer() {
-	UNIMPLEMENTED();
+  if (!own_buffer_) FATAL("external code buffer is too small");
+
+  // Compute new buffer size.
+  CodeDesc desc;  // The new buffer.
+  if (buffer_size_ < 4*KB) {
+    desc.buffer_size = 4*KB;
+  } else if (buffer_size_ < 1*MB) {
+    desc.buffer_size = 2*buffer_size_;
+  } else {
+    desc.buffer_size = buffer_size_ + 1*MB;
+  }
+  CHECK_GT(desc.buffer_size, 0);  // No overflow.
+
+  // Set up new buffer.
+  desc.buffer = NewArray<byte>(desc.buffer_size);
+
+  desc.instr_size = pc_offset();
+  desc.reloc_size = (buffer_ + buffer_size_) - reloc_info_writer.pos();
+
+  // Copy the data.
+  int pc_delta = desc.buffer - buffer_;
+  int rc_delta = (desc.buffer + desc.buffer_size) - (buffer_ + buffer_size_);
+  OS::MemMove(desc.buffer, buffer_, desc.instr_size);
+  OS::MemMove(reloc_info_writer.pos() + rc_delta,
+              reloc_info_writer.pos(), desc.reloc_size);
+
+  // Switch buffers.
+  DeleteArray(buffer_);
+  buffer_ = desc.buffer;
+  buffer_size_ = desc.buffer_size;
+  pc_ += pc_delta;
+  reloc_info_writer.Reposition(reloc_info_writer.pos() + rc_delta,
+                               reloc_info_writer.last_pc() + pc_delta);
+
+  // Relocate runtime entries.
+  for (RelocIterator it(desc); !it.done(); it.next()) {
+    RelocInfo::Mode rmode = it.rinfo()->rmode();
+    if (rmode == RelocInfo::INTERNAL_REFERENCE) {
+      byte* p = reinterpret_cast<byte*>(it.rinfo()->pc());
+      RelocateInternalReference(p, pc_delta);
+    }
+  }
+
+  ASSERT(!overflow());
 }
 
 bool Assembler::is_near(Label* L) {

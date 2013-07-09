@@ -7689,7 +7689,6 @@ void RecordWriteStub::GenerateIncremental(MacroAssembler* masm, Mode mode) {
 
 
 void RecordWriteStub::InformIncrementalMarker(MacroAssembler* masm, Mode mode) {
-#if 0
   regs_.SaveCallerSaveRegisters(masm, save_fp_regs_mode_);
   int argument_count = 3;
   __ PrepareCallCFunction(argument_count, regs_.scratch0());
@@ -7716,10 +7715,6 @@ void RecordWriteStub::InformIncrementalMarker(MacroAssembler* masm, Mode mode) {
         argument_count);
   }
   regs_.RestoreCallerSaveRegisters(masm, save_fp_regs_mode_);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

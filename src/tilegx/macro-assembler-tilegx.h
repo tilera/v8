@@ -126,6 +126,14 @@ class MacroAssembler: public Assembler {
                                               Label* failure);
 
   // Test that both first and second are sequential ASCII strings.
+  // Assume that they are non-smis.
+  void JumpIfNonSmisNotBothSequentialAsciiStrings(Register first,
+                                                  Register second,
+                                                  Register scratch1,
+                                                  Register scratch2,
+                                                  Label* failure);
+
+  // Test that both first and second are sequential ASCII strings.
   // Check that they are non-smis.
   void JumpIfNotBothSequentialAsciiStrings(Register first,
                                            Register second,
@@ -629,6 +637,25 @@ class MacroAssembler: public Assembler {
                             Register scratch,
                             Label* fail);
 
+  // Compare an object's map with the specified map and its transitioned
+  // elements maps if mode is ALLOW_ELEMENT_TRANSITION_MAPS. Jumps to
+  // "branch_to" if the result of the comparison is "cond". If multiple map
+  // compares are required, the compare sequences branches to early_success.
+  void CompareMapAndBranch(Register obj,
+                           Register scratch,
+                           Handle<Map> map,
+                           Label* early_success,
+                           Condition cond,
+                           Label* branch_to);
+
+  // As above, but the map of the object is already loaded into the register
+  // which is preserved by the code generated.
+  void CompareMapAndBranch(Register obj_map,
+                           Handle<Map> map,
+                           Label* early_success,
+                           Condition cond,
+                           Label* branch_to);
+
   void StoreNumberToDoubleElements(Register value_reg,
                                    Register key_reg,
                                    // All regs below here overwritten.
@@ -645,6 +672,12 @@ class MacroAssembler: public Assembler {
   void IsObjectNameType(Register object,
                         Register scratch,
                         Label* fail);
+
+  void InitializeNewString(Register string,
+                           Register length,
+                           Heap::RootListIndex map_index,
+                           Register scratch1,
+                           Register scratch2);
 
   // Invoke the JavaScript function in the given register. Changes the
   // current context to the context in the function before invoking.
@@ -741,6 +774,10 @@ class MacroAssembler: public Assembler {
   // Unlink the stack handler on top of the stack from the try handler chain.
   // Must preserve the result register.
   void PopTryHandler();
+
+  void GetObjectType(Register function,
+                     Register map,
+                     Register type_reg);
 
   // Passes thrown value to the handler of top of the try handler chain.
   void Throw(Register value);

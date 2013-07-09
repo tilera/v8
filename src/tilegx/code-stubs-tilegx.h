@@ -63,43 +63,57 @@ class RecordWriteStub: public PlatformCodeStub {
 
   static void PatchBranchIntoNop(MacroAssembler* masm, int pos) {
     ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
-    masm->instr_at_put(pos, (masm->instr_at(pos) & (~get_BrType_X1(-1))) | get_BrType_X1(BNEZ_BRANCH_OPCODE_X1));
+    masm->instr_at_put(pos, (masm->instr_at(pos) & (~create_BrType_X1(-1))) | create_BrType_X1(BNEZ_BRANCH_OPCODE_X1));
     ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
   }
 
   static void PatchNopIntoBranch(MacroAssembler* masm, int pos) {
     ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
-    masm->instr_at_put(pos, (masm->instr_at(pos) & (~get_BrType_X1(-1))) | get_BrType_X1(BEQZ_BRANCH_OPCODE_X1));
+    masm->instr_at_put(pos, (masm->instr_at(pos) & (~create_BrType_X1(-1))) | create_BrType_X1(BEQZ_BRANCH_OPCODE_X1));
     ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
   }
 
   static Mode GetMode(Code* stub) {
-#if 0
     Instr first_instruction = Assembler::instr_at(stub->instruction_start());
-    Instr second_instruction = Assembler::instr_at(stub->instruction_start() +
-                                                   2 * Assembler::kInstrSize);
+    Instr second_instruction = Assembler::instr_at(stub->instruction_start() + Assembler::kInstrSize);
 
-    if (Assembler::IsBeq(first_instruction)) {
+    if (Assembler::IsBeqz(first_instruction)) {
       return INCREMENTAL;
     }
 
-    ASSERT(Assembler::IsBne(first_instruction));
+    ASSERT(Assembler::IsBnez(first_instruction));
 
-    if (Assembler::IsBeq(second_instruction)) {
+    if (Assembler::IsBeqz(second_instruction)) {
       return INCREMENTAL_COMPACTION;
     }
 
-    ASSERT(Assembler::IsBne(second_instruction));
+    ASSERT(Assembler::IsBnez(second_instruction));
 
     return STORE_BUFFER_ONLY;
-#else
-	  UNIMPLEMENTED();
-          return STORE_BUFFER_ONLY;
-#endif
   }
 
   static void Patch(Code* stub, Mode mode) {
-	  UNIMPLEMENTED();
+    MacroAssembler masm(NULL,
+                        stub->instruction_start(),
+                        stub->instruction_size());
+    switch (mode) {
+      case STORE_BUFFER_ONLY:
+        ASSERT(GetMode(stub) == INCREMENTAL ||
+               GetMode(stub) == INCREMENTAL_COMPACTION);
+        PatchBranchIntoNop(&masm, 0);
+        PatchBranchIntoNop(&masm, Assembler::kInstrSize);
+        break;
+      case INCREMENTAL:
+        ASSERT(GetMode(stub) == STORE_BUFFER_ONLY);
+        PatchNopIntoBranch(&masm, 0);
+        break;
+      case INCREMENTAL_COMPACTION:
+        ASSERT(GetMode(stub) == STORE_BUFFER_ONLY);
+        PatchNopIntoBranch(&masm, Assembler::kInstrSize);
+        break;
+    }
+    ASSERT(GetMode(stub) == mode);
+    CPU::FlushICache(stub->instruction_start(), 2 * Assembler::kInstrSize);
   }
 
  private:
@@ -132,9 +146,15 @@ class RecordWriteStub: public PlatformCodeStub {
     // If we have to call into C then we need to save and restore all caller-
     // saved registers that were not already preserved.  The scratch registers
     // will be restored by other means so we don't bother pushing them here.
-    void SaveCallerSaveRegisters(MacroAssembler* masm, SaveFPRegsMode mode);
+    void SaveCallerSaveRegisters(MacroAssembler* masm, SaveFPRegsMode mode) {
+      masm->MultiPush((kJSCallerSaved | lr.bit()) & ~scratch1_.bit());
+    }
+
     inline void RestoreCallerSaveRegisters(MacroAssembler*masm,
-                                           SaveFPRegsMode mode);
+                                           SaveFPRegsMode mode) {
+      masm->MultiPop((kJSCallerSaved | lr.bit()) & ~scratch1_.bit());
+    }
+
     inline Register object() { return object_; }
     inline Register address() { return address_; }
     inline Register scratch0() { return scratch0_; }
