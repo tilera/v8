@@ -117,7 +117,7 @@ void BreakLocationIterator::SetDebugBreakAtSlot() {
 #if 0
   ASSERT(IsDebugBreakSlot());
   // Patch the code changing the debug break slot code from:
-  //   nop(DEBUG_BREAK_NOP) - nop(1) is sll(zero_reg, zero_reg, 1)
+  //   nop(DEBUG_BREAK_NOP) - nop(1) is sll(zero, zero, 1)
   //   nop(DEBUG_BREAK_NOP)
   //   nop(DEBUG_BREAK_NOP)
   //   nop(DEBUG_BREAK_NOP)
@@ -153,11 +153,9 @@ const bool Debug::FramePaddingLayout::kIsSupported = false;
 
 
 
-#if 0
 static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
                                           RegList object_regs,
                                           RegList non_object_regs) {
-#if 0
   {
     FrameScope scope(masm, StackFrame::INTERNAL);
 
@@ -175,7 +173,7 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
           if (FLAG_debug_code) {
             __ And(at, reg, 0xc0000000);
             __ Assert(
-                eq, "Unable to encode value as smi", at, Operand(zero_reg));
+                eq, "Unable to encode value as smi", at, Operand(zero));
           }
           __ sll(reg, reg, kSmiTagSize);
         }
@@ -216,18 +214,12 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
   // overwritten by the address of DebugBreakXXX.
   __ li(t9, Operand(
       ExternalReference(Debug_Address::AfterBreakTarget(), masm->isolate())));
-  __ lw(t9, MemOperand(t9));
+  __ ld(t9, MemOperand(t9));
   __ Jump(t9);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
-#endif
 
 
 void Debug::GenerateLoadICDebugBreak(MacroAssembler* masm) {
-#if 0
   // Calling convention for IC load (from ic-mips.cc).
   // ----------- S t a t e -------------
   //  -- a2    : name
@@ -238,15 +230,10 @@ void Debug::GenerateLoadICDebugBreak(MacroAssembler* masm) {
   // Registers a0 and a2 contain objects that need to be pushed on the
   // expression stack of the fake JS frame.
   Generate_DebugBreakCallHelper(masm, a0.bit() | a2.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateStoreICDebugBreak(MacroAssembler* masm) {
-#if 0
   // Calling convention for IC store (from ic-mips.cc).
   // ----------- S t a t e -------------
   //  -- a0    : value
@@ -257,129 +244,84 @@ void Debug::GenerateStoreICDebugBreak(MacroAssembler* masm) {
   // Registers a0, a1, and a2 contain objects that need to be pushed on the
   // expression stack of the fake JS frame.
   Generate_DebugBreakCallHelper(masm, a0.bit() | a1.bit() | a2.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateKeyedLoadICDebugBreak(MacroAssembler* masm) {
-#if 0
   // ---------- S t a t e --------------
   //  -- ra  : return address
   //  -- a0  : key
   //  -- a1  : receiver
   Generate_DebugBreakCallHelper(masm, a0.bit() | a1.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateKeyedStoreICDebugBreak(MacroAssembler* masm) {
-#if 0
   // ---------- S t a t e --------------
   //  -- a0     : value
   //  -- a1     : key
   //  -- a2     : receiver
   //  -- ra     : return address
   Generate_DebugBreakCallHelper(masm, a0.bit() | a1.bit() | a2.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateCompareNilICDebugBreak(MacroAssembler* masm) {
-#if 0
   // Register state for CompareNil IC
   // ----------- S t a t e -------------
   //  -- a0    : value
   // -----------------------------------
   Generate_DebugBreakCallHelper(masm, a0.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateCallICDebugBreak(MacroAssembler* masm) {
-#if 0
   // Calling convention for IC call (from ic-mips.cc).
   // ----------- S t a t e -------------
   //  -- a2: name
   // -----------------------------------
   Generate_DebugBreakCallHelper(masm, a2.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateReturnDebugBreak(MacroAssembler* masm) {
-#if 0
   // In places other than IC call sites it is expected that v0 is TOS which
   // is an object - this is not generally the case so this should be used with
   // care.
   Generate_DebugBreakCallHelper(masm, v0.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateCallFunctionStubDebugBreak(MacroAssembler* masm) {
-#if 0
   // Register state for CallFunctionStub (from code-stubs-mips.cc).
   // ----------- S t a t e -------------
   //  -- a1 : function
   // -----------------------------------
   Generate_DebugBreakCallHelper(masm, a1.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateCallFunctionStubRecordDebugBreak(MacroAssembler* masm) {
-#if 0
   // Register state for CallFunctionStub (from code-stubs-mips.cc).
   // ----------- S t a t e -------------
   //  -- a1 : function
   //  -- a2 : cache cell for call target
   // -----------------------------------
   Generate_DebugBreakCallHelper(masm, a1.bit() | a2.bit(), 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateCallConstructStubDebugBreak(MacroAssembler* masm) {
-#if 0
   // Calling convention for CallConstructStub (from code-stubs-mips.cc).
   // ----------- S t a t e -------------
   //  -- a0     : number of arguments (not smi)
   //  -- a1     : constructor function
   // -----------------------------------
   Generate_DebugBreakCallHelper(masm, a1.bit() , a0.bit());
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateCallConstructStubRecordDebugBreak(MacroAssembler* masm) {
-#if 0
   // Calling convention for CallConstructStub (from code-stubs-mips.cc).
   // ----------- S t a t e -------------
   //  -- a0     : number of arguments (not smi)
@@ -387,15 +329,10 @@ void Debug::GenerateCallConstructStubRecordDebugBreak(MacroAssembler* masm) {
   //  -- a2     : cache cell for call target
   // -----------------------------------
   Generate_DebugBreakCallHelper(masm, a1.bit() | a2.bit(), a0.bit());
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateSlot(MacroAssembler* masm) {
-#if 0
   // Generate enough nop's to make space for a call instruction. Avoid emitting
   // the trampoline pool in the debug break slot code.
   Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm);
@@ -407,42 +344,23 @@ void Debug::GenerateSlot(MacroAssembler* masm) {
   }
   ASSERT_EQ(Assembler::kDebugBreakSlotInstructions,
             masm->InstructionsGeneratedSince(&check_codesize));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateSlotDebugBreak(MacroAssembler* masm) {
-#if 0
   // In the places where a debug break slot is inserted no registers can contain
   // object pointers.
   Generate_DebugBreakCallHelper(masm, 0, 0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GeneratePlainReturnLiveEdit(MacroAssembler* masm) {
-#if 0
   masm->Abort("LiveEdit frame dropping is not supported on mips");
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void Debug::GenerateFrameDropperLiveEdit(MacroAssembler* masm) {
-#if 0
   masm->Abort("LiveEdit frame dropping is not supported on mips");
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

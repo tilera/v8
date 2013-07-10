@@ -3567,7 +3567,6 @@ void CodeStub::GenerateStubsAheadOfTime(Isolate* isolate) {
 
 
 void CodeStub::GenerateFPStubs(Isolate* isolate) {
-	UNIMPLEMENTED();
 }
 
 
@@ -7699,7 +7698,6 @@ void RecordWriteStub::CheckNeedsToInformIncrementalMarker(
 
 
 void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a0    : element value to store
   //  -- a1    : array literal
@@ -7761,10 +7759,6 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
                                  &slow_elements);
   __ Ret();
   __ move(v0, a0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -7785,22 +7779,16 @@ void StubFailureTrampolineStub::Generate(MacroAssembler* masm) {
 
 
 void ProfileEntryHookStub::MaybeCallEntryHook(MacroAssembler* masm) {
-#if 0
   if (entry_hook_ != NULL) {
     ProfileEntryHookStub stub;
     __ push(ra);
     __ CallStub(&stub);
     __ pop(ra);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void ProfileEntryHookStub::Generate(MacroAssembler* masm) {
-#if 0
   // The entry hook is a "push ra" instruction, followed by a call.
   // Note: on MIPS "push" is 2 instruction
   const int32_t kReturnAddressDistanceFromFunctionStart =
@@ -7847,16 +7835,11 @@ void ProfileEntryHookStub::Generate(MacroAssembler* masm) {
 
   __ Pop(ra, t1, a1);
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 template<class T>
 static void CreateArrayDispatch(MacroAssembler* masm) {
-#if 0
   int last_index = GetSequenceIndexFromFastElementsKind(
       TERMINAL_FAST_ELEMENTS_KIND);
   for (int i = 0; i <= last_index; ++i) {
@@ -7870,16 +7853,10 @@ static void CreateArrayDispatch(MacroAssembler* masm) {
 
   // If we reached this point there is a problem.
   __ Abort("Unexpected ElementsKind in array constructor");
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
-#if 0
 static void CreateArrayDispatchOneArgument(MacroAssembler* masm) {
-#if 0
   // a2 - type info cell
   // a3 - kind
   // a0 - number of arguments
@@ -7929,12 +7906,7 @@ static void CreateArrayDispatchOneArgument(MacroAssembler* masm) {
 
   // If we reached this point there is a problem.
   __ Abort("Unexpected ElementsKind in array constructor");
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
-#endif
 
 template<class T>
 static void ArrayConstructorStubAheadOfTimeHelper(Isolate* isolate) {
@@ -7958,7 +7930,6 @@ void ArrayConstructorStubBase::GenerateStubsAheadOfTime(Isolate* isolate) {
 
 
 void ArrayConstructorStub::Generate(MacroAssembler* masm) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a0 : argc (only if argument_count_ == ANY)
   //  -- a1 : constructor
@@ -8040,10 +8011,6 @@ void ArrayConstructorStub::Generate(MacroAssembler* masm) {
          masm->isolate()->builtins()->JSConstructStubGeneric();
      __ Jump(generic_construct_stub, RelocInfo::CODE_TARGET);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {

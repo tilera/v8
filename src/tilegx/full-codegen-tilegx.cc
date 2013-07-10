@@ -35,7 +35,7 @@
 // by the ABI to contain function return values. However, the first
 // parameter to a function is defined to be 'a0'. So there are many
 // places where we have to move a previous result in v0 to a0 for the
-// next call: mov(a0, v0). This is not needed on the other architectures.
+// next call: move(a0, v0). This is not needed on the other architectures.
 
 #include "code-stubs.h"
 #include "codegen.h"
@@ -59,10 +59,10 @@ namespace internal {
 // A patch site is a location in the code which it is possible to patch. This
 // class has a number of methods to emit the code which is patchable and the
 // method EmitPatchInfo to record a marker back to the patchable code. This
-// marker is a andi zero_reg, rx, #yyyy instruction, and rx * 0x0000ffff + yyyy
+// marker is a andi zero, rx, #yyyy instruction, and rx * 0x0000ffff + yyyy
 // (raw 16 bit immediate value is used) is the delta from the pc to the first
 // instruction of the patchable code.
-// The marker instruction is effectively a NOP (dest is zero_reg) and will
+// The marker instruction is effectively a NOP (dest is zero) and will
 // never be emitted by normal code.
 class JumpPatchSite BASE_EMBEDDED {
  public:
@@ -79,48 +79,36 @@ class JumpPatchSite BASE_EMBEDDED {
   // When initially emitting this ensure that a jump is always generated to skip
   // the inlined smi code.
   void EmitJumpIfNotSmi(Register reg, Label* target) {
-#if 0
     ASSERT(!patch_site_.is_bound() && !info_emitted_);
     Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm_);
     __ bind(&patch_site_);
     __ andi(at, reg, 0);
     // Always taken before patched.
-    __ Branch(target, eq, at, Operand(zero_reg));
-#else
-    UNREACHABLE();
-#endif
+    __ Branch(target, eq, at, Operand(zero));
   }
 
   // When initially emitting this ensure that a jump is never generated to skip
   // the inlined smi code.
   void EmitJumpIfSmi(Register reg, Label* target) {
-#if 0
     Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm_);
     ASSERT(!patch_site_.is_bound() && !info_emitted_);
     __ bind(&patch_site_);
     __ andi(at, reg, 0);
     // Never taken before patched.
-    __ Branch(target, ne, at, Operand(zero_reg));
-#else
-    UNREACHABLE();
-#endif
+    __ Branch(target, ne, at, Operand(zero));
   }
 
   void EmitPatchInfo() {
-#if 0
     if (patch_site_.is_bound()) {
       int delta_to_patch_site = masm_->InstructionsGeneratedSince(&patch_site_);
       Register reg = Register::from_code(delta_to_patch_site / kImm16Mask);
-      __ andi(zero_reg, reg, delta_to_patch_site % kImm16Mask);
+      __ andi(zero, reg, delta_to_patch_site % kImm16Mask);
 #ifdef DEBUG
       info_emitted_ = true;
 #endif
     } else {
       __ nop();  // Signals no inlined code.
     }
-#else
-    UNREACHABLE();
-#endif
   }
 
  private:
@@ -147,7 +135,6 @@ class JumpPatchSite BASE_EMBEDDED {
 // The function builds a JS frame.  Please see JavaScriptFrameConstants in
 // frames-mips.h for its layout.
 void FullCodeGenerator::Generate() {
-#if 0
   CompilationInfo* info = info_;
   handler_table_ =
       isolate()->factory()->NewFixedArray(function()->handler_count(), TENURED);
@@ -171,10 +158,10 @@ void FullCodeGenerator::Generate() {
   // function calls.
   if (!info->is_classic_mode() || info->is_native()) {
     Label ok;
-    __ Branch(&ok, eq, t1, Operand(zero_reg));
+    __ Branch(&ok, eq, t1, Operand(zero));
     int receiver_offset = info->scope()->num_parameters() * kPointerSize;
     __ LoadRoot(a2, Heap::kUndefinedValueRootIndex);
-    __ sw(a2, MemOperand(sp, receiver_offset));
+    __ st(a2, MemOperand(sp, receiver_offset));
     __ bind(&ok);
   }
 
@@ -223,7 +210,7 @@ void FullCodeGenerator::Generate() {
     function_in_register = false;
     // Context is returned in both v0 and cp.  It replaces the context
     // passed to us.  It's saved in the stack and kept live in cp.
-    __ sw(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+    __ st(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
     // Copy any necessary parameters into the context.
     int num_parameters = info->scope()->num_parameters();
     for (int i = 0; i < num_parameters; i++) {
@@ -232,10 +219,10 @@ void FullCodeGenerator::Generate() {
         int parameter_offset = StandardFrameConstants::kCallerSPOffset +
                                  (num_parameters - 1 - i) * kPointerSize;
         // Load parameter from stack.
-        __ lw(a0, MemOperand(fp, parameter_offset));
+        __ ld(a0, MemOperand(fp, parameter_offset));
         // Store it in the context.
         MemOperand target = ContextOperand(cp, var->index());
-        __ sw(a0, target);
+        __ st(a0, target);
 
         // Update the write barrier.
         __ RecordWriteContextSlot(
@@ -250,9 +237,9 @@ void FullCodeGenerator::Generate() {
     Comment cmnt(masm_, "[ Allocate arguments object");
     if (!function_in_register) {
       // Load this again, if it's used by the local context below.
-      __ lw(a3, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
+      __ ld(a3, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
     } else {
-      __ mov(a3, a1);
+      __ move(a3, a1);
     }
     // Receiver is just before the parameters on the caller's stack.
     int num_parameters = info->scope()->num_parameters();
@@ -328,36 +315,24 @@ void FullCodeGenerator::Generate() {
     __ LoadRoot(v0, Heap::kUndefinedValueRootIndex);
   }
   EmitReturnSequence();
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::ClearAccumulator() {
-#if 0
   ASSERT(Smi::FromInt(0) == 0);
-  __ mov(v0, zero_reg);
-#else
-    UNREACHABLE();
-#endif
+  __ move(v0, zero);
 }
 
 
 void FullCodeGenerator::EmitProfilingCounterDecrement(int delta) {
-#if 0
   __ li(a2, Operand(profiling_counter_));
-  __ lw(a3, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+  __ ld(a3, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
   __ Subu(a3, a3, Operand(Smi::FromInt(delta)));
-  __ sw(a3, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
-#else
-    UNREACHABLE();
-#endif
+  __ st(a3, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
 }
 
 
 void FullCodeGenerator::EmitProfilingCounterReset() {
-#if 0
   int reset_value = FLAG_interrupt_budget;
   if (info_->ShouldSelfOptimize() && !FLAG_retry_self_opt) {
     // Self-optimization is a one-off thing: if it fails, don't try again.
@@ -369,16 +344,12 @@ void FullCodeGenerator::EmitProfilingCounterReset() {
   }
   __ li(a2, Operand(profiling_counter_));
   __ li(a3, Operand(Smi::FromInt(reset_value)));
-  __ sw(a3, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
-#else
-    UNREACHABLE();
-#endif
+  __ st(a3, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
 }
 
 
 void FullCodeGenerator::EmitBackEdgeBookkeeping(IterationStatement* stmt,
                                                 Label* back_edge_target) {
-#if 0
   // The generated code is used in Deoptimizer::PatchStackCheckCodeAt so we need
   // to make sure it is constant. Branch may emit a skip-or-jump sequence
   // instead of the normal Branch. It seems that the "skip" part of that
@@ -395,8 +366,8 @@ void FullCodeGenerator::EmitBackEdgeBookkeeping(IterationStatement* stmt,
                  Max(1, distance / kBackEdgeDistanceUnit));
   }
   EmitProfilingCounterDecrement(weight);
-  __ slt(at, a3, zero_reg);
-  __ beq(at, zero_reg, &ok);
+  __ cmplts(at, a3, zero);
+  __ beqz(at, &ok);
   // CallStub will emit a li t9 first, so it is safe to use the delay slot.
   InterruptStub stub;
   __ CallStub(&stub);
@@ -412,14 +383,10 @@ void FullCodeGenerator::EmitBackEdgeBookkeeping(IterationStatement* stmt,
   // entry becomes the target of a bailout.  We don't expect it to be, but
   // we want it to work if it is.
   PrepareForBailoutForId(stmt->OsrEntryId(), NO_REGISTERS);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::EmitReturnSequence() {
-#if 0
   Comment cmnt(masm_, "[ Return sequence");
   if (return_label_.is_bound()) {
     __ Branch(&return_label_);
@@ -443,10 +410,10 @@ void FullCodeGenerator::EmitReturnSequence() {
       }
       EmitProfilingCounterDecrement(weight);
       Label ok;
-      __ Branch(&ok, ge, a3, Operand(zero_reg));
+      __ Branch(&ok, ge, a3, Operand(zero));
       __ push(v0);
       if (info_->ShouldSelfOptimize() && FLAG_direct_self_opt) {
-        __ lw(a2, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
+        __ ld(a2, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
         __ push(a2);
         __ CallRuntime(Runtime::kOptimizeFunctionOnNextCall, 1);
       } else {
@@ -471,7 +438,7 @@ void FullCodeGenerator::EmitReturnSequence() {
       int32_t sp_delta = (info_->scope()->num_parameters() + 1) * kPointerSize;
       CodeGenerator::RecordPositions(masm_, function()->end_position() - 1);
       __ RecordJSReturn();
-      masm_->mov(sp, fp);
+      masm_->move(sp, fp);
       int no_frame_start = masm_->pc_offset();
       masm_->MultiPop(static_cast<RegList>(fp.bit() | ra.bit()));
       masm_->Addu(sp, sp, Operand(sp_delta));
@@ -486,9 +453,6 @@ void FullCodeGenerator::EmitReturnSequence() {
            masm_->InstructionsGeneratedSince(&check_exit_codesize));
 #endif
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -504,25 +468,17 @@ void FullCodeGenerator::AccumulatorValueContext::Plug(Variable* var) const {
 
 
 void FullCodeGenerator::StackValueContext::Plug(Variable* var) const {
-#if 0
   ASSERT(var->IsStackAllocated() || var->IsContextSlot());
   codegen()->GetVar(result_register(), var);
   __ push(result_register());
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::TestContext::Plug(Variable* var) const {
-#if 0
   // For simplicity we always test the accumulator register.
   codegen()->GetVar(result_register(), var);
   codegen()->PrepareForBailoutBeforeSplit(condition(), false, NULL, NULL);
   codegen()->DoTest(this);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -531,11 +487,7 @@ void FullCodeGenerator::EffectContext::Plug(Heap::RootListIndex index) const { U
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(
     Heap::RootListIndex index) const {
-#if 0
   __ LoadRoot(result_register(), index);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -551,7 +503,6 @@ void FullCodeGenerator::StackValueContext::Plug(
 
 
 void FullCodeGenerator::TestContext::Plug(Heap::RootListIndex index) const {
-#if 0
   codegen()->PrepareForBailoutBeforeSplit(condition(),
                                           true,
                                           true_label_,
@@ -566,9 +517,6 @@ void FullCodeGenerator::TestContext::Plug(Heap::RootListIndex index) const {
     __ LoadRoot(result_register(), index);
     codegen()->DoTest(this);
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -577,27 +525,18 @@ void FullCodeGenerator::EffectContext::Plug(Handle<Object> lit) const { UNREACHA
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(
     Handle<Object> lit) const {
-#if 0
   __ li(result_register(), Operand(lit));
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::StackValueContext::Plug(Handle<Object> lit) const {
-#if 0
   // Immediates cannot be pushed directly.
   __ li(result_register(), Operand(lit));
   __ push(result_register());
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::TestContext::Plug(Handle<Object> lit) const {
-#if 0
   codegen()->PrepareForBailoutBeforeSplit(condition(),
                                           true,
                                           true_label_,
@@ -624,78 +563,54 @@ void FullCodeGenerator::TestContext::Plug(Handle<Object> lit) const {
     __ li(result_register(), Operand(lit));
     codegen()->DoTest(this);
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::EffectContext::DropAndPlug(int count,
                                                    Register reg) const {
-#if 0
   ASSERT(count > 0);
   __ Drop(count);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::AccumulatorValueContext::DropAndPlug(
     int count,
     Register reg) const {
-#if 0
   ASSERT(count > 0);
   __ Drop(count);
   __ Move(result_register(), reg);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::StackValueContext::DropAndPlug(int count,
                                                        Register reg) const {
-#if 0
   ASSERT(count > 0);
   if (count > 1) __ Drop(count - 1);
-  __ sw(reg, MemOperand(sp, 0));
-#else
-    UNREACHABLE();
-#endif
+  __ st(reg, MemOperand(sp, 0));
 }
 
 
 void FullCodeGenerator::TestContext::DropAndPlug(int count,
                                                  Register reg) const {
-#if 0
   ASSERT(count > 0);
   // For simplicity we always test the accumulator register.
   __ Drop(count);
   __ Move(result_register(), reg);
   codegen()->PrepareForBailoutBeforeSplit(condition(), false, NULL, NULL);
   codegen()->DoTest(this);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::EffectContext::Plug(Label* materialize_true,
                                             Label* materialize_false) const {
-#if 0
   ASSERT(materialize_true == materialize_false);
   __ bind(materialize_true);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(
     Label* materialize_true,
     Label* materialize_false) const {
-#if 0
   Label done;
   __ bind(materialize_true);
   __ LoadRoot(result_register(), Heap::kTrueValueRootIndex);
@@ -703,16 +618,12 @@ void FullCodeGenerator::AccumulatorValueContext::Plug(
   __ bind(materialize_false);
   __ LoadRoot(result_register(), Heap::kFalseValueRootIndex);
   __ bind(&done);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::StackValueContext::Plug(
     Label* materialize_true,
     Label* materialize_false) const {
-#if 0
   Label done;
   __ bind(materialize_true);
   __ LoadRoot(at, Heap::kTrueValueRootIndex);
@@ -722,9 +633,6 @@ void FullCodeGenerator::StackValueContext::Plug(
   __ LoadRoot(at, Heap::kFalseValueRootIndex);
   __ push(at);
   __ bind(&done);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -739,25 +647,17 @@ void FullCodeGenerator::EffectContext::Plug(bool flag) const { UNREACHABLE(); }
 
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(bool flag) const {
-#if 0
   Heap::RootListIndex value_root_index =
       flag ? Heap::kTrueValueRootIndex : Heap::kFalseValueRootIndex;
   __ LoadRoot(result_register(), value_root_index);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::StackValueContext::Plug(bool flag) const {
-#if 0
   Heap::RootListIndex value_root_index =
       flag ? Heap::kTrueValueRootIndex : Heap::kFalseValueRootIndex;
   __ LoadRoot(at, value_root_index);
   __ push(at);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -766,15 +666,11 @@ void FullCodeGenerator::TestContext::Plug(bool flag) const {
                                           true,
                                           true_label_,
                                           false_label_);
-#if 0
   if (flag) {
     if (true_label_ != fall_through_) __ Branch(true_label_);
   } else {
     if (false_label_ != fall_through_) __ Branch(false_label_);
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -782,14 +678,10 @@ void FullCodeGenerator::DoTest(Expression* condition,
                                Label* if_true,
                                Label* if_false,
                                Label* fall_through) {
-#if 0
   ToBooleanStub stub(result_register());
   __ CallStub(&stub, condition->test_id());
-  __ mov(at, zero_reg);
+  __ move(at, zero);
   Split(ne, v0, Operand(at), if_true, if_false, fall_through);
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -799,7 +691,6 @@ void FullCodeGenerator::Split(Condition cc,
                               Label* if_true,
                               Label* if_false,
                               Label* fall_through) {
-#if 0
   if (if_false == fall_through) {
     __ Branch(if_true, cc, lhs, rhs);
   } else if (if_true == fall_through) {
@@ -808,14 +699,10 @@ void FullCodeGenerator::Split(Condition cc,
     __ Branch(if_true, cc, lhs, rhs);
     __ Branch(if_false);
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 MemOperand FullCodeGenerator::StackOperand(Variable* var) {
-#if 0
   ASSERT(var->IsStackAllocated());
   // Offset is negative because higher indexes are at lower addresses.
   int offset = -var->index() * kPointerSize;
@@ -826,15 +713,10 @@ MemOperand FullCodeGenerator::StackOperand(Variable* var) {
     offset += JavaScriptFrameConstants::kLocal0Offset;
   }
   return MemOperand(fp, offset);
-#else
-    UNREACHABLE();
-    return MemOperand(fp);
-#endif
 }
 
 
 MemOperand FullCodeGenerator::VarOperand(Variable* var, Register scratch) {
-#if 0
   ASSERT(var->IsContextSlot() || var->IsStackAllocated());
   if (var->IsContextSlot()) {
     int context_chain_length = scope()->ContextChainLength(var->scope());
@@ -843,21 +725,13 @@ MemOperand FullCodeGenerator::VarOperand(Variable* var, Register scratch) {
   } else {
     return StackOperand(var);
   }
-#else
-    UNREACHABLE();
-    return MemOperand(fp);
-#endif
 }
 
 
 void FullCodeGenerator::GetVar(Register dest, Variable* var) {
-#if 0
   // Use destination as scratch.
   MemOperand location = VarOperand(var, dest);
-  __ lw(dest, location);
-#else
-    UNREACHABLE();
-#endif
+  __ ld(dest, location);
 }
 
 
@@ -865,13 +739,12 @@ void FullCodeGenerator::SetVar(Variable* var,
                                Register src,
                                Register scratch0,
                                Register scratch1) {
-#if 0
   ASSERT(var->IsContextSlot() || var->IsStackAllocated());
   ASSERT(!scratch0.is(src));
   ASSERT(!scratch0.is(scratch1));
   ASSERT(!scratch1.is(src));
   MemOperand location = VarOperand(var, scratch0);
-  __ sw(src, location);
+  __ st(src, location);
   // Emit the write barrier code if the location is in the heap.
   if (var->IsContextSlot()) {
     __ RecordWriteContextSlot(scratch0,
@@ -881,9 +754,6 @@ void FullCodeGenerator::SetVar(Variable* var,
                               kRAHasBeenSaved,
                               kDontSaveFPRegs);
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -891,7 +761,6 @@ void FullCodeGenerator::PrepareForBailoutBeforeSplit(Expression* expr,
                                                      bool should_normalize,
                                                      Label* if_true,
                                                      Label* if_false) {
-#if 0
   // Only prepare for bailouts before splits if we're in a test
   // context. Otherwise, we let the Visit function deal with the
   // preparation to avoid preparing with the same AST id twice.
@@ -905,20 +774,16 @@ void FullCodeGenerator::PrepareForBailoutBeforeSplit(Expression* expr,
     Split(eq, a0, Operand(t0), if_true, if_false, NULL);
     __ bind(&skip);
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::EmitDebugCheckDeclarationContext(Variable* variable) {
-#if 0
   // The variable in the declaration always resides in the current function
   // context.
   ASSERT_EQ(0, scope()->ContextChainLength(variable->scope()));
   if (generate_debug_code_) {
     // Check that we're not inside a with or catch context.
-    __ lw(a1, FieldMemOperand(cp, HeapObject::kMapOffset));
+    __ ld(a1, FieldMemOperand(cp, HeapObject::kMapOffset));
     __ LoadRoot(t0, Heap::kWithContextMapRootIndex);
     __ Check(ne, "Declaration in with context.",
         a1, Operand(t0));
@@ -926,15 +791,11 @@ void FullCodeGenerator::EmitDebugCheckDeclarationContext(Variable* variable) {
     __ Check(ne, "Declaration in catch context.",
         a1, Operand(t0));
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::VisitVariableDeclaration(
     VariableDeclaration* declaration) {
-#if 0
   // If it was not possible to allocate the variable at compile time, we
   // need to "declare" it at runtime to make sure it actually exists in the
   // local context.
@@ -956,7 +817,7 @@ void FullCodeGenerator::VisitVariableDeclaration(
       if (hole_init) {
         Comment cmnt(masm_, "[ VariableDeclaration");
         __ LoadRoot(t0, Heap::kTheHoleValueRootIndex);
-        __ sw(t0, StackOperand(variable));
+        __ st(t0, StackOperand(variable));
       }
       break;
 
@@ -965,7 +826,7 @@ void FullCodeGenerator::VisitVariableDeclaration(
         Comment cmnt(masm_, "[ VariableDeclaration");
         EmitDebugCheckDeclarationContext(variable);
           __ LoadRoot(at, Heap::kTheHoleValueRootIndex);
-          __ sw(at, ContextOperand(cp, variable->index()));
+          __ st(at, ContextOperand(cp, variable->index()));
           // No write barrier since the_hole_value is in old space.
           PrepareForBailoutForId(proxy->id(), NO_REGISTERS);
       }
@@ -988,22 +849,18 @@ void FullCodeGenerator::VisitVariableDeclaration(
         __ Push(cp, a2, a1, a0);
       } else {
         ASSERT(Smi::FromInt(0) == 0);
-        __ mov(a0, zero_reg);  // Smi::FromInt(0) indicates no initial value.
+        __ move(a0, zero);  // Smi::FromInt(0) indicates no initial value.
         __ Push(cp, a2, a1, a0);
       }
       __ CallRuntime(Runtime::kDeclareContextSlot, 4);
       break;
     }
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::VisitFunctionDeclaration(
     FunctionDeclaration* declaration) {
-#if 0
   VariableProxy* proxy = declaration->proxy();
   Variable* variable = proxy->var();
   switch (variable->location()) {
@@ -1021,7 +878,7 @@ void FullCodeGenerator::VisitFunctionDeclaration(
     case Variable::LOCAL: {
       Comment cmnt(masm_, "[ FunctionDeclaration");
       VisitForAccumulatorValue(declaration->fun());
-      __ sw(result_register(), StackOperand(variable));
+      __ st(result_register(), StackOperand(variable));
       break;
     }
 
@@ -1029,7 +886,7 @@ void FullCodeGenerator::VisitFunctionDeclaration(
       Comment cmnt(masm_, "[ FunctionDeclaration");
       EmitDebugCheckDeclarationContext(variable);
       VisitForAccumulatorValue(declaration->fun());
-      __ sw(result_register(), ContextOperand(cp, variable->index()));
+      __ st(result_register(), ContextOperand(cp, variable->index()));
       int offset = Context::SlotOffset(variable->index());
       // We know that we have written a function, which is not a smi.
       __ RecordWriteContextSlot(cp,
@@ -1055,14 +912,10 @@ void FullCodeGenerator::VisitFunctionDeclaration(
       break;
     }
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::VisitModuleDeclaration(ModuleDeclaration* declaration) {
-#if 0
   Variable* variable = declaration->proxy()->var();
   ASSERT(variable->location() == Variable::CONTEXT);
   ASSERT(variable->interface()->IsFrozen());
@@ -1072,11 +925,11 @@ void FullCodeGenerator::VisitModuleDeclaration(ModuleDeclaration* declaration) {
 
   // Load instance object.
   __ LoadContext(a1, scope_->ContextChainLength(scope_->GlobalScope()));
-  __ lw(a1, ContextOperand(a1, variable->interface()->Index()));
-  __ lw(a1, ContextOperand(a1, Context::EXTENSION_INDEX));
+  __ ld(a1, ContextOperand(a1, variable->interface()->Index()));
+  __ ld(a1, ContextOperand(a1, Context::EXTENSION_INDEX));
 
   // Assign it.
-  __ sw(a1, ContextOperand(cp, variable->index()));
+  __ st(a1, ContextOperand(cp, variable->index()));
   // We know that we have written a module, which is not a smi.
   __ RecordWriteContextSlot(cp,
                             Context::SlotOffset(variable->index()),
@@ -1090,14 +943,10 @@ void FullCodeGenerator::VisitModuleDeclaration(ModuleDeclaration* declaration) {
 
   // Traverse into body.
   Visit(declaration->module());
-#else
-    UNREACHABLE();
-#endif
 }
 
 
 void FullCodeGenerator::VisitImportDeclaration(ImportDeclaration* declaration) {
-#if 0
   VariableProxy* proxy = declaration->proxy();
   Variable* variable = proxy->var();
   switch (variable->location()) {
@@ -1117,9 +966,6 @@ void FullCodeGenerator::VisitImportDeclaration(ImportDeclaration* declaration) {
     case Variable::LOOKUP:
       UNREACHABLE();
   }
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -1129,7 +975,6 @@ void FullCodeGenerator::VisitExportDeclaration(ExportDeclaration* declaration) {
 
 
 void FullCodeGenerator::DeclareGlobals(Handle<FixedArray> pairs) {
-#if 0
   // Call the runtime to declare the globals.
   // The context is the first argument.
   __ li(a1, Operand(pairs));
@@ -1137,9 +982,6 @@ void FullCodeGenerator::DeclareGlobals(Handle<FixedArray> pairs) {
   __ Push(cp, a1, a0);
   __ CallRuntime(Runtime::kDeclareGlobals, 3);
   // Return value is ignored.
-#else
-    UNREACHABLE();
-#endif
 }
 
 

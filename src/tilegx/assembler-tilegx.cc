@@ -921,6 +921,18 @@ int Assembler::RelocateInternalReference(byte* pc, intptr_t pc_delta) {
   }
 }
 
+void Assembler::RecordJSReturn() {
+  positions_recorder()->WriteRecordedPositions();
+  CheckBuffer();
+  RecordRelocInfo(RelocInfo::JS_RETURN);
+}
+
+void Assembler::RecordDebugBreakSlot() {
+  positions_recorder()->WriteRecordedPositions();
+  CheckBuffer();
+  RecordRelocInfo(RelocInfo::DEBUG_BREAK_SLOT);
+}
+
 void Assembler::RecordComment(const char* msg) {
   if (FLAG_code_comments) {
     CheckBuffer();

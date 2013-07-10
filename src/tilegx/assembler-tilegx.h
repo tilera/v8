@@ -669,6 +669,8 @@ class Assembler : public AssemblerBase {
 
   void ClearRecordedAstId() { recorded_ast_id_ = TypeFeedbackId::None(); }
 
+  void RecordJSReturn();
+  void RecordDebugBreakSlot();
   // Record a comment relocation entry that can be used by a disassembler.
   // Use --code-comments to enable.
   void RecordComment(const char* msg);

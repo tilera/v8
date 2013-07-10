@@ -45,7 +45,6 @@ int Deoptimizer::patch_size() {
 
 void Deoptimizer::DeoptimizeFunctionWithPreparedFunctionList(
     JSFunction* function) {
-#if 0
   Isolate* isolate = function->GetIsolate();
   HandleScope scope(isolate);
   AssertNoAllocation no_allocation;
@@ -107,24 +106,21 @@ void Deoptimizer::DeoptimizeFunctionWithPreparedFunctionList(
   if (FLAG_trace_deopt) {
     PrintF("[forced deoptimization: ");
     function->PrintName();
-    PrintF(" / %x]\n", reinterpret_cast<uint32_t>(function));
+    PrintF(" / %lx]\n", reinterpret_cast<uint64_t>(function));
 #ifdef DEBUG
     if (FLAG_print_code) {
       code->PrintLn();
     }
 #endif
   }
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
 
 // This structure comes from FullCodeGenerator::EmitBackEdgeBookkeeping.
 // The back edge bookkeeping code matches the pattern:
 //
-// sltu at, sp, t0 / slt at, a3, zero_reg (in case of count based interrupts)
-// beq at, zero_reg, ok
+// sltu at, sp, t0 / slt at, a3, zero (in case of count based interrupts)
+// beq at, zero, ok
 // lui t9, <interrupt stub address> upper
 // ori t9, <interrupt stub address> lower
 // jalr t9
@@ -133,8 +129,8 @@ void Deoptimizer::DeoptimizeFunctionWithPreparedFunctionList(
 //
 // We patch the code to the following form:
 //
-// addiu at, zero_reg, 1
-// beq at, zero_reg, ok  ;; Not changed
+// addiu at, zero, 1
+// beq at, zero, ok  ;; Not changed
 // lui t9, <on-stack replacement address> upper
 // ori t9, <on-stack replacement address> lower
 // jalr t9  ;; Not changed
@@ -153,7 +149,7 @@ void Deoptimizer::PatchInterruptCodeAt(Code* unoptimized_code,
   static const int kInstrSize = Assembler::kInstrSize;
   // Replace the sltu instruction with load-imm 1 to at, so beq is not taken.
   CodePatcher patcher(pc_after - 6 * kInstrSize, 1);
-  patcher.masm()->addiu(at, zero_reg, 1);
+  patcher.masm()->addiu(at, zero, 1);
   // Replace the stack check address in the load-immediate (lui/ori pair)
   // with the entry address of the replacement code.
   Assembler::set_target_address_at(pc_after - 4 * kInstrSize,
@@ -179,7 +175,7 @@ void Deoptimizer::RevertInterruptCodeAt(Code* unoptimized_code,
   static const int kInstrSize = Assembler::kInstrSize;
   // Restore the sltu instruction so beq can be taken again.
   CodePatcher patcher(pc_after - 6 * kInstrSize, 1);
-  patcher.masm()->slt(at, a3, zero_reg);
+  patcher.masm()->slt(at, a3, zero);
   // Restore the original call address.
   Assembler::set_target_address_at(pc_after - 4 * kInstrSize,
                                    interrupt_code->entry());
@@ -462,7 +458,6 @@ bool Deoptimizer::HasAlignmentPadding(JSFunction* function) {
 // This code tries to be close to ia32 code so that any changes can be
 // easily ported.
 void Deoptimizer::EntryGenerator::Generate() {
-#if 0
   GeneratePrologue();
 
   // Unlike on ARM we don't save all the registers, just the useful ones.
@@ -472,6 +467,8 @@ void Deoptimizer::EntryGenerator::Generate() {
   RegList restored_regs = kJSCallerSaved | kCalleeSaved;
   RegList saved_regs = restored_regs | sp.bit() | ra.bit();
 
+  //FIXME
+#if 0
   const int kDoubleRegsSize =
       kDoubleSize * FPURegister::kMaxNumAllocatableRegisters;
 
@@ -482,35 +479,37 @@ void Deoptimizer::EntryGenerator::Generate() {
     int offset = i * kDoubleSize;
     __ sdc1(fpu_reg, MemOperand(sp, offset));
   }
+#endif
 
   // Push saved_regs (needed to populate FrameDescription::registers_).
   // Leave gaps for other registers.
   __ Subu(sp, sp, kNumberOfRegisters * kPointerSize);
   for (int16_t i = kNumberOfRegisters - 1; i >= 0; i--) {
     if ((saved_regs & (1 << i)) != 0) {
-      __ sw(ToRegister(i), MemOperand(sp, kPointerSize * i));
+      __ st(ToRegister(i), MemOperand(sp, kPointerSize * i));
     }
   }
 
   const int kSavedRegistersAreaSize =
-      (kNumberOfRegisters * kPointerSize) + kDoubleRegsSize;
+      //(kNumberOfRegisters * kPointerSize) + kDoubleRegsSize;
+      (kNumberOfRegisters * kPointerSize);
 
   // Get the bailout id from the stack.
-  __ lw(a2, MemOperand(sp, kSavedRegistersAreaSize));
+  __ ld(a2, MemOperand(sp, kSavedRegistersAreaSize));
 
   // Get the address of the location in the code object if possible (a3) (return
   // address for lazy deoptimization) and compute the fp-to-sp delta in
   // register t0.
   if (type() == EAGER || type() == SOFT) {
-    __ mov(a3, zero_reg);
+    __ move(a3, zero);
     // Correct one word for bailout id.
     __ Addu(t0, sp, Operand(kSavedRegistersAreaSize + (1 * kPointerSize)));
   } else if (type() == OSR) {
-    __ mov(a3, ra);
+    __ move(a3, ra);
     // Correct one word for bailout id.
     __ Addu(t0, sp, Operand(kSavedRegistersAreaSize + (1 * kPointerSize)));
   } else {
-    __ mov(a3, ra);
+    __ move(a3, ra);
     // Correct two words for bailout id and return address.
     __ Addu(t0, sp, Operand(kSavedRegistersAreaSize + (2 * kPointerSize)));
   }
@@ -520,13 +519,20 @@ void Deoptimizer::EntryGenerator::Generate() {
   // Allocate a new deoptimizer object.
   // Pass four arguments in a0 to a3 and fifth & sixth arguments on stack.
   __ PrepareCallCFunction(6, t1);
-  __ lw(a0, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
+  __ ld(a0, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
   __ li(a1, Operand(type()));  // bailout type,
   // a2: bailout id already loaded.
   // a3: code address or 0 already loaded.
-  __ sw(t0, CFunctionArgumentOperand(5));  // Fp-to-sp delta.
+  // FIXME
+#if 0
+  __ st(t0, CFunctionArgumentOperand(5));  // Fp-to-sp delta.
   __ li(t1, Operand(ExternalReference::isolate_address(isolate())));
-  __ sw(t1, CFunctionArgumentOperand(6));  // Isolate.
+  __ st(t1, CFunctionArgumentOperand(6));  // Isolate.
+#else
+  __ move(r4, t0);  // Fp-to-sp delta.
+  __ li(t1, Operand(ExternalReference::isolate_address(isolate())));
+  __ move(r5, t1);  // Isolate.
+#endif
   // Call Deoptimizer::New().
   {
     AllowExternalCallThatCantCauseGC scope(masm());
@@ -536,22 +542,24 @@ void Deoptimizer::EntryGenerator::Generate() {
   // Preserve "deoptimizer" object in register v0 and get the input
   // frame descriptor pointer to a1 (deoptimizer->input_);
   // Move deopt-obj to a0 for call to Deoptimizer::ComputeOutputFrames() below.
-  __ mov(a0, v0);
-  __ lw(a1, MemOperand(v0, Deoptimizer::input_offset()));
+  __ move(a0, v0);
+  __ ld(a1, MemOperand(v0, Deoptimizer::input_offset()));
 
   // Copy core registers into FrameDescription::registers_[kNumRegisters].
   ASSERT(Register::kNumRegisters == kNumberOfRegisters);
   for (int i = 0; i < kNumberOfRegisters; i++) {
     int offset = (i * kPointerSize) + FrameDescription::registers_offset();
     if ((saved_regs & (1 << i)) != 0) {
-      __ lw(a2, MemOperand(sp, i * kPointerSize));
-      __ sw(a2, MemOperand(a1, offset));
+      __ ld(a2, MemOperand(sp, i * kPointerSize));
+      __ st(a2, MemOperand(a1, offset));
     } else if (FLAG_debug_code) {
       __ li(a2, kDebugZapValue);
-      __ sw(a2, MemOperand(a1, offset));
+      __ st(a2, MemOperand(a1, offset));
     }
   }
 
+  // FIXME
+#if 0
   int double_regs_offset = FrameDescription::double_registers_offset();
   // Copy FPU registers to
   // double_registers_[DoubleRegister::kNumAllocatableRegisters]
@@ -561,6 +569,7 @@ void Deoptimizer::EntryGenerator::Generate() {
     __ ldc1(f0, MemOperand(sp, src_offset));
     __ sdc1(f0, MemOperand(a1, dst_offset));
   }
+#endif
 
   // Remove the bailout id, eventually return address, and the saved registers
   // from the stack.
@@ -572,7 +581,7 @@ void Deoptimizer::EntryGenerator::Generate() {
 
   // Compute a pointer to the unwinding limit in register a2; that is
   // the first stack slot not part of the input frame.
-  __ lw(a2, MemOperand(a1, FrameDescription::frame_size_offset()));
+  __ ld(a2, MemOperand(a1, FrameDescription::frame_size_offset()));
   __ Addu(a2, a2, sp);
 
   // Unwind the stack down to - but not including - the unwinding
@@ -584,8 +593,8 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ Branch(&pop_loop_header);
   __ bind(&pop_loop);
   __ pop(t0);
-  __ sw(t0, MemOperand(a3, 0));
-  __ addiu(a3, a3, sizeof(uint32_t));
+  __ st(t0, MemOperand(a3, 0));
+  __ addli(a3, a3, sizeof(uint32_t));
   __ bind(&pop_loop_header);
   __ Branch(&pop_loop, ne, a2, Operand(sp));
 
@@ -606,56 +615,60 @@ void Deoptimizer::EntryGenerator::Generate() {
       outer_loop_header, inner_loop_header;
   // Outer loop state: t0 = current "FrameDescription** output_",
   // a1 = one past the last FrameDescription**.
-  __ lw(a1, MemOperand(a0, Deoptimizer::output_count_offset()));
-  __ lw(t0, MemOperand(a0, Deoptimizer::output_offset()));  // t0 is output_.
+  __ ld(a1, MemOperand(a0, Deoptimizer::output_count_offset()));
+  __ ld(t0, MemOperand(a0, Deoptimizer::output_offset()));  // t0 is output_.
   __ sll(a1, a1, kPointerSizeLog2);  // Count to offset.
-  __ addu(a1, t0, a1);  // a1 = one past the last FrameDescription**.
+  __ add(a1, t0, a1);  // a1 = one past the last FrameDescription**.
   __ jmp(&outer_loop_header);
   __ bind(&outer_push_loop);
   // Inner loop state: a2 = current FrameDescription*, a3 = loop index.
-  __ lw(a2, MemOperand(t0, 0));  // output_[ix]
-  __ lw(a3, MemOperand(a2, FrameDescription::frame_size_offset()));
+  __ ld(a2, MemOperand(t0, 0));  // output_[ix]
+  __ ld(a3, MemOperand(a2, FrameDescription::frame_size_offset()));
   __ jmp(&inner_loop_header);
   __ bind(&inner_push_loop);
   __ Subu(a3, a3, Operand(sizeof(uint32_t)));
   __ Addu(t2, a2, Operand(a3));
-  __ lw(t3, MemOperand(t2, FrameDescription::frame_content_offset()));
+  __ ld(t3, MemOperand(t2, FrameDescription::frame_content_offset()));
   __ push(t3);
   __ bind(&inner_loop_header);
-  __ Branch(&inner_push_loop, ne, a3, Operand(zero_reg));
+  __ Branch(&inner_push_loop, ne, a3, Operand(zero));
 
   __ Addu(t0, t0, Operand(kPointerSize));
   __ bind(&outer_loop_header);
   __ Branch(&outer_push_loop, lt, t0, Operand(a1));
 
-  __ lw(a1, MemOperand(a0, Deoptimizer::input_offset()));
+  __ ld(a1, MemOperand(a0, Deoptimizer::input_offset()));
+  //FIXME
+#if 0
   for (int i = 0; i < FPURegister::kMaxNumAllocatableRegisters; ++i) {
     const FPURegister fpu_reg = FPURegister::FromAllocationIndex(i);
     int src_offset = i * kDoubleSize + double_regs_offset;
     __ ldc1(fpu_reg, MemOperand(a1, src_offset));
   }
+#endif
 
   // Push state, pc, and continuation from the last output frame.
   if (type() != OSR) {
-    __ lw(t2, MemOperand(a2, FrameDescription::state_offset()));
+    __ ld(t2, MemOperand(a2, FrameDescription::state_offset()));
     __ push(t2);
   }
 
-  __ lw(t2, MemOperand(a2, FrameDescription::pc_offset()));
+  __ ld(t2, MemOperand(a2, FrameDescription::pc_offset()));
   __ push(t2);
-  __ lw(t2, MemOperand(a2, FrameDescription::continuation_offset()));
+  __ ld(t2, MemOperand(a2, FrameDescription::continuation_offset()));
   __ push(t2);
 
 
-  // Technically restoring 'at' should work unless zero_reg is also restored
+  // Technically restoring 'at' should work unless zero is also restored
   // but it's safer to check for this.
-  ASSERT(!(at.bit() & restored_regs));
+  // FIXME
+  //ASSERT(!(at.bit() & restored_regs));
   // Restore the registers from the last output frame.
-  __ mov(at, a2);
+  __ move(at, a2);
   for (int i = kNumberOfRegisters - 1; i >= 0; i--) {
     int offset = (i * kPointerSize) + FrameDescription::registers_offset();
     if ((restored_regs & (1 << i)) != 0) {
-      __ lw(ToRegister(i), MemOperand(at, offset));
+      __ ld(ToRegister(i), MemOperand(at, offset));
     }
   }
 
@@ -665,9 +678,6 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ pop(ra);
   __ Jump(at);
   __ stop("Unreachable.");
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
 
@@ -675,7 +685,6 @@ void Deoptimizer::EntryGenerator::Generate() {
 const int Deoptimizer::table_entry_size_ = 9 * Assembler::kInstrSize;
 
 void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
-#if 0
   Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm());
 
   // Create a sequence of deoptimization entries. Note that any
@@ -687,10 +696,10 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
     __ bind(&start);
     if (type() != EAGER && type() != SOFT) {
       // Emulate ia32 like call by pushing return address to stack.
-      __ addiu(sp, sp, -2 * kPointerSize);
-      __ sw(ra, MemOperand(sp, 1 * kPointerSize));
+      __ addli(sp, sp, -2 * kPointerSize);
+      __ st(ra, MemOperand(sp, 1 * kPointerSize));
     } else {
-      __ addiu(sp, sp, -1 * kPointerSize);
+      __ addli(sp, sp, -1 * kPointerSize);
     }
     // Jump over the remaining deopt entries (including this one).
     // This code is always reached by calling Jump, which puts the target (label
@@ -700,7 +709,7 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
     // 'at' was clobbered so we can only load the current entry value here.
     __ li(at, i);
     __ jr(t9);  // Expose delay slot.
-    __ sw(at, MemOperand(sp, 0 * kPointerSize));  // In the delay slot.
+    __ st(at, MemOperand(sp, 0 * kPointerSize));  // In the delay slot.
 
     // Pad the rest of the code.
     while (table_entry_size_ > (masm()->SizeOfCodeGeneratedSince(&start))) {
@@ -712,9 +721,6 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
 
   ASSERT_EQ(masm()->SizeOfCodeGeneratedSince(&table_start),
       count() * table_entry_size_);
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
 #undef __
