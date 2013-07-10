@@ -44,122 +44,86 @@ namespace internal {
 void FastCloneShallowArrayStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a3, a2, a1 };
   descriptor->register_param_count_ = 3;
   descriptor->register_params_ = registers;
   descriptor->stack_parameter_count_ = NULL;
   descriptor->deoptimization_handler_ =
       Runtime::FunctionForId(Runtime::kCreateArrayLiteralShallow)->entry;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void FastCloneShallowObjectStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a3, a2, a1, a0 };
   descriptor->register_param_count_ = 4;
   descriptor->register_params_ = registers;
   descriptor->stack_parameter_count_ = NULL;
   descriptor->deoptimization_handler_ =
       Runtime::FunctionForId(Runtime::kCreateObjectLiteralShallow)->entry;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void KeyedLoadFastElementStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a1, a0 };
   descriptor->register_param_count_ = 2;
   descriptor->register_params_ = registers;
   descriptor->deoptimization_handler_ =
       FUNCTION_ADDR(KeyedLoadIC_MissFromStubFailure);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void LoadFieldStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a0 };
   descriptor->register_param_count_ = 1;
   descriptor->register_params_ = registers;
   descriptor->stack_parameter_count_ = NULL;
   descriptor->deoptimization_handler_ = NULL;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void KeyedLoadFieldStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a1 };
   descriptor->register_param_count_ = 1;
   descriptor->register_params_ = registers;
   descriptor->stack_parameter_count_ = NULL;
   descriptor->deoptimization_handler_ = NULL;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void KeyedStoreFastElementStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a2, a1, a0 };
   descriptor->register_param_count_ = 3;
   descriptor->register_params_ = registers;
   descriptor->deoptimization_handler_ =
       FUNCTION_ADDR(KeyedStoreIC_MissFromStubFailure);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void TransitionElementsKindStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a0, a1 };
   descriptor->register_param_count_ = 2;
   descriptor->register_params_ = registers;
   Address entry =
       Runtime::FunctionForId(Runtime::kTransitionElementsKind)->entry;
   descriptor->deoptimization_handler_ = FUNCTION_ADDR(entry);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void CompareNilICStub::InitializeInterfaceDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   static Register registers[] = { a0 };
   descriptor->register_param_count_ = 1;
   descriptor->register_params_ = registers;
@@ -167,10 +131,6 @@ void CompareNilICStub::InitializeInterfaceDescriptor(
       FUNCTION_ADDR(CompareNilIC_Miss);
   descriptor->SetMissHandler(
       ExternalReference(IC_Utility(IC::kCompareNilIC_Miss), isolate));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -178,7 +138,6 @@ static void InitializeArrayConstructorDescriptor(
     Isolate* isolate,
     CodeStubInterfaceDescriptor* descriptor,
     int constant_stack_parameter_count) {
-#if 0
   // register state
   // a0 -- number of arguments
   // a1 -- function
@@ -194,10 +153,6 @@ static void InitializeArrayConstructorDescriptor(
   descriptor->function_mode_ = JS_FUNCTION_STUB_MODE;
   descriptor->deoptimization_handler_ =
       FUNCTION_ADDR(ArrayConstructor_StubFailure);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -222,22 +177,6 @@ void ArrayNArgumentsConstructorStub::InitializeInterfaceDescriptor(
 }
 
 
-
-#if 0
-static void EmitIdenticalObjectComparison(MacroAssembler* masm,
-                                          Label* slow,
-                                          Condition cc);
-static void EmitSmiNonsmiComparison(MacroAssembler* masm,
-                                    Register lhs,
-                                    Register rhs,
-                                    Label* rhs_not_nan,
-                                    Label* slow,
-                                    bool strict);
-static void EmitStrictTwoHeapObjectCompare(MacroAssembler* masm,
-                                           Register lhs,
-                                           Register rhs);
-
-
 // Check if the operand is a heap number.
 static void EmitCheckForHeapNumber(MacroAssembler* masm, Register operand,
                                    Register scratch1, Register scratch2,
@@ -245,13 +184,9 @@ static void EmitCheckForHeapNumber(MacroAssembler* masm, Register operand,
   __ ld(scratch1, FieldMemOperand(operand, HeapObject::kMapOffset));
   __ LoadRoot(scratch2, Heap::kHeapNumberMapRootIndex);
   __ Branch(not_a_heap_number, ne, scratch1, Operand(scratch2));
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
 }
-#endif
 
 void HydrogenCodeStub::GenerateLightweightMiss(MacroAssembler* masm) {
-#if 0
   // Update the static counter each time a new code stub is generated.
   Isolate* isolate = masm->isolate();
   isolate->counters()->code_stubs()->Increment();
@@ -272,15 +207,10 @@ void HydrogenCodeStub::GenerateLightweightMiss(MacroAssembler* masm) {
   }
 
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void ToNumberStub::Generate(MacroAssembler* masm) {
-#if 0
   // The ToNumber stub takes one argument in a0.
   Label check_heap_number, call_builtin;
   __ JumpIfNotSmi(a0, &check_heap_number);
@@ -295,15 +225,10 @@ void ToNumberStub::Generate(MacroAssembler* masm) {
   __ bind(&call_builtin);
   __ push(a0);
   __ InvokeBuiltin(Builtins::TO_NUMBER, JUMP_FUNCTION);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void FastNewClosureStub::Generate(MacroAssembler* masm) {
-#if 0
   // Create a new closure from the given function info in new
   // space. Set the context to the current context in cp.
   Counters* counters = masm->isolate()->counters();
@@ -428,15 +353,10 @@ void FastNewClosureStub::Generate(MacroAssembler* masm) {
   __ LoadRoot(t0, Heap::kFalseValueRootIndex);
   __ Push(cp, a3, t0);
   __ TailCallRuntime(Runtime::kNewClosure, 3, 1);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void FastNewContextStub::Generate(MacroAssembler* masm) {
-#if 0
   // Try to allocate the context in new space.
   Label gc;
   int length = slots_ + Context::MIN_CONTEXT_SLOTS;
@@ -474,15 +394,10 @@ void FastNewContextStub::Generate(MacroAssembler* masm) {
   // Need to collect. Call into runtime system.
   __ bind(&gc);
   __ TailCallRuntime(Runtime::kNewFunctionContext, 1, 1);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void FastNewBlockContextStub::Generate(MacroAssembler* masm) {
-#if 0
   // Stack layout on entry:
   //
   // [sp]: function.
@@ -540,10 +455,6 @@ void FastNewBlockContextStub::Generate(MacroAssembler* masm) {
   // Need to collect. Call into runtime system.
   __ bind(&gc);
   __ TailCallRuntime(Runtime::kPushBlockContext, 2, 1);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1276,6 +1187,7 @@ static void EmitCheckForInternalizedStringsOrObjects(MacroAssembler* masm,
   __ Ret();
   __ xori(v0, a0, 1 << Map::kIsUndetectable);
 }
+#endif
 
 
 void NumberToStringStub::GenerateLookupNumberStringCache(MacroAssembler* masm,
@@ -1333,9 +1245,12 @@ void NumberToStringStub::GenerateLookupNumberStringCache(MacroAssembler* masm,
     __ ld(probe,
            FieldMemOperand(scratch1, FixedArray::kHeaderSize));
     __ JumpIfSmi(probe, not_found);
+    //FIXME
+#if 0
     __ ldc1(f12, FieldMemOperand(object, HeapNumber::kValueOffset));
     __ ldc1(f14, FieldMemOperand(probe, HeapNumber::kValueOffset));
     __ BranchF(&load_result_from_cache, NULL, eq, f12, f14);
+#endif
     __ Branch(not_found);
   }
 
@@ -1380,6 +1295,7 @@ void NumberToStringStub::Generate(MacroAssembler* masm) {
   __ TailCallRuntime(Runtime::kNumberToString, 1, 1);
 }
 
+#if 0
 
 static void ICCompareStub_CheckInputType(MacroAssembler* masm,
                                          Register input,
@@ -4904,7 +4820,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ ld(t9, FieldMemOperand(regexp_data, JSRegExp::kDataAsciiCodeOffset));
   __ sra(a3, a0, 2);  // a3 is 1 for ASCII, 0 for UC16 (used below).
   __ ld(t1, FieldMemOperand(regexp_data, JSRegExp::kDataUC16CodeOffset));
-  __ Movz(t9, t1, a0);  // If UC16 (a0 is 0), replace t9 w/kDataUC16CodeOffset.
+  __ movz(t9, t1, a0);  // If UC16 (a0 is 0), replace t9 w/kDataUC16CodeOffset.
 
   // (E) Carry on.  String handling is done.
   // t9: irregexp code
@@ -5636,7 +5552,7 @@ void StringCharFromCodeGenerator::GenerateFast(MacroAssembler* masm) {
   ASSERT(!t0.is(code_));
 
   STATIC_ASSERT(kSmiTag == 0);
-  STATIC_ASSERT(kSmiShiftSize == 0);
+  STATIC_ASSERT(kSmiShiftSize == 31);
   ASSERT(IsPowerOf2(String::kMaxOneByteCharCode + 1));
   __ And(t0,
          code_,
@@ -5773,6 +5689,8 @@ void StringHelper::GenerateCopyCharactersLong(MacroAssembler* masm,
   __ And(scratch4, src, Operand(kReadAlignmentMask));
   __ Branch(&simple_loop, eq, scratch4, Operand(zero));
 
+// FIXME
+#if 0 
   // Loop for src/dst that are not aligned the same way.
   // This loop uses lwl and lwr instructions. These instructions
   // depend on the endianness, and the implementation assumes little-endian.
@@ -5787,6 +5705,7 @@ void StringHelper::GenerateCopyCharactersLong(MacroAssembler* masm,
     __ Subu(scratch2, limit, dest);
     __ Branch(&loop, ge, scratch2, Operand(kReadAlignment));
   }
+#endif
 
   __ Branch(&byte_loop);
 
@@ -5943,7 +5862,7 @@ void StringHelper::GenerateTwoCharacterStringTableProbe(MacroAssembler* masm,
 
     // Check if the two characters match.
     // Assumes that word load is little endian.
-    __ lhu(scratch, FieldMemOperand(candidate, SeqOneByteString::kHeaderSize));
+    __ ld2u(scratch, FieldMemOperand(candidate, SeqOneByteString::kHeaderSize));
     __ Branch(&found_in_string_table, eq, chars, Operand(scratch));
     __ bind(&next_probe[i]);
   }
@@ -6005,7 +5924,7 @@ void StringHelper::GenerateHashGetHash(MacroAssembler* masm,
 
   // if (hash == 0) hash = 27;
   __ ori(at, zero, StringHasher::kZeroHash);
-  __ Movz(hash, at, hash);
+  __ movz(hash, at, hash);
 }
 
 
@@ -6030,9 +5949,9 @@ void SubStringStub::Generate(MacroAssembler* masm) {
 
   __ ld(a2, MemOperand(sp, kToOffset));
   __ ld(a3, MemOperand(sp, kFromOffset));
-  STATIC_ASSERT(kFromOffset == kToOffset + 4);
+  STATIC_ASSERT(kFromOffset == kToOffset + 8);
   STATIC_ASSERT(kSmiTag == 0);
-  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 1);
+  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 32);
 
   // Utilize delay slots. SmiUntag doesn't emit a jump, everything else is
   // safe in this case.
@@ -6283,8 +6202,8 @@ void StringCompareStub::GenerateCompareFlatAsciiStrings(MacroAssembler* masm,
   __ ld(scratch2, FieldMemOperand(right, String::kLengthOffset));
   __ Subu(scratch3, scratch1, Operand(scratch2));
   Register length_delta = scratch3;
-  __ slt(scratch4, scratch2, scratch1);
-  __ Movn(scratch1, scratch2, scratch4);
+  __ cmplts(scratch4, scratch2, scratch1);
+  __ movn(scratch1, scratch2, scratch4);
   Register min_length = scratch1;
   STATIC_ASSERT(kSmiTag == 0);
   __ Branch(&compare_lengths, eq, min_length, Operand(zero));
@@ -6441,9 +6360,9 @@ void StringAddStub::Generate(MacroAssembler* masm) {
     __ ld(a2, FieldMemOperand(a0, String::kLengthOffset));
     __ ld(a3, FieldMemOperand(a1, String::kLengthOffset));
     __ move(v0, a0);       // Assume we'll return first string (from a0).
-    __ Movz(v0, a1, a2);  // If first is empty, return second (from a1).
-    __ slt(t4, zero, a2);   // if (a2 > 0) t4 = 1.
-    __ slt(t5, zero, a3);   // if (a3 > 0) t5 = 1.
+    __ movz(v0, a1, a2);  // If first is empty, return second (from a1).
+    __ cmplts(t4, zero, a2);   // if (a2 > 0) t4 = 1.
+    __ cmplts(t5, zero, a3);   // if (a3 > 0) t5 = 1.
     __ and_(t4, t4, t5);        // Branch if both strings were non-empty.
     __ Branch(&strings_not_empty, ne, t4, Operand(zero));
 
@@ -6503,7 +6422,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   // in a little endian mode).
   __ li(t2, Operand(2));
   __ AllocateAsciiString(v0, t2, t0, t1, t5, &call_runtime);
-  __ sh(a2, FieldMemOperand(v0, SeqOneByteString::kHeaderSize));
+  __ st2(a2, FieldMemOperand(v0, SeqOneByteString::kHeaderSize));
   __ IncrementCounter(counters->string_add_native(), 1, a2, a3);
   __ DropAndRet(2);
 
@@ -6812,6 +6731,8 @@ void ICCompareStub::GenerateNumbers(MacroAssembler* masm) {
     __ JumpIfNotSmi(a0, &miss);
   }
 
+  //FIXME:
+#if 0
   // Inlining the double comparison and falling back to the general compare
   // stub if NaN is involved.
   // Load left and right operand.
@@ -6865,6 +6786,7 @@ void ICCompareStub::GenerateNumbers(MacroAssembler* masm) {
 
   __ bind(&unordered);
   __ bind(&generic_stub);
+#endif
   ICCompareStub stub(op_, CompareIC::GENERIC, CompareIC::GENERIC,
                      CompareIC::GENERIC);
   __ Jump(stub.GetCode(masm->isolate()), RelocInfo::CODE_TARGET);
@@ -7323,7 +7245,6 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
                                                       Register name,
                                                       Register scratch1,
                                                       Register scratch2) {
-#if 0
   ASSERT(!elements.is(scratch1));
   ASSERT(!elements.is(scratch2));
   ASSERT(!name.is(scratch1));
@@ -7390,15 +7311,10 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
 
   __ Branch(done, ne, at, Operand(zero));
   __ Branch(miss, eq, at, Operand(zero));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
-#if 0
   // This stub overrides SometimesSetsUpAFrame() to return false.  That means
   // we cannot call anything that could cause a GC from this stub.
   // Registers:
@@ -7494,10 +7410,6 @@ void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
   __ bind(&not_in_dictionary);
   __ Ret();
   __ move(result, zero);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -7549,7 +7461,6 @@ static const AheadOfTimeWriteBarrierStubList kAheadOfTime[] = {
 
 
 bool RecordWriteStub::IsPregenerated() {
-#if 0
   for (const AheadOfTimeWriteBarrierStubList* entry = kAheadOfTime;
        !entry->object.is(no_reg);
        entry++) {
@@ -7562,10 +7473,6 @@ bool RecordWriteStub::IsPregenerated() {
     }
   }
   return false;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

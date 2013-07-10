@@ -70,6 +70,10 @@ int print_insn_tilegx (unsigned char * memaddr);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(SUB_RRR_0_OPCODE_X1) | FNOP_X0
 
+#define MULX_X0                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(MULX_RRR_0_OPCODE_X0) | FNOP_X1
+
 #define NOR_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(NOR_RRR_0_OPCODE_X1) | FNOP_X0
@@ -128,6 +132,16 @@ int print_insn_tilegx (unsigned char * memaddr);
 #define ST1_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(ST1_RRR_0_OPCODE_X1) | create_Dest_X1(0x0) | \
+      FNOP_X0
+
+#define ST2_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(ST2_RRR_0_OPCODE_X1) | create_Dest_X1(0x0) | \
+      FNOP_X0
+
+#define ST4_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(ST4_RRR_0_OPCODE_X1) | create_Dest_X1(0x0) | \
       FNOP_X0
 
 #define LD_X1                                                                  \
@@ -538,6 +552,7 @@ const Register gp  = { kRegister_gp_Code };
 const Register fp  = { kRegister_fp_Code };
 const Register tp  = { kRegister_tp_Code };
 const Register sp  = { kRegister_sp_Code };
+const Register ra  = { kRegister_lr_Code };
 const Register lr  = { kRegister_lr_Code };
 const Register zero = { kRegister_zero_Code };
 const Register no_reg = { kRegister_no_reg_Code };
@@ -816,6 +831,10 @@ class Assembler : public AssemblerBase {
   void st(const Register& rd, const Register& rs, int line = 0);
   void st1(const Register& rd, const MemOperand& rs, int line = 0);
   void st1(const Register& rd, const Register& rs, int line = 0);
+  void st2(const Register& rd, const MemOperand& rs, int line = 0);
+  void st2(const Register& rd, const Register& rs, int line = 0);
+  void st4(const Register& rd, const MemOperand& rs, int line = 0);
+  void st4(const Register& rd, const Register& rs, int line = 0);
   void ld(const Register& rd, const MemOperand& rs, int line = 0);
   void ld(const Register& rd, const Register& rs, int line = 0);
   void ld1u(const Register& rd, const MemOperand& rs, int line = 0);
@@ -826,8 +845,10 @@ class Assembler : public AssemblerBase {
   void ld4u(const Register& rd, const Register& rs, int line = 0);
   void add(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void sub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void mulx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void addi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
   void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void nor(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void srl(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void sra(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void sll(const Register& rd, const Register& rs, int16_t imm, int line = 0);
@@ -878,6 +899,25 @@ class Assembler : public AssemblerBase {
     DISALLOW_IMPLICIT_CONSTRUCTORS(BlockTrampolinePoolScope);
   };
 
+  // Class for postponing the assembly buffer growth. Typically used for
+  // sequences of instructions that must be emitted as a unit, before
+  // buffer growth (and relocation) can occur.
+  // This blocking scope is not nestable.
+  class BlockGrowBufferScope {
+   public:
+    explicit BlockGrowBufferScope(Assembler* assem) : assem_(assem) {
+      assem_->StartBlockGrowBuffer();
+    }
+    ~BlockGrowBufferScope() {
+      assem_->EndBlockGrowBuffer();
+    }
+
+    private:
+     Assembler* assem_;
+
+     DISALLOW_IMPLICIT_CONSTRUCTORS(BlockGrowBufferScope);
+  };
+
  protected:
   TypeFeedbackId recorded_ast_id_;
 
@@ -891,6 +931,21 @@ class Assembler : public AssemblerBase {
 
   bool is_trampoline_pool_blocked() const {
     return trampoline_pool_blocked_nesting_ > 0;
+  }
+
+  bool is_trampoline_emitted() const {
+    return trampoline_emitted_;
+  }
+
+  // Temporarily block automatic assembly buffer growth.
+  void StartBlockGrowBuffer() {
+    ASSERT(!block_buffer_growth_);
+    block_buffer_growth_ = true;
+  }
+
+  void EndBlockGrowBuffer() {
+    ASSERT(block_buffer_growth_);
+    block_buffer_growth_ = false;
   }
 
   // Record reloc info for current pc_.

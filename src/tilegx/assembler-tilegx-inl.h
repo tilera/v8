@@ -344,8 +344,10 @@ bool Operand::is_reg() const {
 void Assembler::emit(Instr x, int line) {
   CheckBuffer();
   *reinterpret_cast<Instr*>(pc_) = x;
+#ifdef TILEGX_DEBUG
   printf("[%05d]\t", line);
   print_insn_tilegx((unsigned char *)pc_);
+#endif
   pc_ += kInstrSize;
 }
 

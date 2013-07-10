@@ -59,6 +59,14 @@ enum RAStatus { kRAHasNotBeenSaved, kRAHasBeenSaved };
 
 bool AreAliased(Register r1, Register r2, Register r3, Register r4);
 
+inline MemOperand ContextOperand(Register context, int index) {
+  return MemOperand(context, Context::SlotOffset(index));
+}
+
+inline MemOperand GlobalObjectOperand()  {
+  return ContextOperand(cp, Context::GLOBAL_OBJECT_INDEX);
+}
+
 // Generate a MemOperand for loading a field from an object.
 inline MemOperand FieldMemOperand(Register object, int offset) {
   return MemOperand(object, offset - kHeapObjectTag);
@@ -150,6 +158,14 @@ class MacroAssembler: public Assembler {
   void LoadInstanceDescriptors(Register map, Register descriptors);
   void EnumLength(Register dst, Register map);
   void NumberOfOwnDescriptors(Register dst, Register map);
+
+  template<typename Field>
+  void DecodeField(Register reg) {
+    static const int shift = Field::kShift;
+    static const int mask = (Field::kMask >> shift) << kSmiTagSize;
+    srl(reg, reg, shift);
+    And(reg, reg, Operand(mask));
+  }
 
   // Untag the source value into destination and jump if source is a smi.
   // Souce and destination can be the same register.
@@ -490,7 +506,6 @@ class MacroAssembler: public Assembler {
             COND_ARGS);
   void Ret(COND_ARGS);
 
-  void Jr(Label* L);
   void Branch(Label* L,
               Condition cond,
               Register rs,
@@ -913,6 +928,27 @@ class MacroAssembler: public Assembler {
       RememberedSetAction remembered_set_action = EMIT_REMEMBERED_SET,
       SmiCheck smi_check = INLINE_SMI_CHECK);
 
+  // As above, but the offset has the tag presubtracted.  For use with
+  // MemOperand(reg, off).
+  inline void RecordWriteContextSlot(
+      Register context,
+      int offset,
+      Register value,
+      Register scratch,
+      RAStatus ra_status,
+      SaveFPRegsMode save_fp,
+      RememberedSetAction remembered_set_action = EMIT_REMEMBERED_SET,
+      SmiCheck smi_check = INLINE_SMI_CHECK) {
+    RecordWriteField(context,
+                     offset + kHeapObjectTag,
+                     value,
+                     scratch,
+                     ra_status,
+                     save_fp,
+                     remembered_set_action,
+                     smi_check);
+  }
+
   // For a given |object| notify the garbage collector that the slot |address|
   // has been written.  |value| is the object being stored. The value and
   // address registers are clobbered by the operation.
@@ -987,6 +1023,8 @@ class MacroAssembler: public Assembler {
   void DebugBreak();
 #endif
 
+  void Jr(Label* L);
+
  private:
   void CallCFunctionHelper(Register function,
                            int num_reg_arguments);
@@ -994,6 +1032,15 @@ class MacroAssembler: public Assembler {
   void BranchShort(Label* L, Condition cond, Register rs, const Operand& rt);
   void BranchShort(int16_t offset);
   void BranchShort(int16_t offset, Condition cond, Register rs, const Operand& rt);
+
+  void BranchAndLinkShort(int16_t offset) {};
+  void BranchAndLinkShort(int16_t offset, Condition cond, Register rs,
+                          const Operand& rt) {};
+  void BranchAndLinkShort(Label* L) {};
+  void BranchAndLinkShort(Label* L, Condition cond, Register rs,
+                          const Operand& rt) {};
+  void J(Label* L);
+  void Jalr(Label* L);
 
   bool generating_stub_;
   bool allow_stub_calls_;

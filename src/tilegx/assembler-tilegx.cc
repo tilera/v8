@@ -281,6 +281,42 @@ void Assembler::st1(const Register& rd, const Register& rs, int line) {
   emit(instr, line);
 }
 
+void Assembler::st2(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = ST2_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+    emit(instr, line);
+  } else
+    st2(rd, rs.rm(), line);
+}
+
+void Assembler::st2(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = ST2_X1 | SRCA_X1(rs.code()) | SRCB_X1(rd.code());
+  emit(instr, line);
+}
+
+void Assembler::st4(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = ST4_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+    emit(instr, line);
+  } else
+    st4(rd, rs.rm(), line);
+}
+
+void Assembler::st4(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = ST4_X1 | SRCA_X1(rs.code()) | SRCB_X1(rd.code());
+  emit(instr, line);
+}
+
 void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
@@ -365,6 +401,20 @@ void Assembler::sub(const Register& rd, const Register& rsa, const Register& rsb
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = SUB_X1 | DEST_X1(rd.code())
 	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
+void Assembler::nor(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = NOR_X1 | DEST_X1(rd.code())
+	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
+void Assembler::mulx(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = MULX_X0 | DEST_X0(rd.code())
+	                | SRCA_X0(rsa.code()) | SRCB_X0(rsb.code());
   emit(instr, line);
 }
 
@@ -531,9 +581,11 @@ int Assembler::target_at(int32_t pos) {
        return (imm18 + pos);
      }
   }
+#ifdef TILEGX_DEBUG
   // Check we have a branch or jump instruction.
   printf("==> ");
   print_insn_tilegx((unsigned char *)&instr);
+#endif
   ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
   // Do NOT change this to << 3. We rely on arithmetic shifts here, assuming
   // the compiler uses arithmectic shifts for signed integers.
@@ -1136,6 +1188,11 @@ void Assembler::jr(Register rs, int line) {
 void Assembler::jalr(Register rs, int line) {
   positions_recorder()->WriteRecordedPositions();
   Instr instr = JALR_X1 | SRCA_X1(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::j(int64_t target, int line) {
+  Instr instr = J_X1 | JOFF_X1(target);
   emit(instr, line);
 }
 
