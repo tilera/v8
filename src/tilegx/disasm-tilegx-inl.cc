@@ -10144,4 +10144,99 @@ print_insn_tilegx (unsigned char * memaddr)
   return TILEGX_BUNDLE_SIZE_IN_BYTES;
 }
 
+int
+print_insn_tilegx_buf (unsigned char * memaddr, char *out_buf)
+{
+  char *buf_p = out_buf;
+  struct tilegx_decoded_instruction
+    decoded[TILEGX_MAX_INSTRUCTIONS_PER_BUNDLE];
+  unsigned char opbuf[TILEGX_BUNDLE_SIZE_IN_BYTES];
+  int i, num_instructions, num_printed;
+  tilegx_mnemonic padding_mnemonic;
+
+  memcpy((void *)opbuf, (void *)memaddr, TILEGX_BUNDLE_SIZE_IN_BYTES);
+
+  /* Parse the instructions in the bundle. */
+  num_instructions =
+    parse_insn_tilegx (*(unsigned long *)opbuf, (unsigned long)memaddr, decoded);
+
+  /* Print the instructions in the bundle. */
+  buf_p = buf_p + sprintf(buf_p, "{ ");
+  num_printed = 0;
+
+  /* Determine which nop opcode is used for padding and should be skipped. */
+  padding_mnemonic = TILEGX_OPC_FNOP;
+  for (i = 0; i < num_instructions; i++)
+  {
+    if (!decoded[i].opcode->can_bundle)
+    {
+      /* Instructions that cannot be bundled are padded out with nops,
+         rather than fnops. Displaying them is always clutter. */
+      padding_mnemonic = TILEGX_OPC_NOP;
+      break;
+    }
+  }
+
+  for (i = 0; i < num_instructions; i++)
+  {
+    const struct tilegx_opcode *opcode = decoded[i].opcode;
+    const char *name;
+    int j;
+
+    /* Do not print out fnops, unless everything is an fnop, in
+       which case we will print out just the last one. */
+    if (opcode->mnemonic == padding_mnemonic
+        && (num_printed > 0 || i + 1 < num_instructions))
+      continue;
+
+    if (num_printed > 0)
+      buf_p = buf_p + sprintf(buf_p, " ; ");
+    ++num_printed;
+
+    name = opcode->name;
+    if (name == NULL)
+      name = "<invalid>";
+    buf_p = buf_p + sprintf(buf_p, "%s", name);
+    
+    for (j = 0; j < opcode->num_operands; j++)
+    {
+      unsigned long num;
+      const struct tilegx_operand *op;
+      const char *spr_name;
+
+      if (j > 0)
+        buf_p = buf_p + sprintf (buf_p, ",");
+      buf_p = buf_p + sprintf (buf_p, " ");
+
+      num = decoded[i].operand_values[j];
+
+      op = decoded[i].operands[j];
+      switch (op->type)
+      {
+      case TILEGX_OP_TYPE_REGISTER:
+        buf_p = buf_p + sprintf (buf_p, "%s", tilegx_register_names[(int)num]);
+        break;
+      case TILEGX_OP_TYPE_SPR:
+        spr_name = get_tilegx_spr_name(num);
+        if (spr_name != NULL)
+          buf_p = buf_p + sprintf (buf_p, "%s", spr_name);
+        else
+          buf_p = buf_p + sprintf (buf_p, "%d", (int)num);
+        break;
+      case TILEGX_OP_TYPE_IMMEDIATE:
+        buf_p = buf_p + sprintf (buf_p, "%d", (int)num);
+        break;
+      case TILEGX_OP_TYPE_ADDRESS:
+        buf_p = buf_p + sprintf (buf_p, "0x%016lx", num);
+        break;
+      default:
+        abort ();
+      }
+    }
+  }
+  buf_p = buf_p + sprintf (buf_p, " }");
+
+  return TILEGX_BUNDLE_SIZE_IN_BYTES;
+}
+
 }}

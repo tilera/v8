@@ -51,7 +51,6 @@ unsigned CpuFeatures::found_by_runtime_probing_only_ = 0;
 
 
 ExternalReference ExternalReference::cpu_features() {
-  UNIMPLEMENTED();
   ASSERT(CpuFeatures::initialized_);
   return ExternalReference(&CpuFeatures::supported_);
 }

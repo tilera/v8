@@ -46,6 +46,7 @@ namespace v8 {
 namespace internal {
 
 int print_insn_tilegx (unsigned char * memaddr);
+int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 
 /* Opcode Helper Macros */
 #define TILEGX_X_MODE 0
