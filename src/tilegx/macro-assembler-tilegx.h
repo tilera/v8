@@ -101,6 +101,15 @@ class MacroAssembler: public Assembler {
   void EnterFrame(StackFrame::Type type);
   void LeaveFrame(StackFrame::Type type);
 
+  // Patch the relocated value (lui/ori pair).
+  void PatchRelocatedValue(Register li_location,
+                           Register scratch,
+                           Register new_value);
+  // Get the relocatad value (loaded data) from the lui/ori pair.
+  void GetRelocatedValue(Register li_location,
+                         Register value,
+                         Register scratch);
+
   // Arguments macros.
 #define COND_TYPED_ARGS Condition cond, Register r1, const Operand& r2
 
@@ -726,10 +735,6 @@ class MacroAssembler: public Assembler {
 
   void SetCallKind(Register dst, CallKind kind);
 
-  void IsObjectNameType(Register object,
-                        Register scratch,
-                        Label* fail);
-
   void InitializeNewString(Register string,
                            Register length,
                            Heap::RootListIndex map_index,
@@ -777,6 +782,9 @@ class MacroAssembler: public Assembler {
                       const CallWrapper& call_wrapper,
                       CallKind call_kind);
 
+  // Copies a fixed number of fields of heap objects from src to dst.
+  void CopyFields(Register dst, Register src, RegList temps, int field_count);
+
   // Copies a number of bytes from src to dst. All registers are clobbered. On
   // exit src and dst will point to the place just after where the last byte was
   // read or written and length will be zero.
@@ -809,6 +817,38 @@ class MacroAssembler: public Assembler {
   void IllegalOperation(int num_arguments);
 
   void IndexFromHash(Register hash, Register index);
+
+  // Get the number of least significant bits from a register.
+  void GetLeastBitsFromSmi(Register dst, Register src, int num_least_bits);
+  void GetLeastBitsFromInt32(Register dst, Register src, int mun_least_bits);
+
+  // -------------------------------------------------------------------------
+  // Overflow handling functions.
+  // Usage: first call the appropriate arithmetic function, then call one of the
+  // jump functions with the overflow_dst register as the second parameter.
+
+  void AdduAndCheckForOverflow(Register dst,
+                               Register left,
+                               Register right,
+                               Register overflow_dst,
+                               Register scratch = at);
+
+  void SubuAndCheckForOverflow(Register dst,
+                               Register left,
+                               Register right,
+                               Register overflow_dst,
+                               Register scratch = at);
+
+  void BranchOnOverflow(Label* label,
+                        Register overflow_check) {
+    Branch(label, lt, overflow_check, Operand(zero));
+  }
+
+  void BranchOnNoOverflow(Label* label,
+                          Register overflow_check) {
+    Branch(label, ge, overflow_check, Operand(zero));
+  }
+
   // Check if the map of an object is equal to a specified map and branch to
   // label if not. Skip the smi check if not required (object is known to be a
   // heap object). If mode is ALLOW_ELEMENT_TRANSITION_MAPS, then also match
@@ -1026,6 +1066,24 @@ class MacroAssembler: public Assembler {
                                 Register reg0,
                                 Register reg1,
                                 Register reg2);
+
+  void IsObjectJSObjectType(Register heap_object,
+                            Register map,
+                            Register scratch,
+                            Label* fail);
+
+  void IsInstanceJSObjectType(Register map,
+                              Register scratch,
+                              Label* fail);
+
+  void IsObjectJSStringType(Register object,
+                            Register scratch,
+                            Label* fail);
+
+  void IsObjectNameType(Register object,
+                        Register scratch,
+                        Label* fail);
+
 
 #ifdef ENABLE_DEBUGGER_SUPPORT
   // -------------------------------------------------------------------------

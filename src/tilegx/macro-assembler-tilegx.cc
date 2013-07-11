@@ -2081,6 +2081,127 @@ void MacroAssembler::AllocateHeapNumber(Register result,
   }
 }
 
+void MacroAssembler::GetLeastBitsFromSmi(Register dst,
+                                         Register src,
+                                         int num_least_bits) {
+  bfextu(dst, src, kSmiTagSize, kSmiTagSize + num_least_bits - 1);
+}
+
+
+void MacroAssembler::GetLeastBitsFromInt32(Register dst,
+                                           Register src,
+                                           int num_least_bits) {
+  And(dst, src, Operand((1 << num_least_bits) - 1));
+}
+
+void MacroAssembler::AdduAndCheckForOverflow(Register dst,
+                                             Register left,
+                                             Register right,
+                                             Register overflow_dst,
+                                             Register scratch) {
+  ASSERT(!dst.is(overflow_dst));
+  ASSERT(!dst.is(scratch));
+  ASSERT(!overflow_dst.is(scratch));
+  ASSERT(!overflow_dst.is(left));
+  ASSERT(!overflow_dst.is(right));
+
+  if (left.is(right) && dst.is(left)) {
+    ASSERT(!dst.is(t9));
+    ASSERT(!scratch.is(t9));
+    ASSERT(!left.is(t9));
+    ASSERT(!right.is(t9));
+    ASSERT(!overflow_dst.is(t9));
+    move(t9, right);
+    right = t9;
+  }
+
+  if (dst.is(left)) {
+    move(scratch, left);  // Preserve left.
+    add(dst, left, right);  // Left is overwritten.
+    xor_(scratch, dst, scratch);  // Original left.
+    xor_(overflow_dst, dst, right);
+    and_(overflow_dst, overflow_dst, scratch);
+  } else if (dst.is(right)) {
+    move(scratch, right);  // Preserve right.
+    add(dst, left, right);  // Right is overwritten.
+    xor_(scratch, dst, scratch);  // Original right.
+    xor_(overflow_dst, dst, left);
+    and_(overflow_dst, overflow_dst, scratch);
+  } else {
+    add(dst, left, right);
+    xor_(overflow_dst, dst, left);
+    xor_(scratch, dst, right);
+    and_(overflow_dst, scratch, overflow_dst);
+  }
+}
+
+
+void MacroAssembler::SubuAndCheckForOverflow(Register dst,
+                                             Register left,
+                                             Register right,
+                                             Register overflow_dst,
+                                             Register scratch) {
+  ASSERT(!dst.is(overflow_dst));
+  ASSERT(!dst.is(scratch));
+  ASSERT(!overflow_dst.is(scratch));
+  ASSERT(!overflow_dst.is(left));
+  ASSERT(!overflow_dst.is(right));
+  ASSERT(!scratch.is(left));
+  ASSERT(!scratch.is(right));
+
+  // This happens with some crankshaft code. Since Subu works fine if
+  // left == right, let's not make that restriction here.
+  if (left.is(right)) {
+    move(dst, zero);
+    move(overflow_dst, zero);
+    return;
+  }
+
+  if (dst.is(left)) {
+    move(scratch, left);  // Preserve left.
+    sub(dst, left, right);  // Left is overwritten.
+    xor_(overflow_dst, dst, scratch);  // scratch is original left.
+    xor_(scratch, scratch, right);  // scratch is original left.
+    and_(overflow_dst, scratch, overflow_dst);
+  } else if (dst.is(right)) {
+    move(scratch, right);  // Preserve right.
+    sub(dst, left, right);  // Right is overwritten.
+    xor_(overflow_dst, dst, left);
+    xor_(scratch, left, scratch);  // Original right.
+    and_(overflow_dst, scratch, overflow_dst);
+  } else {
+    sub(dst, left, right);
+    xor_(overflow_dst, dst, left);
+    xor_(scratch, left, right);
+    and_(overflow_dst, scratch, overflow_dst);
+  }
+}
+
+// Copies a fixed number of fields of heap objects from src to dst.
+void MacroAssembler::CopyFields(Register dst,
+                                Register src,
+                                RegList temps,
+                                int field_count) {
+  ASSERT((temps & dst.bit()) == 0);
+  ASSERT((temps & src.bit()) == 0);
+  // Primitive implementation using only one temporary register.
+
+  Register tmp = no_reg;
+  // Find a temp register in temps list.
+  for (int i = 0; i < kNumRegisters; i++) {
+    if ((temps & (1 << i)) != 0) {
+      tmp.code_ = i;
+      break;
+    }
+  }
+  ASSERT(!tmp.is(no_reg));
+
+  for (int i = 0; i < field_count; i++) {
+    ld(tmp, FieldMemOperand(src, i * kPointerSize));
+    st(tmp, FieldMemOperand(dst, i * kPointerSize));
+  }
+}
+
 void MacroAssembler::CopyBytes(Register src,
                                Register dst,
                                Register length,
@@ -2218,26 +2339,26 @@ void MacroAssembler::StoreNumberToDoubleElements(Register value_reg,
   // Check for nan: all NaN values have a value greater (signed) than 0x7ff00000
   // in the exponent.
   li(scratch1, Operand(kNaNOrInfinityLowerBoundUpper32));
-  lw(exponent_reg, FieldMemOperand(value_reg, HeapNumber::kExponentOffset));
+  ld(exponent_reg, FieldMemOperand(value_reg, HeapNumber::kExponentOffset));
   Branch(&maybe_nan, ge, exponent_reg, Operand(scratch1));
 
-  lw(mantissa_reg, FieldMemOperand(value_reg, HeapNumber::kMantissaOffset));
+  ld(mantissa_reg, FieldMemOperand(value_reg, HeapNumber::kMantissaOffset));
 
   bind(&have_double_value);
   sll(scratch1, key_reg, kDoubleSizeLog2 - kSmiTagSize);
   Addu(scratch1, scratch1, elements_reg);
-  sw(mantissa_reg, FieldMemOperand(
+  st(mantissa_reg, FieldMemOperand(
      scratch1, FixedDoubleArray::kHeaderSize - elements_offset));
   uint32_t offset = FixedDoubleArray::kHeaderSize - elements_offset +
       sizeof(kHoleNanLower32);
-  sw(exponent_reg, FieldMemOperand(scratch1, offset));
+  st(exponent_reg, FieldMemOperand(scratch1, offset));
   jmp(&done);
 
   bind(&maybe_nan);
   // Could be NaN or Infinity. If fraction is not zero, it's NaN, otherwise
   // it's an Infinity, and the non-NaN code path applies.
   Branch(&is_nan, gt, exponent_reg, Operand(scratch1));
-  lw(mantissa_reg, FieldMemOperand(value_reg, HeapNumber::kMantissaOffset));
+  ld(mantissa_reg, FieldMemOperand(value_reg, HeapNumber::kMantissaOffset));
   Branch(&have_double_value, eq, mantissa_reg, Operand(zero));
   bind(&is_nan);
   // Load canonical NaN for storing into the double array.
@@ -2271,8 +2392,8 @@ void MacroAssembler::StoreNumberToDoubleElements(Register value_reg,
   if (destination == FloatingPointHelper::kFPURegisters) {
     sdc1(f0, MemOperand(scratch1, 0));
   } else {
-    sw(mantissa_reg, MemOperand(scratch1, 0));
-    sw(exponent_reg, MemOperand(scratch1, Register::kSizeInBytes));
+    st(mantissa_reg, MemOperand(scratch1, 0));
+    st(exponent_reg, MemOperand(scratch1, Register::kSizeInBytes));
   }
   bind(&done);
 #endif
@@ -2536,14 +2657,6 @@ void MacroAssembler::InvokeFunction(Handle<JSFunction> function,
   // call sites.
   ld(a3, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
   InvokeCode(a3, expected, actual, flag, call_wrapper, call_kind);
-}
-
-void MacroAssembler::IsObjectNameType(Register object,
-                                      Register scratch,
-                                      Label* fail) {
-  ld(scratch, FieldMemOperand(object, HeapObject::kMapOffset));
-  ld1u(scratch, FieldMemOperand(scratch, Map::kInstanceTypeOffset));
-  Branch(fail, hi, scratch, Operand(LAST_NAME_TYPE));
 }
 
 
@@ -3853,6 +3966,114 @@ void MacroAssembler::SmiTagCheckOverflow(Register dst,
     SmiTag(dst, src);
     xor_(overflow, dst, src);  // Overflow if (value ^ 2 * value) < 0.
   }
+}
+
+void MacroAssembler::IsObjectJSStringType(Register object,
+                                          Register scratch,
+                                          Label* fail) {
+  ASSERT(kNotStringTag != 0);
+
+  ld(scratch, FieldMemOperand(object, HeapObject::kMapOffset));
+  ld1u(scratch, FieldMemOperand(scratch, Map::kInstanceTypeOffset));
+  And(scratch, scratch, Operand(kIsNotStringMask));
+  Branch(fail, ne, scratch, Operand(zero));
+}
+
+
+void MacroAssembler::IsObjectNameType(Register object,
+                                      Register scratch,
+                                      Label* fail) {
+  ld(scratch, FieldMemOperand(object, HeapObject::kMapOffset));
+  ld1u(scratch, FieldMemOperand(scratch, Map::kInstanceTypeOffset));
+  Branch(fail, hi, scratch, Operand(LAST_NAME_TYPE));
+}
+
+void MacroAssembler::IsInstanceJSObjectType(Register map,
+                                            Register scratch,
+                                            Label* fail) {
+  ld1u(scratch, FieldMemOperand(map, Map::kInstanceTypeOffset));
+  Branch(fail, lt, scratch, Operand(FIRST_NONCALLABLE_SPEC_OBJECT_TYPE));
+  Branch(fail, gt, scratch, Operand(LAST_NONCALLABLE_SPEC_OBJECT_TYPE));
+}
+
+void MacroAssembler::IsObjectJSObjectType(Register heap_object,
+                                          Register map,
+                                          Register scratch,
+                                          Label* fail) {
+  ld(map, FieldMemOperand(heap_object, HeapObject::kMapOffset));
+  IsInstanceJSObjectType(map, scratch, fail);
+}
+
+void MacroAssembler::PatchRelocatedValue(Register li_location,
+                                         Register scratch,
+                                         Register new_value) {
+  ld(scratch, MemOperand(li_location));
+  // At this point scratch is a lui(at, ...) instruction.
+  if (emit_debug_code()) {
+    //FIXME
+#if 0
+    And(scratch, scratch, kOpcodeMask);
+    Check(eq, "The instruction to patch should be a lui.",
+        scratch, Operand(LUI));
+#endif
+    ld(scratch, MemOperand(li_location));
+  }
+  srl(t9, new_value, kImm16Bits);
+  bfins(scratch, t9, 0, kImm16Bits - 1);
+  st(scratch, MemOperand(li_location));
+
+  ld(scratch, MemOperand(li_location, kInstrSize));
+  // scratch is now ori(at, ...).
+  if (emit_debug_code()) {
+    //FIXME
+#if 0
+    And(scratch, scratch, kOpcodeMask);
+    Check(eq, "The instruction to patch should be an ori.",
+        scratch, Operand(ORI));
+#endif
+    ld(scratch, MemOperand(li_location, kInstrSize));
+  }
+  bfins(scratch, new_value, 0, kImm16Bits - 1);
+  st(scratch, MemOperand(li_location, kInstrSize));
+
+  // Update the I-cache so the new lui and ori can be executed.
+  FlushICache(li_location, 2);
+}
+
+void MacroAssembler::GetRelocatedValue(Register li_location,
+                                       Register value,
+                                       Register scratch) {
+  ld(value, MemOperand(li_location));
+  if (emit_debug_code()) {
+    //FIXME
+#if 0
+    And(value, value, kOpcodeMask);
+    Check(eq, "The instruction should be a lui.",
+        value, Operand(LUI));
+#endif
+    ld(value, MemOperand(li_location));
+  }
+
+  // value now holds a lui instruction. Extract the immediate.
+  sll(value, value, kImm16Bits);
+
+  ld(scratch, MemOperand(li_location, kInstrSize));
+  if (emit_debug_code()) {
+    //FIXME
+#if 0
+    And(scratch, scratch, kOpcodeMask);
+    Check(eq, "The instruction should be an ori.",
+        scratch, Operand(ORI));
+#endif
+    ld(scratch, MemOperand(li_location, kInstrSize));
+  }
+  // "scratch" now holds an ori instruction. Extract the immediate.
+  // FIXME
+  li(tt, Operand(kImm16Mask));
+  and_(scratch, scratch, tt);
+
+  // Merge the results.
+  or_(value, value, scratch);
 }
 
 bool AreAliased(Register r1, Register r2, Register r3, Register r4) {

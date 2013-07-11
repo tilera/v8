@@ -113,6 +113,10 @@ int print_insn_tilegx (unsigned char * memaddr);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(V4INT_L_RRR_0_OPCODE_X1) | FNOP_X0
 
+#define BFINS_X0                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(BF_OPCODE_X0) |                \
+      create_BFOpcodeExtension_X0(BFINS_BF_OPCODE_X0) | FNOP_X1
+
 #define BFEXTU_X0                                                              \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(BF_OPCODE_X0) |                \
       create_BFOpcodeExtension_X0(BFEXTU_BF_OPCODE_X0) | FNOP_X1
@@ -522,6 +526,7 @@ const int kRegister_no_reg_Code = -1;
 
 const Register v0  = { kRegister_a0_Code };
 const Register a0  = { kRegister_a0_Code };
+const Register v1  = { kRegister_a1_Code };
 const Register a1  = { kRegister_a1_Code };
 const Register a2  = { kRegister_a2_Code };
 const Register a3  = { kRegister_a3_Code };
@@ -819,6 +824,7 @@ class Assembler : public AssemblerBase {
   void bltz(const Register& rs, int32_t offset, int line = 0);
 
   void bfextu(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line = 0);
+  void bfins(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line = 0);
 
   void cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmpne(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
@@ -852,7 +858,9 @@ class Assembler : public AssemblerBase {
   void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void nor(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void srl(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void srl(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void sra(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void sra(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void sll(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void sll(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void moveli(const Register& rd, int16_t imm, int line = 0);

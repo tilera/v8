@@ -515,10 +515,24 @@ void Assembler::srl(const Register& rd, const Register& rs, int16_t imm, int lin
   emit(instr, line);
 }
 
+void Assembler::srl(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHRU_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
+  emit(instr, line);
+}
+
 void Assembler::sra(const Register& rd, const Register& rs, int16_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = SHRSI_X1 | DEST_X1(rd.code())
 	                 | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::sra(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHRS_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
   emit(instr, line);
 }
 
@@ -852,16 +866,23 @@ void Assembler::set_target_address_at(Address pc, Address target) {
 }
 
 void Assembler::Align(int m) {
-  UNREACHABLE();
+  ASSERT(m >= 4 && IsPowerOf2(m));
+  while ((pc_offset() & (m - 1)) != 0) {
+    nop();
+  }
 }
 
 void Assembler::db(uint8_t data) {
-  UNREACHABLE();
+  CheckBuffer();
+  *reinterpret_cast<uint8_t*>(pc_) = data;
+  pc_ += sizeof(uint8_t);
 }
 
 
 void Assembler::dd(uint32_t data) {
-  UNREACHABLE();
+  CheckBuffer();
+  *reinterpret_cast<uint32_t*>(pc_) = data;
+  pc_ += sizeof(uint32_t);
 }
 
 bool Assembler::IsNop(Instr instr, unsigned int type) {
@@ -967,7 +988,6 @@ bool RelocInfo::IsCodedSpecially() {
   // The deserializer needs to know whether a pointer is specially coded.  Being
   // specially coded on MIPS means that it is a lui/ori instruction, and that is
   // always the case inside code objects.
-  UNIMPLEMENTED();
   return true;
 }
 
@@ -988,7 +1008,13 @@ void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {
     }
     ASSERT(buffer_space() >= kMaxRelocSize);  // Too late to grow buffer here.
     if (rmode == RelocInfo::CODE_TARGET_WITH_ID) {
-      UNIMPLEMENTED();
+      RelocInfo reloc_info_with_ast_id(pc_,
+                                       rmode,
+                                       RecordedAstId().ToInt(),
+                                       NULL);
+      ClearRecordedAstId();
+      reloc_info_writer.Write(&reloc_info_with_ast_id);
+
     } else {
       reloc_info_writer.Write(&rinfo);
     }
@@ -1034,6 +1060,12 @@ void Assembler::blez(const Register& rs, int32_t offset, int line) {
 void Assembler::bltz(const Register& rs, int32_t offset, int line) {
   ASSERT(rs.is_valid());
   Instr instr = BLTZ_X1 | SRCA_X1(rs.code()) | BOFF_X1(offset);
+  emit(instr, line);
+}
+
+void Assembler::bfins(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = BFINS_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFSTART_X0(offset2);
   emit(instr, line);
 }
 

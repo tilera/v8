@@ -3952,7 +3952,6 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ Jump(lr);
 }
 
-#if 0
 
 // Uses registers a0 to t0.
 // Expected input (depending on whether args are in registers or on the stack):
@@ -4131,7 +4130,6 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
   }
 }
 
-#endif
 
 void FunctionPrototypeStub::Generate(MacroAssembler* masm) {
 	UNIMPLEMENTED();
@@ -4139,7 +4137,6 @@ void FunctionPrototypeStub::Generate(MacroAssembler* masm) {
 
 
 void StringLengthStub::Generate(MacroAssembler* masm) {
-#if 0
   Label miss;
   Register receiver;
   if (kind() == Code::KEYED_LOAD_IC) {
@@ -4167,13 +4164,9 @@ void StringLengthStub::Generate(MacroAssembler* masm) {
 
   __ bind(&miss);
   StubCompiler::TailCallBuiltin(masm, StubCompiler::MissBuiltin(kind()));
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
 void StoreArrayLengthStub::Generate(MacroAssembler* masm) {
-#if 0
   // This accepts as a receiver anything JSArray::SetElementsLength accepts
   // (currently anything except for external arrays which means anything with
   // elements of FixedArray type).  Value must be a number, but only smis are
@@ -4240,12 +4233,8 @@ void StoreArrayLengthStub::Generate(MacroAssembler* masm) {
   __ bind(&miss);
 
   StubCompiler::TailCallBuiltin(masm, StubCompiler::MissBuiltin(kind()));
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
-#if 0
 
 
 Register InstanceofStub::left() { return a0; }
@@ -4727,7 +4716,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // Or          number_of_captures * 2 <= offsets vector size - 2
   // Multiplying by 2 comes for free since a2 is smi-tagged.
   STATIC_ASSERT(kSmiTag == 0);
-  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 1);
+  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 32);
   STATIC_ASSERT(Isolate::kJSRegexpStaticOffsetsVectorSize >= 2);
   __ Branch(
       &runtime, hi, a2, Operand(Isolate::kJSRegexpStaticOffsetsVectorSize - 2));
@@ -4896,14 +4885,14 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // Argument 4, a3: End of string data
   // Argument 3, a2: Start of string data
   // Prepare start and end index of the input.
-  __ sllv(t1, t0, a3);
+  __ sll(t1, t0, a3);
   __ add(t0, t2, t1);
-  __ sllv(t1, a1, a3);
+  __ sll(t1, a1, a3);
   __ add(a2, t0, t1);
 
   __ ld(t2, FieldMemOperand(subject, String::kLengthOffset));
   __ sra(t2, t2, kSmiTagSize);
-  __ sllv(t1, t2, a3);
+  __ sll(t1, t2, a3);
   __ add(a3, t0, t1);
   // Argument 2 (a1): Previous index.
   // Already there
@@ -4965,7 +4954,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // Calculate number of capture registers (number_of_captures + 1) * 2.
   // Multiplying by 2 comes for free since r1 is smi-tagged.
   STATIC_ASSERT(kSmiTag == 0);
-  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 1);
+  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 32);
   __ Addu(a1, a1, Operand(2));  // a1 was a smi.
 
   __ ld(a0, MemOperand(sp, kLastMatchInfoOffset));
@@ -5178,7 +5167,6 @@ void RegExpConstructResultStub::Generate(MacroAssembler* masm) {
   __ bind(&slowcase);
   __ TailCallRuntime(Runtime::kRegExpConstructResult, 3, 1);
 }
-#endif
 
 
 static void GenerateRecordCallTargetNoArray(MacroAssembler* masm) {
@@ -8011,22 +7999,6 @@ void ArrayConstructorStub::Generate(MacroAssembler* masm) {
          masm->isolate()->builtins()->JSConstructStubGeneric();
      __ Jump(generic_construct_stub, RelocInfo::CODE_TARGET);
   }
-}
-
-void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
-	UNIMPLEMENTED();
-}
-
-void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
-	UNIMPLEMENTED();
-}
-
-void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
-	UNIMPLEMENTED();
-}
-
-void ArgumentsAccessStub::GenerateNewNonStrictSlow(MacroAssembler* masm) {
-	UNIMPLEMENTED();
 }
 
 #undef __
