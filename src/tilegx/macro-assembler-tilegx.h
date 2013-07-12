@@ -544,7 +544,7 @@ class MacroAssembler: public Assembler {
   // Lower case push() for compatibility with arch-independent code.
   void push(Register src) {
     addi(sp, sp, -kPointerSize);
-    st(sp, src);
+    st(src, sp);
   }
 
   void pop(Register dst) {
