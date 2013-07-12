@@ -660,7 +660,6 @@ void Assembler::target_at_put(int32_t pos, int32_t target_pos) {
     int32_t imm20 = target_pos - pos;
     ASSERT((imm20 & 7) == 0);
 
-    instr &= ~kImm16Mask;
     int32_t imm17 = imm20 >> 3;
     ASSERT(is_intn(imm17, 17));
 
