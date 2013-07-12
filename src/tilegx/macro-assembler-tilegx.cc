@@ -2489,24 +2489,24 @@ void MacroAssembler::InvokePrologue(const ParameterCount& expected,
 
   // Check whether the expected and actual arguments count match. If not,
   // setup registers according to contract with ArgumentsAdaptorTrampoline:
-  //  a0: actual arguments count
-  //  a1: function (passed through to callee)
-  //  a2: expected arguments count
-  //  a3: callee code entry
+  //  r0: actual arguments count
+  //  r1: function (passed through to callee)
+  //  r2: expected arguments count
+  //  r3: callee code entry
 
   // The code below is made a lot easier because the calling code already sets
   // up actual and expected registers according to the contract if values are
   // passed in registers.
-  ASSERT(actual.is_immediate() || actual.reg().is(a0));
-  ASSERT(expected.is_immediate() || expected.reg().is(a2));
-  ASSERT((!code_constant.is_null() && code_reg.is(no_reg)) || code_reg.is(a3));
+  ASSERT(actual.is_immediate() || actual.reg().is(r0));
+  ASSERT(expected.is_immediate() || expected.reg().is(r2));
+  ASSERT((!code_constant.is_null() && code_reg.is(no_reg)) || code_reg.is(r3));
 
   if (expected.is_immediate()) {
     ASSERT(actual.is_immediate());
     if (expected.immediate() == actual.immediate()) {
       definitely_matches = true;
     } else {
-      li(a0, Operand(actual.immediate()));
+      li(r0, Operand(actual.immediate()));
       const int sentinel = SharedFunctionInfo::kDontAdaptArgumentsSentinel;
       if (expected.immediate() == sentinel) {
         // Don't worry about adapting arguments for builtins that
@@ -2521,15 +2521,15 @@ void MacroAssembler::InvokePrologue(const ParameterCount& expected,
     }
   } else if (actual.is_immediate()) {
     Branch(&regular_invoke, eq, expected.reg(), Operand(actual.immediate()));
-    li(a0, Operand(actual.immediate()));
+    li(r0, Operand(actual.immediate()));
   } else {
     Branch(&regular_invoke, eq, expected.reg(), Operand(actual.reg()));
   }
 
   if (!definitely_matches) {
     if (!code_constant.is_null()) {
-      li(a3, Operand(code_constant));
-      addli(a3, a3, Code::kHeaderSize - kHeapObjectTag);
+      li(r3, Operand(code_constant));
+      addli(r3, r3, Code::kHeaderSize - kHeapObjectTag);
     }
 
     Handle<Code> adaptor =

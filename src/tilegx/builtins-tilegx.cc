@@ -581,8 +581,8 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     __ bind(&copy);
     __ ld(t0, MemOperand(a0));
     __ push(t0);
-    __ Branch(&copy, ne, a0, Operand(a2));
     __ addi(a0, a0, -kPointerSize);  // In delay slot.
+    __ Branch(&copy, ne, a0, Operand(a2));
 
     __ jmp(&invoke);
   }
@@ -614,8 +614,8 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     __ ld(t0, MemOperand(a0));  // Adjusted above for return addr and receiver.
     __ Subu(sp, sp, kPointerSize);
     __ Subu(a0, a0, kPointerSize);
+    __ st(t0, MemOperand(sp));
     __ Branch(&copy, ne, a0, Operand(t3));
-    __ st(t0, MemOperand(sp));  // In the delay slot.
 
     // Fill the remaining expected arguments with undefined.
     // a1: function
@@ -624,13 +624,12 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     __ LoadRoot(t0, Heap::kUndefinedValueRootIndex);
     __ sll(t2, a2, kPointerSizeLog2);
     __ Subu(a2, fp, Operand(t2));
-    __ Addu(a2, a2, Operand(-4 * kPointerSize));  // Adjust for frame.
 
     Label fill;
     __ bind(&fill);
     __ Subu(sp, sp, kPointerSize);
-    __ Branch(&fill, ne, sp, Operand(a2));
     __ st(t0, MemOperand(sp));
+    __ Branch(&fill, ne, sp, Operand(a2));
   }
 
   // Call the entry point.
@@ -1223,8 +1222,8 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
                       NullCallWrapper(), CALL_AS_METHOD);
 
     frame_scope.GenerateLeaveFrame();
-    __ Ret();
     __ Addu(sp, sp, Operand(3 * kPointerSize));  // In delay slot.
+    __ Ret();
 
     // Invoke the function proxy.
     __ bind(&call_proxy);
@@ -1238,8 +1237,8 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
     // Tear down the internal frame and remove function, receiver and args.
   }
 
-  __ Ret();
   __ Addu(sp, sp, Operand(3 * kPointerSize));  // In delay slot.
+  __ Ret();
 }
 
 // Load the built-in InternalArray function from the current context.
