@@ -617,7 +617,7 @@ void MacroAssembler::MultiPush(RegList regs) {
 
   Subu(sp, sp, Operand(stack_offset));
   for (int16_t i = kNumRegisters - 1; i >= 0; i--) {
-    if ((regs & (1 << i)) != 0) {
+    if ((regs & (1L << i)) != 0) {
       stack_offset -= kPointerSize;
       st(ToRegister(i), MemOperand(sp, stack_offset));
     }

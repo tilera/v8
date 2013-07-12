@@ -515,14 +515,15 @@ const int kRegister_s3_Code = 43;
 const int kRegister_s4_Code = 44;
 const int kRegister_s5_Code = 45;
 
-const int kRegister_tt_Code = 49;
+const int kRegister_tt_Code = 19;
+
 const int kRegister_pc_Code = 50;
 const int kRegister_gp_Code = 51;
 const int kRegister_fp_Code = 52;
 const int kRegister_tp_Code = 53;
 const int kRegister_sp_Code = 54;
 const int kRegister_lr_Code = 55;
-const int kRegister_zero_Code = 55;
+const int kRegister_zero_Code = 63;
 const int kRegister_no_reg_Code = -1;
 
 const Register v0  = { kRegister_a0_Code };
