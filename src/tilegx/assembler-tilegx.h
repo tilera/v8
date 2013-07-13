@@ -405,7 +405,7 @@ struct Register {
     return code_;
   }
 
-  int bit() const {
+  uint64_t bit() const {
     ASSERT(is_valid());
     return 1L << code_;
   }
@@ -794,7 +794,7 @@ class Assembler : public AssemblerBase {
 
   // Number of instructions used for the JS return sequence. The constant is
   // used by the debugger to patch the JS return sequence.
-  static const int kJSReturnSequenceInstructions = 8;
+  static const int kJSReturnSequenceInstructions = 7;
   static const int kDebugBreakSlotInstructions = 4;
   static const int kDebugBreakSlotLength =
       kDebugBreakSlotInstructions * kInstrSize;
