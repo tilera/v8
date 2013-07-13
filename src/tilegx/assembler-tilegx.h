@@ -407,7 +407,7 @@ struct Register {
 
   int bit() const {
     ASSERT(is_valid());
-    return 1 << code_;
+    return 1L << code_;
   }
 
   void set_code(int code) {

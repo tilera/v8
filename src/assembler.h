@@ -1012,7 +1012,7 @@ inline bool is_uint24(int x)  { return is_uintn(x, 24); }
 inline bool is_uint26(int x)  { return is_uintn(x, 26); }
 inline bool is_uint28(int x)  { return is_uintn(x, 28); }
 
-inline int NumberOfBitsSet(uint32_t x) {
+inline int NumberOfBitsSet(uint64_t x) {
   unsigned int num_bits_set;
   for (num_bits_set = 0; x; x >>= 1) {
     num_bits_set += x & 1;
