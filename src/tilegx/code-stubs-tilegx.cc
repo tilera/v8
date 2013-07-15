@@ -3634,11 +3634,8 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
     // saved to the ra register.
     // Use masm-> here instead of the double-underscore macro since extra
     // coverage code can interfere with the proper calculation of ra.
-    Label find_lr;
-    // FIXME: no bal on tilegx
     masm->move(r1, r31);
-    masm->Jr(&find_lr);
-    masm->bind(&find_lr);
+    masm->lnk(lr);
 
     // Adjust the value in lr to point to the correct return location, 2nd
     // instruction past the real call into C code (the jalr(t9)), and push it.
@@ -3651,10 +3648,6 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
     // Call the C routine.
     masm->jalr(r32);
-
-    // Make sure the stored 'ra' points to this position.
-    ASSERT_EQ(kNumInstructionsToJump,
-              masm->InstructionsGeneratedSince(&find_lr));
   }
 
   if (always_allocate) {

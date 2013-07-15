@@ -244,6 +244,12 @@ Assembler::Assembler(Isolate* isolate, void* buffer, int buffer_size)
   ClearRecordedAstId();
 }
 
+void Assembler::lnk(const Register& rd, int line) {
+  ASSERT(rd.is_valid());
+  Instr instr = LNK_X1 | DEST_X1(rd.code());
+  emit(instr, line);
+}
+
 void Assembler::st(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
