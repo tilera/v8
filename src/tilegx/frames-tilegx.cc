@@ -43,21 +43,16 @@ namespace internal {
 
 
 Address ExitFrame::ComputeStackPointer(Address fp) {
-#if 0
   return Memory::Address_at(fp + ExitFrameConstants::kSPOffset);
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 
-Register JavaScriptFrame::fp_register() { UNREACHABLE(); return v8::internal::fp; }
-Register JavaScriptFrame::context_register() { UNREACHABLE();  return cp; }
+Register JavaScriptFrame::fp_register() { return v8::internal::fp; }
+Register JavaScriptFrame::context_register() { return cp; }
 
 
-Register StubFailureTrampolineFrame::fp_register() { UNREACHABLE(); return v8::internal::fp; }
-Register StubFailureTrampolineFrame::context_register() { UNREACHABLE(); return cp; }
+Register StubFailureTrampolineFrame::fp_register() { return v8::internal::fp; }
+Register StubFailureTrampolineFrame::context_register() { return cp; }
 
 
 } }  // namespace v8::internal
