@@ -790,7 +790,7 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
       // No type feedback cell is available
       Handle<Object> undefined_sentinel(
           masm->isolate()->heap()->undefined_value(), masm->isolate());
-      __ li(a2, Operand(undefined_sentinel));
+      __ li(r2, Operand(undefined_sentinel));
       CallConstructStub stub(NO_CALL_FUNCTION_FLAGS);
       __ CallStub(&stub);
     } else {

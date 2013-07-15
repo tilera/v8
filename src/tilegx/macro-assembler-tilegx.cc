@@ -422,7 +422,7 @@ void MacroAssembler::LoadFromNumberDictionary(Label* miss,
 
   // Compute the capacity mask.
   ld(reg1, FieldMemOperand(elements, SeededNumberDictionary::kCapacityOffset));
-  sra(reg1, reg1, kSmiTagSize);
+  sra(reg1, reg1, kSmiTagSize + kSmiShiftSize);
   Subu(reg1, reg1, Operand(1));
 
   // Generate an unrolled loop that performs a few probes before giving up.
@@ -1636,7 +1636,7 @@ void MacroAssembler::JumpToHandlerEntry() {
   Addu(r2, r3, r2);
   ld(r2, MemOperand(r2));  // Smi-tagged offset.
   Addu(r1, r1, Operand(Code::kHeaderSize - kHeapObjectTag));  // Code start.
-  sra(tt, r2, kSmiTagSize);
+  sra(tt, r2, kSmiTagSize + kSmiShiftSize);
   Addu(tt, tt, r1);
   Jump(tt);  // Jump.
 }
@@ -1905,7 +1905,7 @@ void MacroAssembler::InitializeNewString(Register string,
                                          Heap::RootListIndex map_index,
                                          Register scratch1,
                                          Register scratch2) {
-  sll(scratch1, length, kSmiTagSize);
+  sll(scratch1, length, kSmiTagSize + kSmiShiftSize);
   LoadRoot(scratch2, map_index);
   st(scratch1, FieldMemOperand(string, String::kLengthOffset));
   li(scratch1, Operand(String::kEmptyHashField));
@@ -2084,7 +2084,7 @@ void MacroAssembler::AllocateHeapNumber(Register result,
 void MacroAssembler::GetLeastBitsFromSmi(Register dst,
                                          Register src,
                                          int num_least_bits) {
-  bfextu(dst, src, kSmiTagSize, kSmiTagSize + num_least_bits - 1);
+  bfextu(dst, src, kSmiTagSize + kSmiShiftSize, kSmiTagSize + kSmiShiftSize + num_least_bits - 1);
 }
 
 
@@ -2622,17 +2622,17 @@ void MacroAssembler::InvokeFunction(Register function,
   ASSERT(flag == JUMP_FUNCTION || has_frame());
 
   // Contract with called JS functions requires that function is passed in a1.
-  ASSERT(function.is(a1));
-  Register expected_reg = a2;
-  Register code_reg = a3;
+  ASSERT(function.is(r1));
+  Register expected_reg = r2;
+  Register code_reg = r3;
 
-  ld(code_reg, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
+  ld(code_reg, FieldMemOperand(r1, JSFunction::kSharedFunctionInfoOffset));
   ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
   ld(expected_reg,
       FieldMemOperand(code_reg,
                       SharedFunctionInfo::kFormalParameterCountOffset));
-  sra(expected_reg, expected_reg, kSmiTagSize);
-  ld(code_reg, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
+  sra(expected_reg, expected_reg, kSmiTagSize + kSmiShiftSize);
+  ld(code_reg, FieldMemOperand(r1, JSFunction::kCodeEntryOffset));
 
   ParameterCount expected(expected_reg);
   InvokeCode(code_reg, expected, actual, flag, call_wrapper, call_kind);
@@ -2885,7 +2885,7 @@ void MacroAssembler::IndexFromHash(Register hash,
   // the low kHashShift bits.
   STATIC_ASSERT(kSmiTag == 0);
   bfextu(hash, hash, String::kHashShift, String::kHashShift + String::kArrayIndexValueBits - 1);
-  sll(index, hash, kSmiTagSize);
+  sll(index, hash, kSmiTagSize + kSmiShiftSize);
 }
 
 void MacroAssembler::CallRuntime(const Runtime::Function* f,
