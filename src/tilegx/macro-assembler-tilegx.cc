@@ -3226,13 +3226,13 @@ void MacroAssembler::LoadGlobalFunctionInitialMap(Register function,
 
 void MacroAssembler::EnterFrame(StackFrame::Type type) {
   addi(sp, sp, -5 * kPointerSize);
-  li(r40, Operand(Smi::FromInt(type)));
-  li(r41, Operand(CodeObject()), CONSTANT_SIZE);
+  li(t8, Operand(Smi::FromInt(type)));
+  li(t9, Operand(CodeObject()), CONSTANT_SIZE);
   st(lr, MemOperand(sp, 4 * kPointerSize));
   st(fp, MemOperand(sp, 3 * kPointerSize));
   st(cp, MemOperand(sp, 2 * kPointerSize));
-  st(r40, MemOperand(sp, 1 * kPointerSize));
-  st(r41, MemOperand(sp, 0 * kPointerSize));
+  st(t8, MemOperand(sp, 1 * kPointerSize));
+  st(t9, MemOperand(sp, 0 * kPointerSize));
   addi(fp, sp, 3 * kPointerSize);
 }
 

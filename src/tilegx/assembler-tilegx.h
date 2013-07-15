@@ -508,12 +508,14 @@ const int kRegister_t7_Code = 29;
 const int kRegister_t8_Code = 20;
 const int kRegister_t9_Code = 21;
 
-const int kRegister_s0_Code = 40;
-const int kRegister_s1_Code = 41;
-const int kRegister_s2_Code = 42;
-const int kRegister_s3_Code = 43;
-const int kRegister_s4_Code = 44;
-const int kRegister_s5_Code = 45;
+const int kRegister_s0_Code = 39;
+const int kRegister_s1_Code = 40;
+const int kRegister_s2_Code = 41;
+const int kRegister_s3_Code = 42;
+const int kRegister_s4_Code = 43;
+const int kRegister_s5_Code = 44;
+const int kRegister_s6_Code = 45;
+const int kRegister_s7_Code = 46;
 
 const int kRegister_tt_Code = 19;
 
@@ -551,6 +553,8 @@ const Register s2  = { kRegister_s2_Code };
 const Register s3  = { kRegister_s3_Code };
 const Register s4  = { kRegister_s4_Code };
 const Register s5  = { kRegister_s5_Code };
+const Register s6  = { kRegister_s6_Code };
+const Register s7  = { kRegister_s7_Code };
 
 const Register at  = { kRegister_tt_Code };
 const Register tt  = { kRegister_tt_Code };
@@ -569,10 +573,10 @@ const Register no_reg = { kRegister_no_reg_Code };
 // Defined using #define instead of "static const Register&" because Clang
 // complains otherwise when a compilation unit that includes this header
 // doesn't use the variables.
-#define kRootRegister r45
-#define cp r46
-#define kLithiumScratchReg r47
-#define kLithiumScratchReg2 r48
+#define kRootRegister s6
+#define cp s7
+#define kLithiumScratchReg s3
+#define kLithiumScratchReg2 s4
 
 int ToNumber(Register reg);
 

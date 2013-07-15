@@ -3836,7 +3836,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   // r1: function
   // r2: receiver_pointer
   // r3: argc
-  // r4/r30: argv
+  // r4: argv
   //
   // Stack:
   // caller fp          |
@@ -3899,7 +3899,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   // a1: function
   // a2: receiver_pointer
   // a3: argc
-  // s0: argv
+  // a4: argv
   //
   // Stack:
   // handler frame

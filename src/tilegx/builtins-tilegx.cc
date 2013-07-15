@@ -737,11 +737,11 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
   // Called from JSEntryStub::GenerateBody
 
   // ----------- S t a t e -------------
-  //  -- a0: code entry
-  //  -- a1: function
-  //  -- a2: receiver_pointer
-  //  -- a3: argc
-  //  -- s0: argv
+  //  -- r0: code entry
+  //  -- r1: function
+  //  -- r2: receiver_pointer
+  //  -- r3: argc
+  //  -- r4: argv
   // -----------------------------------
 
   // Clear the context before we push it when entering the JS frame.
@@ -752,26 +752,26 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
     FrameScope scope(masm, StackFrame::INTERNAL);
 
     // Set up the context from the function argument.
-    __ ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+    __ ld(cp, FieldMemOperand(r1, JSFunction::kContextOffset));
 
     // Push the function and the receiver onto the stack.
-    __ Push(a1, a2);
+    __ Push(r1, r2);
 
     // Copy arguments to the stack in a loop.
-    // a3: argc
-    // s0: argv, i.e. points to first arg
+    // r3: argc
+    // r4: argv, i.e. points to first arg
     Label loop, entry;
-    __ sll(t0, a3, kPointerSizeLog2);
-    __ add(t2, s0, t0);
+    __ sll(t0, r3, kPointerSizeLog2);
+    __ add(t2, r4, t0);
     __ b(&entry);
     // t2 points past last arg.
     __ bind(&loop);
-    __ ld(t0, MemOperand(s0));  // Read next parameter.
-    __ addli(s0, s0, kPointerSize);
+    __ ld(t0, MemOperand(r4));  // Read next parameter.
+    __ addli(r4, r4, kPointerSize);
     __ ld(t0, MemOperand(t0));  // Dereference handle.
     __ push(t0);  // Push parameter.
     __ bind(&entry);
-    __ Branch(&loop, ne, s0, Operand(t2));
+    __ Branch(&loop, ne, r4, Operand(t2));
 
     // Initialize all JavaScript callee-saved registers, since they will be seen
     // by the garbage collector as part of handlers.
@@ -785,7 +785,7 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
     // s7 is cp. Do not init.
 
     // Invoke the code and pass argc as a0.
-    __ move(a0, a3);
+    __ move(r0, r3);
     if (is_construct) {
       // No type feedback cell is available
       Handle<Object> undefined_sentinel(
