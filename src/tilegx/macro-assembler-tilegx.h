@@ -632,12 +632,12 @@ class MacroAssembler: public Assembler {
 
   // See comments at the beginning of CEntryStub::Generate.
   inline void PrepareCEntryArgs(int num_args) {
-    li(r30, num_args);
-    li(r31, (num_args - 1) * kPointerSize);
+    li(s0, num_args);
+    li(s1, (num_args - 1) * kPointerSize);
   }
 
   inline void PrepareCEntryFunction(const ExternalReference& ref) {
-    li(r32, Operand(ref));
+    li(s2, Operand(ref));
   }
 
   // Call a code stub.

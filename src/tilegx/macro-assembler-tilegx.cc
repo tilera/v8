@@ -246,21 +246,21 @@ void MacroAssembler::RememberedSetHelper(Register object,  // For debug tests.
   // Load store buffer top.
   ExternalReference store_buffer =
       ExternalReference::store_buffer_top(isolate());
-  li(r40, Operand(store_buffer));
-  ld(scratch, MemOperand(r40));
+  li(t8, Operand(store_buffer));
+  ld(scratch, MemOperand(t8));
   // Store pointer to buffer and increment buffer top.
   st(address, MemOperand(scratch));
   Addu(scratch, scratch, kPointerSize);
   // Write back new top of buffer.
-  st(scratch, MemOperand(r40));
+  st(scratch, MemOperand(t8));
   // Call stub on end of buffer.
   // Check for end of buffer.
-  And(r40, scratch, Operand(StoreBuffer::kStoreBufferOverflowBit));
+  And(t8, scratch, Operand(StoreBuffer::kStoreBufferOverflowBit));
   if (and_then == kFallThroughAtEnd) {
-    Branch(&done, eq, r40, Operand(zero));
+    Branch(&done, eq, t8, Operand(zero));
   } else {
     ASSERT(and_then == kReturnAtEnd);
-    Ret(eq, r40, Operand(zero));
+    Ret(eq, t8, Operand(zero));
   }
   push(lr);
   StoreBufferOverflowStub store_buffer_overflow =
@@ -3271,14 +3271,14 @@ void MacroAssembler::EnterExitFrame(bool save_doubles,
   }
 
   // Accessed from ExitFrame::code_slot.
-  li(r40, Operand(CodeObject()), CONSTANT_SIZE);
-  st(r40, MemOperand(fp, ExitFrameConstants::kCodeOffset));
+  li(t8, Operand(CodeObject()), CONSTANT_SIZE);
+  st(t8, MemOperand(fp, ExitFrameConstants::kCodeOffset));
 
   // Save the frame pointer and the context in top.
-  li(r40, Operand(ExternalReference(Isolate::kCEntryFPAddress, isolate())));
-  st(fp, MemOperand(r40));
-  li(r40, Operand(ExternalReference(Isolate::kContextAddress, isolate())));
-  st(cp, MemOperand(r40));
+  li(t8, Operand(ExternalReference(Isolate::kCEntryFPAddress, isolate())));
+  st(fp, MemOperand(t8));
+  li(t8, Operand(ExternalReference(Isolate::kContextAddress, isolate())));
+  st(cp, MemOperand(t8));
 
   const int frame_alignment = MacroAssembler::ActivationFrameAlignment();
 #if 0
@@ -3339,14 +3339,14 @@ void MacroAssembler::LeaveExitFrame(bool save_doubles,
 #endif
 
   // Clear top frame.
-  li(r40, Operand(ExternalReference(Isolate::kCEntryFPAddress, isolate())));
-  st(zero, MemOperand(r40));
+  li(t8, Operand(ExternalReference(Isolate::kCEntryFPAddress, isolate())));
+  st(zero, MemOperand(t8));
 
   // Restore current context from top and clear it in debug mode.
-  li(r40, Operand(ExternalReference(Isolate::kContextAddress, isolate())));
-  ld(cp, MemOperand(r40));
+  li(t8, Operand(ExternalReference(Isolate::kContextAddress, isolate())));
+  ld(cp, MemOperand(t8));
 #ifdef DEBUG
-  st(r3, MemOperand(r40));
+  st(r3, MemOperand(t8));
 #endif
 
   // Pop the arguments, restore registers, and return.
@@ -3355,8 +3355,8 @@ void MacroAssembler::LeaveExitFrame(bool save_doubles,
   ld(lr, MemOperand(sp, ExitFrameConstants::kCallerPCOffset));
 
   if (argument_count.is_valid()) {
-    sll(r40, argument_count, kPointerSizeLog2);
-    add(sp, sp, r40);
+    sll(t8, argument_count, kPointerSizeLog2);
+    add(sp, sp, t8);
   }
 
   if (do_return) {
@@ -3597,8 +3597,8 @@ void MacroAssembler::PrepareCallCFunction(int num_reg_arguments,
 
 void MacroAssembler::CallCFunction(ExternalReference function,
                                    int num_arguments) {
-  li(r40, Operand(function));
-  CallCFunctionHelper(r40, num_arguments);
+  li(t8, Operand(function));
+  CallCFunctionHelper(t8, num_arguments);
 }
 
 

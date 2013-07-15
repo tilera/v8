@@ -977,9 +977,9 @@ void FullCodeGenerator::VisitExportDeclaration(ExportDeclaration* declaration) {
 void FullCodeGenerator::DeclareGlobals(Handle<FixedArray> pairs) {
   // Call the runtime to declare the globals.
   // The context is the first argument.
-  __ li(a1, Operand(pairs));
-  __ li(a0, Operand(Smi::FromInt(DeclareGlobalsFlags())));
-  __ Push(cp, a1, a0);
+  __ li(r1, Operand(pairs));
+  __ li(r0, Operand(Smi::FromInt(DeclareGlobalsFlags())));
+  __ Push(cp, r1, r0);
   __ CallRuntime(Runtime::kDeclareGlobals, 3);
   // Return value is ignored.
 }

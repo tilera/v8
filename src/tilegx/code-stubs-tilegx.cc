@@ -3593,9 +3593,9 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
                               bool do_gc,
                               bool always_allocate) {
   // r0: result parameter for PerformGC, if any
-  // r30: number of arguments including receiver (C callee-saved)
-  // r31: pointer to the first argument          (C callee-saved)
-  // r32: pointer to builtin function            (C callee-saved)
+  // s0: number of arguments including receiver (C callee-saved)
+  // s1: pointer to the first argument          (C callee-saved)
+  // s2: pointer to builtin function            (C callee-saved)
 
   Isolate* isolate = masm->isolate();
 
@@ -3615,7 +3615,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
   // Prepare arguments for C routine.
   // a0 = argc
-  __ move(r0, r30);
+  __ move(r0, s0);
   // a1 = argv (set in the delay slot after find_lr below).
 
   // We are calling compiled C/C++ code. a0 and a1 hold our two arguments. We
@@ -3634,7 +3634,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
     // saved to the ra register.
     // Use masm-> here instead of the double-underscore macro since extra
     // coverage code can interfere with the proper calculation of ra.
-    masm->move(r1, r31);
+    masm->move(r1, s1);
     masm->lnk(lr);
 
     // Adjust the value in lr to point to the correct return location, 2nd
@@ -3647,7 +3647,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
     // Stack is still aligned.
 
     // Call the C routine.
-    masm->jalr(r32);
+    masm->jalr(s2);
   }
 
   if (always_allocate) {
@@ -3662,44 +3662,44 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
   Label failure_returned;
   STATIC_ASSERT(((kFailureTag + 1) & kFailureTagMask) == 0);
   __ addi(r2, r0, 1);
-  __ andi(r40, r2, kFailureTagMask);
-  __ Branch(&failure_returned, eq, r40, Operand(zero));
+  __ andi(t0, r2, kFailureTagMask);
+  __ Branch(&failure_returned, eq, t0, Operand(zero));
 
 
   // Exit C frame and return.
   // r0: result
   // sp: stack pointer
   // fp: frame pointer
-  __ LeaveExitFrame(save_doubles_, r30, true);
+  __ LeaveExitFrame(save_doubles_, s0, true);
 
   // Check if we should retry or throw exception.
   Label retry;
   __ bind(&failure_returned);
   STATIC_ASSERT(Failure::RETRY_AFTER_GC == 0);
-  __ andi(r40, r0, ((1 << kFailureTypeTagSize) - 1) << kFailureTagSize);
-  __ Branch(&retry, eq, r40, Operand(zero));
+  __ andi(t0, r0, ((1 << kFailureTypeTagSize) - 1) << kFailureTagSize);
+  __ Branch(&retry, eq, t0, Operand(zero));
 
   // Special handling of out of memory exceptions.
-  JumpIfOOM(masm, r0, r40, throw_out_of_memory_exception);
+  JumpIfOOM(masm, r0, t0, throw_out_of_memory_exception);
 
   // Retrieve the pending exception.
-  __ li(r40, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
+  __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
-  __ ld(r0, MemOperand(r40));
+  __ ld(r0, MemOperand(t0));
 
   // See if we just retrieved an OOM exception.
-  JumpIfOOM(masm, r0, r40, throw_out_of_memory_exception);
+  JumpIfOOM(masm, r0, t0, throw_out_of_memory_exception);
 
   // Clear the pending exception.
   __ li(r3, Operand(isolate->factory()->the_hole_value()));
-  __ li(r40, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
+  __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
-  __ st(r3, MemOperand(r40));
+  __ st(r3, MemOperand(t0));
 
   // Special handling of termination exceptions which are uncatchable
   // by javascript code.
-  __ LoadRoot(r40, Heap::kTerminationExceptionRootIndex);
-  __ Branch(throw_termination_exception, eq, r0, Operand(r40));
+  __ LoadRoot(t0, Heap::kTerminationExceptionRootIndex);
+  __ Branch(throw_termination_exception, eq, r0, Operand(t0));
 
   // Handle normal exception.
   __ jmp(throw_normal_exception);
@@ -3711,9 +3711,9 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
 void CEntryStub::Generate(MacroAssembler* masm) {
   // Called from JavaScript; parameters are on stack as if calling JS function
-  // r30: number of arguments including receiver
-  // r31: size of arguments excluding receiver
-  // r32: pointer to builtin function
+  // s0: number of arguments including receiver
+  // s1: size of arguments excluding receiver
+  // s2: pointer to builtin function
   // fp: frame pointer    (restored after C call)
   // sp: stack pointer    (restored as callee's sp after C call)
   // cp: current context  (C callee-saved)
@@ -3723,13 +3723,13 @@ void CEntryStub::Generate(MacroAssembler* masm) {
   // this by performing a garbage collection and retrying the
   // builtin once.
 
-  // NOTE: r30-r32 hold the arguments of this function instead of r0-r2.
+  // NOTE: s0-s2 hold the arguments of this function instead of r0-r2.
   // The reason for this is that these arguments would need to be saved anyway
   // so it's faster to set them up directly.
   // See MacroAssembler::PrepareCEntryArgs and PrepareCEntryFunction.
 
   // Compute the argv pointer in a callee-saved register.
-  __ Addu(r31, sp, r31);
+  __ Addu(s1, sp, s1);
 
   // Enter the exit frame that transitions from JavaScript to C++.
   FrameScope scope(masm, StackFrame::MANUAL);
@@ -3780,7 +3780,7 @@ void CEntryStub::Generate(MacroAssembler* masm) {
 
   // Set pending exception and v0 to out of memory exception.
   Label already_have_failure;
-  JumpIfOOM(masm, r0, r40, &already_have_failure);
+  JumpIfOOM(masm, r0, t0, &already_have_failure);
   Failure* out_of_memory = Failure::OutOfMemoryException(0x1);
   __ li(r0, Operand(reinterpret_cast<int64_t>(out_of_memory)));
   __ bind(&already_have_failure);
