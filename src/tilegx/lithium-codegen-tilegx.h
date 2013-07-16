@@ -66,6 +66,7 @@ class LCodeGen BASE_EMBEDDED {
         last_lazy_deopt_pc_(0),
         frame_is_built_(false),
         safepoints_(info->zone()),
+        resolver_(this),
         expected_safepoint_kind_(Safepoint::kSimple) {
     PopulateDeoptimizationLiteralsWithInlinedFunctions();
   }
@@ -197,6 +198,8 @@ class LCodeGen BASE_EMBEDDED {
   LPlatformChunk* chunk() const { return chunk_; }
   Scope* scope() const { return scope_; }
   HGraph* graph() const { return chunk()->graph(); }
+  Register scratch0() { return kLithiumScratchReg; }
+  Register scratch1() { return kLithiumScratchReg2; }
 
   int GetNextEmittedBlock() const;
   LInstruction* GetNextInstruction();
@@ -414,12 +417,45 @@ class LCodeGen BASE_EMBEDDED {
   // itself is emitted at the end of the generated code.
   SafepointTableBuilder safepoints_;
 
+  // Compiler from a set of parallel moves to a sequential list of moves.
+  LGapResolver resolver_;
+
   Safepoint::Kind expected_safepoint_kind_;
 
   friend class LDeferredCode;
   friend class LEnvironment;
   friend class SafepointGenerator;
   DISALLOW_COPY_AND_ASSIGN(LCodeGen);
+};
+
+class LDeferredCode: public ZoneObject {
+ public:
+  explicit LDeferredCode(LCodeGen* codegen)
+      : codegen_(codegen),
+        external_exit_(NULL),
+        instruction_index_(codegen->current_instruction_) {
+    codegen->AddDeferredCode(this);
+  }
+
+  virtual ~LDeferredCode() { }
+  virtual void Generate() = 0;
+  virtual LInstruction* instr() = 0;
+
+  void SetExit(Label* exit) { external_exit_ = exit; }
+  Label* entry() { return &entry_; }
+  Label* exit() { return external_exit_ != NULL ? external_exit_ : &exit_; }
+  int instruction_index() const { return instruction_index_; }
+
+ protected:
+  LCodeGen* codegen() const { return codegen_; }
+  MacroAssembler* masm() const { return codegen_->masm(); }
+
+ private:
+  LCodeGen* codegen_;
+  Label entry_;
+  Label exit_;
+  Label* external_exit_;
+  int instruction_index_;
 };
 
 } }  // namespace v8::internal

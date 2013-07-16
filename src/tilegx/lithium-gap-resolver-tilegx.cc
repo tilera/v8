@@ -42,19 +42,105 @@ LGapResolver::LGapResolver(LCodeGen* owner)
 
 
 void LGapResolver::Resolve(LParallelMove* parallel_move) {
-	UNREACHABLE();
+  ASSERT(moves_.is_empty());
+  // Build up a worklist of moves.
+  BuildInitialMoveList(parallel_move);
+
+  for (int i = 0; i < moves_.length(); ++i) {
+    LMoveOperands move = moves_[i];
+    // Skip constants to perform them last.  They don't block other moves
+    // and skipping such moves with register destinations keeps those
+    // registers free for the whole algorithm.
+    if (!move.IsEliminated() && !move.source()->IsConstantOperand()) {
+      root_index_ = i;  // Any cycle is found when by reaching this move again.
+      PerformMove(i);
+      if (in_cycle_) {
+        RestoreValue();
+      }
+    }
+  }
+
+  // Perform the moves with constant sources.
+  for (int i = 0; i < moves_.length(); ++i) {
+    if (!moves_[i].IsEliminated()) {
+      ASSERT(moves_[i].source()->IsConstantOperand());
+      EmitMove(i);
+    }
+  }
+
+  moves_.Rewind(0);
 }
 
 
 void LGapResolver::BuildInitialMoveList(LParallelMove* parallel_move) {
-	UNREACHABLE();
+  // Perform a linear sweep of the moves to add them to the initial list of
+  // moves to perform, ignoring any move that is redundant (the source is
+  // the same as the destination, the destination is ignored and
+  // unallocated, or the move was already eliminated).
+  const ZoneList<LMoveOperands>* moves = parallel_move->move_operands();
+  for (int i = 0; i < moves->length(); ++i) {
+    LMoveOperands move = moves->at(i);
+    if (!move.IsRedundant()) moves_.Add(move, cgen_->zone());
+  }
+  Verify();
 }
-
 
 void LGapResolver::PerformMove(int index) {
-	UNREACHABLE();
-}
+  // Each call to this function performs a move and deletes it from the move
+  // graph.  We first recursively perform any move blocking this one.  We
+  // mark a move as "pending" on entry to PerformMove in order to detect
+  // cycles in the move graph.
 
+  // We can only find a cycle, when doing a depth-first traversal of moves,
+  // be encountering the starting move again. So by spilling the source of
+  // the starting move, we break the cycle.  All moves are then unblocked,
+  // and the starting move is completed by writing the spilled value to
+  // its destination.  All other moves from the spilled source have been
+  // completed prior to breaking the cycle.
+  // An additional complication is that moves to MemOperands with large
+  // offsets (more than 1K or 4K) require us to spill this spilled value to
+  // the stack, to free up the register.
+  ASSERT(!moves_[index].IsPending());
+  ASSERT(!moves_[index].IsRedundant());
+
+  // Clear this move's destination to indicate a pending move.  The actual
+  // destination is saved in a stack allocated local.  Multiple moves can
+  // be pending because this function is recursive.
+  ASSERT(moves_[index].source() != NULL);  // Or else it will look eliminated.
+  LOperand* destination = moves_[index].destination();
+  moves_[index].set_destination(NULL);
+
+  // Perform a depth-first traversal of the move graph to resolve
+  // dependencies.  Any unperformed, unpending move with a source the same
+  // as this one's destination blocks this one so recursively perform all
+  // such moves.
+  for (int i = 0; i < moves_.length(); ++i) {
+    LMoveOperands other_move = moves_[i];
+    if (other_move.Blocks(destination) && !other_move.IsPending()) {
+      PerformMove(i);
+      // If there is a blocking, pending move it must be moves_[root_index_]
+      // and all other moves with the same source as moves_[root_index_] are
+      // sucessfully executed (because they are cycle-free) by this loop.
+    }
+  }
+
+  // We are about to resolve this move and don't need it marked as
+  // pending, so restore its destination.
+  moves_[index].set_destination(destination);
+
+  // The move may be blocked on a pending move, which must be the starting move.
+  // In this case, we have a cycle, and we save the source of this move to
+  // a scratch register to break it.
+  LMoveOperands other_move = moves_[root_index_];
+  if (other_move.Blocks(destination)) {
+    ASSERT(other_move.IsPending());
+    BreakCycle(index);
+    return;
+  }
+
+  // This move is no longer blocked.
+  EmitMove(index);
+}
 
 void LGapResolver::Verify() {
 	UNREACHABLE();

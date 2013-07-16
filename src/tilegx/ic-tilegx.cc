@@ -1605,7 +1605,6 @@ void StoreIC::GenerateGlobalProxy(MacroAssembler* masm,
 
 
 Condition CompareIC::ComputeCondition(Token::Value op) {
-#if 0
   switch (op) {
     case Token::EQ_STRICT:
     case Token::EQ:
@@ -1622,10 +1621,6 @@ Condition CompareIC::ComputeCondition(Token::Value op) {
       UNREACHABLE();
       return kNoCondition;
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

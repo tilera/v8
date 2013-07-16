@@ -62,33 +62,354 @@ class SafepointGenerator : public CallWrapper {
 #define __ masm()->
 
 bool LCodeGen::GenerateCode() {
-	UNREACHABLE();
-	return false;
+  HPhase phase("Z_Code generation", chunk());
+  ASSERT(is_unused());
+  status_ = GENERATING;
+
+  // Open a frame scope to indicate that there is a frame on the stack.  The
+  // NONE indicates that the scope shouldn't actually generate code to set up
+  // the frame (that is done in GeneratePrologue).
+  FrameScope frame_scope(masm_, StackFrame::NONE);
+
+  return GeneratePrologue() &&
+      GenerateBody() &&
+      GenerateDeferredCode() &&
+      GenerateDeoptJumpTable() &&
+      GenerateSafepointTable();
 }
 
 
-void LCodeGen::FinishCode(Handle<Code> code) {  UNREACHABLE();  }
+void LCodeGen::FinishCode(Handle<Code> code) {
+  ASSERT(is_done());
+  code->set_stack_slots(GetStackSlotCount());
+  code->set_safepoint_table_offset(safepoints_.GetCodeOffset());
+  if (FLAG_weak_embedded_maps_in_optimized_code) {
+    RegisterDependentCodeForEmbeddedMaps(code);
+  }
+  PopulateDeoptimizationData(code);
+  for (int i = 0 ; i < prototype_maps_.length(); i++) {
+    prototype_maps_.at(i)->AddDependentCode(
+        DependentCode::kPrototypeCheckGroup, code);
+  }
+  for (int i = 0 ; i < transition_maps_.length(); i++) {
+    transition_maps_.at(i)->AddDependentCode(
+        DependentCode::kTransitionGroup, code);
+  }
+  if (graph()->depends_on_empty_array_proto_elements()) {
+    isolate()->initial_object_prototype()->map()->AddDependentCode(
+        DependentCode::kElementsCantBeAddedGroup, code);
+    isolate()->initial_array_prototype()->map()->AddDependentCode(
+        DependentCode::kElementsCantBeAddedGroup, code);
+  }
+}
+
+void LChunkBuilder::Abort(const char* reason) {
+  info()->set_bailout_reason(reason);
+  status_ = ABORTED;
+}
+
+void LCodeGen::Comment(const char* format, ...) {
+  if (!FLAG_code_comments) return;
+  char buffer[4 * KB];
+  StringBuilder builder(buffer, ARRAY_SIZE(buffer));
+  va_list arguments;
+  va_start(arguments, format);
+  builder.AddFormattedList(format, arguments);
+  va_end(arguments);
+
+  // Copy the string before recording it in the assembler to avoid
+  // issues when the stack allocated buffer goes out of scope.
+  size_t length = builder.position();
+  Vector<char> copy = Vector<char>::New(length + 1);
+  OS::MemCopy(copy.start(), builder.Finalize(), copy.length());
+  masm()->RecordComment(copy.start());
+}
+
+bool LCodeGen::GeneratePrologue() {
+  ASSERT(is_generating());
+
+  if (info()->IsOptimizing()) {
+    ProfileEntryHookStub::MaybeCallEntryHook(masm_);
+
+#ifdef DEBUG
+    if (strlen(FLAG_stop_at) > 0 &&
+        info_->function()->name()->IsUtf8EqualTo(CStrVector(FLAG_stop_at))) {
+      __ stop("stop_at");
+    }
+#endif
+
+    // a1: Callee's JS function.
+    // cp: Callee's context.
+    // fp: Caller's frame pointer.
+    // lr: Caller's pc.
+
+    // Strict mode functions and builtins need to replace the receiver
+    // with undefined when called as functions (without an explicit
+    // receiver object). r5 is zero for method calls and non-zero for
+    // function calls.
+    if (!info_->is_classic_mode() || info_->is_native()) {
+      Label ok;
+      __ Branch(&ok, eq, t1, Operand(zero));
+
+      int receiver_offset = scope()->num_parameters() * kPointerSize;
+      __ LoadRoot(a2, Heap::kUndefinedValueRootIndex);
+      __ st(a2, MemOperand(sp, receiver_offset));
+      __ bind(&ok);
+    }
+  }
+
+  info()->set_prologue_offset(masm_->pc_offset());
+  if (NeedsEagerFrame()) {
+    if (info()->IsStub()) {
+      __ Push(ra, fp, cp);
+      __ Push(Smi::FromInt(StackFrame::STUB));
+      // Adjust FP to point to saved FP.
+      __ Addu(fp, sp, Operand(2 * kPointerSize));
+    } else {
+      // The following three instructions must remain together and unmodified
+      // for code aging to work properly.
+      __ Push(ra, fp, cp, a1);
+      // Add unused load of ip to ensure prologue sequence is identical for
+      // full-codegen and lithium-codegen.
+      __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
+      // Adj. FP to point to saved FP.
+      __ Addu(fp, sp, Operand(2 * kPointerSize));
+    }
+    frame_is_built_ = true;
+    info_->AddNoFrameRange(0, masm_->pc_offset());
+  }
+
+  // Reserve space for the stack slots needed by the code.
+  int slots = GetStackSlotCount();
+  if (slots > 0) {
+    if (FLAG_debug_code) {
+      __ Subu(sp,  sp, Operand(slots * kPointerSize));
+      __ push(a0);
+      __ push(a1);
+      __ Addu(a0, sp, Operand(slots *  kPointerSize));
+      __ li(a1, Operand(kSlotsZapValue));
+      Label loop;
+      __ bind(&loop);
+      __ Subu(a0, a0, Operand(kPointerSize));
+      __ st(a1, MemOperand(a0, 2 * kPointerSize));
+      __ Branch(&loop, ne, a0, Operand(sp));
+      __ pop(a1);
+      __ pop(a0);
+    } else {
+      __ Subu(sp, sp, Operand(slots * kPointerSize));
+    }
+  }
+
+#if 0
+  if (info()->saves_caller_doubles()) {
+    Comment(";;; Save clobbered callee double registers");
+    int count = 0;
+    BitVector* doubles = chunk()->allocated_double_registers();
+    BitVector::Iterator save_iterator(doubles);
+    while (!save_iterator.Done()) {
+      __ sdc1(DoubleRegister::FromAllocationIndex(save_iterator.Current()),
+              MemOperand(sp, count * kDoubleSize));
+      save_iterator.Advance();
+      count++;
+    }
+  }
+#endif
+
+  // Possibly allocate a local context.
+  int heap_slots = info()->num_heap_slots() - Context::MIN_CONTEXT_SLOTS;
+  if (heap_slots > 0) {
+    Comment(";;; Allocate local context");
+    // Argument to NewContext is the function, which is in a1.
+    __ push(a1);
+    if (heap_slots <= FastNewContextStub::kMaximumSlots) {
+      FastNewContextStub stub(heap_slots);
+      __ CallStub(&stub);
+    } else {
+      __ CallRuntime(Runtime::kNewFunctionContext, 1);
+    }
+    RecordSafepoint(Safepoint::kNoLazyDeopt);
+    // Context is returned in both v0 and cp.  It replaces the context
+    // passed to us.  It's saved in the stack and kept live in cp.
+    __ st(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+    // Copy any necessary parameters into the context.
+    int num_parameters = scope()->num_parameters();
+    for (int i = 0; i < num_parameters; i++) {
+      Variable* var = scope()->parameter(i);
+      if (var->IsContextSlot()) {
+        int parameter_offset = StandardFrameConstants::kCallerSPOffset +
+            (num_parameters - 1 - i) * kPointerSize;
+        // Load parameter from stack.
+        __ ld(a0, MemOperand(fp, parameter_offset));
+        // Store it in the context.
+        MemOperand target = ContextOperand(cp, var->index());
+        __ st(a0, target);
+        // Update the write barrier. This clobbers a3 and a0.
+        __ RecordWriteContextSlot(
+            cp, target.offset(), a0, a3, GetRAState(), kSaveFPRegs);
+      }
+    }
+    Comment(";;; End allocate local context");
+  }
+
+  // Trace the call.
+  if (FLAG_trace && info()->IsOptimizing()) {
+    __ CallRuntime(Runtime::kTraceEnter, 0);
+  }
+  EnsureSpaceForLazyDeopt();
+  return !is_aborted();
+}
 
 
-void LChunkBuilder::Abort(const char* reason) {  UNREACHABLE();  }
+bool LCodeGen::GenerateBody() {
+  ASSERT(is_generating());
+  bool emit_instructions = true;
+  for (current_instruction_ = 0;
+       !is_aborted() && current_instruction_ < instructions_->length();
+       current_instruction_++) {
+    LInstruction* instr = instructions_->at(current_instruction_);
+
+    // Don't emit code for basic blocks with a replacement.
+    if (instr->IsLabel()) {
+      emit_instructions = !LLabel::cast(instr)->HasReplacement();
+    }
+    if (!emit_instructions) continue;
+
+    if (FLAG_code_comments && instr->HasInterestingComment(this)) {
+      Comment(";;; <@%d,#%d> %s",
+              current_instruction_,
+              instr->hydrogen_value()->id(),
+              instr->Mnemonic());
+    }
+
+    instr->CompileToNative(this);
+  }
+  return !is_aborted();
+}
+
+bool LCodeGen::GenerateDeferredCode() {
+  ASSERT(is_generating());
+  if (deferred_.length() > 0) {
+    for (int i = 0; !is_aborted() && i < deferred_.length(); i++) {
+      LDeferredCode* code = deferred_[i];
+      Comment(";;; <@%d,#%d> "
+              "-------------------- Deferred %s --------------------",
+              code->instruction_index(),
+              code->instr()->hydrogen_value()->id(),
+              code->instr()->Mnemonic());
+      __ bind(code->entry());
+      if (NeedsDeferredFrame()) {
+        Comment(";;; Build frame");
+        ASSERT(!frame_is_built_);
+        ASSERT(info()->IsStub());
+        frame_is_built_ = true;
+        __ MultiPush(cp.bit() | fp.bit() | ra.bit());
+        __ li(scratch0(), Operand(Smi::FromInt(StackFrame::STUB)));
+        __ push(scratch0());
+        __ Addu(fp, sp, Operand(2 * kPointerSize));
+        Comment(";;; Deferred code");
+      }
+      code->Generate();
+      if (NeedsDeferredFrame()) {
+        Comment(";;; Destroy frame");
+        ASSERT(frame_is_built_);
+        __ pop(at);
+        __ MultiPop(cp.bit() | fp.bit() | ra.bit());
+        frame_is_built_ = false;
+      }
+      __ jmp(code->exit());
+    }
+  }
+  // Deferred code is the last part of the instruction sequence. Mark
+  // the generated code as done unless we bailed out.
+  if (!is_aborted()) status_ = DONE;
+  return !is_aborted();
+}
 
 
-void LCodeGen::Comment(const char* format, ...) {  UNREACHABLE();  }
+bool LCodeGen::GenerateDeoptJumpTable() {
+  // Check that the jump table is accessible from everywhere in the function
+  // code, i.e. that offsets to the table can be encoded in the 16bit signed
+  // immediate of a branch instruction.
+  // To simplify we consider the code size from the first instruction to the
+  // end of the jump table.
+  if (!is_int16((masm()->pc_offset() / Assembler::kInstrSize) +
+      deopt_jump_table_.length() * 12)) {
+    Abort("Generated code is too large");
+  }
+
+  if (deopt_jump_table_.length() > 0) {
+    Comment(";;; -------------------- Jump table --------------------");
+  }
+  Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm_);
+  Label table_start;
+  __ bind(&table_start);
+  Label needs_frame_not_call;
+  Label needs_frame_is_call;
+  for (int i = 0; i < deopt_jump_table_.length(); i++) {
+    __ bind(&deopt_jump_table_[i].label);
+    Address entry = deopt_jump_table_[i].address;
+    Deoptimizer::BailoutType type = deopt_jump_table_[i].bailout_type;
+    int id = Deoptimizer::GetDeoptimizationId(isolate(), entry, type);
+    if (id == Deoptimizer::kNotDeoptimizationEntry) {
+      Comment(";;; jump table entry %d.", i);
+    } else {
+      Comment(";;; jump table entry %d: deoptimization bailout %d.", i, id);
+    }
+    __ li(t9, Operand(ExternalReference::ForDeoptEntry(entry)));
+    if (deopt_jump_table_[i].needs_frame) {
+      if (type == Deoptimizer::LAZY) {
+        if (needs_frame_is_call.is_bound()) {
+          __ Branch(&needs_frame_is_call);
+        } else {
+          __ bind(&needs_frame_is_call);
+          __ MultiPush(cp.bit() | fp.bit() | ra.bit());
+          // This variant of deopt can only be used with stubs. Since we don't
+          // have a function pointer to install in the stack frame that we're
+          // building, install a special marker there instead.
+          ASSERT(info()->IsStub());
+          __ li(scratch0(), Operand(Smi::FromInt(StackFrame::STUB)));
+          __ push(scratch0());
+          __ Addu(fp, sp, Operand(2 * kPointerSize));
+          __ Call(t9);
+        }
+      } else {
+        if (needs_frame_not_call.is_bound()) {
+          __ Branch(&needs_frame_not_call);
+        } else {
+          __ bind(&needs_frame_not_call);
+          __ MultiPush(cp.bit() | fp.bit() | ra.bit());
+          // This variant of deopt can only be used with stubs. Since we don't
+          // have a function pointer to install in the stack frame that we're
+          // building, install a special marker there instead.
+          ASSERT(info()->IsStub());
+          __ li(scratch0(), Operand(Smi::FromInt(StackFrame::STUB)));
+          __ push(scratch0());
+          __ Addu(fp, sp, Operand(2 * kPointerSize));
+          __ Jump(t9);
+        }
+      }
+    } else {
+      if (type == Deoptimizer::LAZY) {
+        __ Call(t9);
+      } else {
+        __ Jump(t9);
+      }
+    }
+  }
+  __ RecordComment("]");
+
+  // The deoptimization jump table is the last part of the instruction
+  // sequence. Mark the generated code as done unless we bailed out.
+  if (!is_aborted()) status_ = DONE;
+  return !is_aborted();
+}
 
 
-bool LCodeGen::GeneratePrologue() {  UNREACHABLE();  return false;}
-
-
-bool LCodeGen::GenerateBody() {  UNREACHABLE();  return false;}
-
-
-bool LCodeGen::GenerateDeferredCode() {  UNREACHABLE();  return false;}
-
-
-bool LCodeGen::GenerateDeoptJumpTable() {  UNREACHABLE();  return false;}
-
-
-bool LCodeGen::GenerateSafepointTable() {  UNREACHABLE();  return false;}
+bool LCodeGen::GenerateSafepointTable() {
+  ASSERT(is_done());
+  safepoints_.Emit(masm(), GetStackSlotCount());
+  return !is_aborted();
+}
 
 
 Register LCodeGen::ToRegister(int index) const {  UNREACHABLE();
@@ -209,13 +530,65 @@ void LCodeGen::SoftDeoptimize(LEnvironment* environment,
 void LCodeGen::RegisterDependentCodeForEmbeddedMaps(Handle<Code> code) {  UNREACHABLE();  }
 
 
-void LCodeGen::PopulateDeoptimizationData(Handle<Code> code) {  UNREACHABLE();  }
+void LCodeGen::PopulateDeoptimizationData(Handle<Code> code) {
+  int length = deoptimizations_.length();
+  if (length == 0) return;
+  Handle<DeoptimizationInputData> data =
+      factory()->NewDeoptimizationInputData(length, TENURED);
 
+  Handle<ByteArray> translations =
+      translations_.CreateByteArray(isolate()->factory());
+  data->SetTranslationByteArray(*translations);
+  data->SetInlinedFunctionCount(Smi::FromInt(inlined_function_count_));
 
-int LCodeGen::DefineDeoptimizationLiteral(Handle<Object> literal) {  UNREACHABLE();  return -1;}
+  Handle<FixedArray> literals =
+      factory()->NewFixedArray(deoptimization_literals_.length(), TENURED);
+  { ALLOW_HANDLE_DEREF(isolate(),
+                       "copying a ZoneList of handles into a FixedArray");
+    for (int i = 0; i < deoptimization_literals_.length(); i++) {
+      literals->set(i, *deoptimization_literals_[i]);
+    }
+    data->SetLiteralArray(*literals);
+  }
 
+  data->SetOsrAstId(Smi::FromInt(info_->osr_ast_id().ToInt()));
+  data->SetOsrPcOffset(Smi::FromInt(osr_pc_offset_));
 
-void LCodeGen::PopulateDeoptimizationLiteralsWithInlinedFunctions() {  UNREACHABLE();  }
+  // Populate the deoptimization entries.
+  for (int i = 0; i < length; i++) {
+    LEnvironment* env = deoptimizations_[i];
+    data->SetAstId(i, env->ast_id());
+    data->SetTranslationIndex(i, Smi::FromInt(env->translation_index()));
+    data->SetArgumentsStackHeight(i,
+                                  Smi::FromInt(env->arguments_stack_height()));
+    data->SetPc(i, Smi::FromInt(env->pc_offset()));
+  }
+  code->set_deoptimization_data(*data);
+}
+
+int LCodeGen::DefineDeoptimizationLiteral(Handle<Object> literal) {
+  int result = deoptimization_literals_.length();
+  for (int i = 0; i < deoptimization_literals_.length(); ++i) {
+    if (deoptimization_literals_[i].is_identical_to(literal)) return i;
+  }
+  deoptimization_literals_.Add(literal, zone());
+  return result;
+}
+
+void LCodeGen::PopulateDeoptimizationLiteralsWithInlinedFunctions() {
+  ASSERT(deoptimization_literals_.length() == 0);
+
+  const ZoneList<Handle<JSFunction> >* inlined_closures =
+      chunk()->inlined_closures();
+
+  for (int i = 0, length = inlined_closures->length();
+       i < length;
+       i++) {
+    DefineDeoptimizationLiteral(inlined_closures->at(i));
+  }
+
+  inlined_function_count_ = deoptimization_literals_.length();
+}
 
 
 void LCodeGen::RecordSafepointWithLazyDeopt(
@@ -249,18 +622,40 @@ void LCodeGen::RecordSafepointWithRegistersAndDoubles(
 
 void LCodeGen::RecordPosition(int position) {  UNREACHABLE();  }
 
+static const char* LabelType(LLabel* label) {
+  if (label->is_loop_header()) return " (loop header)";
+  if (label->is_osr_entry()) return " (OSR entry)";
+  return "";
+}
 
-void LCodeGen::DoLabel(LLabel* label) {  UNREACHABLE();  }
+void LCodeGen::DoLabel(LLabel* label) {
+  Comment(";;; <@%d,#%d> -------------------- B%d%s --------------------",
+          current_instruction_,
+          label->hydrogen_value()->id(),
+          label->block_id(),
+          LabelType(label));
+  __ bind(label->label());
+  current_block_ = label->block_id();
+  DoGap(label);
+}
 
+void LCodeGen::DoParallelMove(LParallelMove* move) {
+  resolver_.Resolve(move);
+}
 
-void LCodeGen::DoParallelMove(LParallelMove* move) {  UNREACHABLE();  }
+void LCodeGen::DoGap(LGap* gap) {
+  for (int i = LGap::FIRST_INNER_POSITION;
+       i <= LGap::LAST_INNER_POSITION;
+       i++) {
+    LGap::InnerPosition inner_pos = static_cast<LGap::InnerPosition>(i);
+    LParallelMove* move = gap->GetParallelMove(inner_pos);
+    if (move != NULL) DoParallelMove(move);
+  }
+}
 
-
-void LCodeGen::DoGap(LGap* gap) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoInstructionGap(LInstructionGap* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoInstructionGap(LInstructionGap* instr) {
+  DoGap(instr);
+}
 
 void LCodeGen::DoParameter(LParameter* instr) {  UNREACHABLE();  }
 
@@ -805,25 +1200,68 @@ void LCodeGen::DoIsConstructCallAndBranch(LIsConstructCallAndBranch* instr) {  U
 void LCodeGen::EmitIsConstructCall(Register temp1, Register temp2) {  UNREACHABLE();  }
 
 
-void LCodeGen::EnsureSpaceForLazyDeopt() {  UNREACHABLE();  }
+void LCodeGen::EnsureSpaceForLazyDeopt() {
+  if (info()->IsStub()) return;
+  // Ensure that we have enough space after the previous lazy-bailout
+  // instruction for patching the code here.
+  int current_pc = masm()->pc_offset();
+  int patch_size = Deoptimizer::patch_size();
+  if (current_pc < last_lazy_deopt_pc_ + patch_size) {
+    int padding_size = last_lazy_deopt_pc_ + patch_size - current_pc;
+    ASSERT_EQ(0, padding_size % Assembler::kInstrSize);
+    while (padding_size > 0) {
+      __ nop();
+      padding_size -= Assembler::kInstrSize;
+    }
+  }
+  last_lazy_deopt_pc_ = masm()->pc_offset();
+}
 
+void LCodeGen::DoLazyBailout(LLazyBailout* instr) {
+  EnsureSpaceForLazyDeopt();
+  ASSERT(instr->HasEnvironment());
+  LEnvironment* env = instr->environment();
+  RegisterEnvironmentForDeoptimization(env, Safepoint::kLazyDeopt);
+  safepoints_.RecordLazyDeoptimizationIndex(env->deoptimization_index());
+}
 
-void LCodeGen::DoLazyBailout(LLazyBailout* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoDeoptimize(LDeoptimize* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoDeoptimize(LDeoptimize* instr) {
+  if (instr->hydrogen_value()->IsSoftDeoptimize()) {
+    SoftDeoptimize(instr->environment(), zero, Operand(zero));
+  } else {
+    DeoptimizeIf(al, instr->environment(), zero, Operand(zero));
+  }
+}
 
 void LCodeGen::DoDummyUse(LDummyUse* instr) {
   // Nothing to see here, move on!
 }
 
 
-void LCodeGen::DoDeleteProperty(LDeleteProperty* instr) {  UNREACHABLE();  }
+void LCodeGen::DoDeleteProperty(LDeleteProperty* instr) {
+  Register object = ToRegister(instr->object());
+  Register key = ToRegister(instr->key());
+  Register strict = scratch0();
+  __ li(strict, Operand(Smi::FromInt(strict_mode_flag())));
+  __ Push(object, key, strict);
+  ASSERT(instr->HasPointerMap());
+  LPointerMap* pointers = instr->pointer_map();
+  RecordPosition(pointers->position());
+  SafepointGenerator safepoint_generator(
+      this, pointers, Safepoint::kLazyDeopt);
+  __ InvokeBuiltin(Builtins::DELETE, CALL_FUNCTION, safepoint_generator);
+}
 
-
-void LCodeGen::DoIn(LIn* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoIn(LIn* instr) {
+  Register obj = ToRegister(instr->object());
+  Register key = ToRegister(instr->key());
+  __ Push(key, obj);
+  ASSERT(instr->HasPointerMap());
+  LPointerMap* pointers = instr->pointer_map();
+  RecordPosition(pointers->position());
+  SafepointGenerator safepoint_generator(this, pointers, Safepoint::kLazyDeopt);
+  __ InvokeBuiltin(Builtins::IN, CALL_FUNCTION, safepoint_generator);
+}
 
 void LCodeGen::DoDeferredStackCheck(LStackCheck* instr) {  UNREACHABLE();  }
 
@@ -843,7 +1281,30 @@ void LCodeGen::DoForInCacheArray(LForInCacheArray* instr) {  UNREACHABLE();  }
 void LCodeGen::DoCheckMapValue(LCheckMapValue* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoLoadFieldByIndex(LLoadFieldByIndex* instr) {  UNREACHABLE();  }
+void LCodeGen::DoLoadFieldByIndex(LLoadFieldByIndex* instr) {
+  Register object = ToRegister(instr->object());
+  Register index = ToRegister(instr->index());
+  Register result = ToRegister(instr->result());
+  Register scratch = scratch0();
+
+  Label out_of_object, done;
+  __ sll(scratch, index, kPointerSizeLog2 - kSmiTagSize);  // In delay slot.
+  __ Branch(&out_of_object, lt, index, Operand(zero));
+
+  STATIC_ASSERT(kPointerSizeLog2 > kSmiTagSize);
+  __ Addu(scratch, object, scratch);
+  __ ld(result, FieldMemOperand(scratch, JSObject::kHeaderSize));
+
+  __ Branch(&done);
+
+  __ bind(&out_of_object);
+  __ ld(result, FieldMemOperand(object, JSObject::kPropertiesOffset));
+  // Index is equal to negated out of object property index plus 1.
+  __ Subu(scratch, result, scratch);
+  __ ld(result, FieldMemOperand(scratch,
+                                FixedArray::kHeaderSize - kPointerSize));
+  __ bind(&done);
+}
 
 
 #undef __

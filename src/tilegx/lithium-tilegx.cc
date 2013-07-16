@@ -1819,7 +1819,6 @@ LInstruction* LChunkBuilder::DoForceRepresentation(HForceRepresentation* bad) {
 
 
 LInstruction* LChunkBuilder::DoChange(HChange* instr) {
-#if 0
   Representation from = instr->from();
   Representation to = instr->to();
   if (from.IsSmi()) {
@@ -1850,6 +1849,8 @@ LInstruction* LChunkBuilder::DoChange(HChange* instr) {
         value = UseRegisterAtStart(instr->value());
         res = DefineAsRegister(new(zone()) LSmiUntag(value, false));
       } else {
+        UNREACHABLE();
+#if 0
         value = UseRegister(instr->value());
         LOperand* temp1 = TempRegister();
         LOperand* temp2 = instr->CanTruncateToInt32() ? TempRegister()
@@ -1860,6 +1861,7 @@ LInstruction* LChunkBuilder::DoChange(HChange* instr) {
                                                        temp2,
                                                        temp3));
         res = AssignEnvironment(res);
+#endif
       }
       return res;
     }
@@ -1924,10 +1926,6 @@ LInstruction* LChunkBuilder::DoChange(HChange* instr) {
   }
   UNREACHABLE();
   return NULL;
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 

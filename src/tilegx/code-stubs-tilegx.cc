@@ -3940,7 +3940,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   __ addi(sp, sp, -EntryFrameConstants::kCallerFPOffset);
 
   // Restore callee saved registers from the stack.
-  __ MultiPop(kCalleeSaved | lr.bit());
+  __ MultiPop(kCalleeSaved | fp.bit() | lr.bit());
   // Return.
   __ Jump(lr);
 }
@@ -7010,7 +7010,6 @@ void ICCompareStub::GenerateObjects(MacroAssembler* masm) {
 
 
 void ICCompareStub::GenerateKnownObjects(MacroAssembler* masm) {
-#if 0
   Label miss;
   __ And(a2, a1, a0);
   __ JumpIfSmi(a2, &miss);
@@ -7019,19 +7018,14 @@ void ICCompareStub::GenerateKnownObjects(MacroAssembler* masm) {
   __ Branch(&miss, ne, a2, Operand(known_map_));
   __ Branch(&miss, ne, a3, Operand(known_map_));
 
+  __ sub(r0, r0, r1);
   __ Ret();
-  __ sub(v0, a0, a1);
 
   __ bind(&miss);
   GenerateMiss(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 void ICCompareStub::GenerateMiss(MacroAssembler* masm) {
-#if 0
   {
     // Call the runtime system in a fresh internal frame.
     ExternalReference miss =
@@ -7050,10 +7044,6 @@ void ICCompareStub::GenerateMiss(MacroAssembler* masm) {
     __ Pop(a1, a0, ra);
   }
   __ Jump(a2);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
