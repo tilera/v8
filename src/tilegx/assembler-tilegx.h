@@ -51,6 +51,11 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 /* Opcode Helper Macros */
 #define TILEGX_X_MODE 0
 
+#define ANOP_X0                                                                \
+  create_Opcode_X0(RRR_0_OPCODE_X0) |                                          \
+      create_RRROpcodeExtension_X0(UNARY_RRR_0_OPCODE_X0) |                    \
+      create_UnaryOpcodeExtension_X0(NOP_UNARY_OPCODE_X0)
+
 #define FNOP_X0                                                                \
   create_Opcode_X0(RRR_0_OPCODE_X0) |                                          \
       create_RRROpcodeExtension_X0(UNARY_RRR_0_OPCODE_X0) |                    \
@@ -313,7 +318,7 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
       create_UnaryOpcodeExtension_X1(ILL_UNARY_OPCODE_X1) |                    \
-      create_Dest_X1(0x1C) | create_SrcA_X1(0x25) | FNOP_X0
+      create_Dest_X1(0x1C) | create_SrcA_X1(0x25) | ANOP_X0
 
 #define DEST_X0(x) create_Dest_X0(x)
 #define SRCA_X0(x) create_SrcA_X0(x)
@@ -855,6 +860,7 @@ class Assembler : public AssemblerBase {
   void cmpltui(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
   void cmpleu(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 
+  void bpt(int line = 0);
   void info(const int16_t imm16, int line = 0);
   void lnk(const Register& rd, int line = 0);
   void st(const Register& rd, const MemOperand& rs, int line = 0);

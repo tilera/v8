@@ -496,6 +496,11 @@ void Assembler::addli(const Register& rd, const Register& rs, int16_t imm, int l
   emit(instr, line);
 }
 
+void Assembler::bpt(int line) {
+  Instr instr = BPT_X1;
+  emit(instr, line);
+}
+
 void Assembler::info(const int16_t imm16, int line) {
   ASSERT(is_int16(imm16));
   Instr instr = INFOL_X1 | IMM16_X1(imm16);

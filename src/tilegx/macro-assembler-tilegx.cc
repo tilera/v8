@@ -3360,11 +3360,11 @@ void MacroAssembler::LeaveExitFrame(bool save_doubles,
   }
 
   if (do_return) {
-    addi(sp, sp, 8);
+    addi(sp, sp, 16);
     Ret();
     // If returning, the instruction in the delay slot will be the addiu below.
   }
-  addi(sp, sp, 8);
+  addi(sp, sp, 16);
 }
 
 int MacroAssembler::ActivationFrameAlignment() {
