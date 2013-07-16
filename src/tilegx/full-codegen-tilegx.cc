@@ -174,7 +174,7 @@ void FullCodeGenerator::Generate() {
   info->set_prologue_offset(masm_->pc_offset());
   // The following three instructions must remain together and unmodified for
   // code aging to work properly.
-  __ Push(lr, fp, cp, a1);
+  __ Push(lr, fp, cp, r1);
   // Load undefined value here, so the value is ready for the loop
   // below.
   __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
@@ -2093,8 +2093,8 @@ void FullCodeGenerator::EmitGeneratorResume(Expression *generator,
 
   // Push holes for the rest of the arguments to the generator function.
   __ ld(a3, FieldMemOperand(t0, JSFunction::kSharedFunctionInfoOffset));
-  __ ld(a3,
-        FieldMemOperand(a3, SharedFunctionInfo::kFormalParameterCountOffset));
+  __ ld4u(a3,
+          FieldMemOperand(a3, SharedFunctionInfo::kFormalParameterCountOffset));
   __ LoadRoot(a2, Heap::kTheHoleValueRootIndex);
   Label push_argument_holes, push_frame;
   __ bind(&push_argument_holes);
