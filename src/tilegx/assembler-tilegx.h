@@ -168,10 +168,21 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
       create_UnaryOpcodeExtension_X1(LD_UNARY_OPCODE_X1) | FNOP_X0
 
+#define LD1S_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(LD1S_UNARY_OPCODE_X1) | FNOP_X0
+
 #define LD1U_X1                                                                \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
       create_UnaryOpcodeExtension_X1(LD1U_UNARY_OPCODE_X1) | FNOP_X0
+
+#define LD2S_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
+      create_UnaryOpcodeExtension_X1(LD2S_UNARY_OPCODE_X1) | FNOP_X0
+
 
 #define LD2U_X1                                                                \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
@@ -873,10 +884,14 @@ class Assembler : public AssemblerBase {
   void st4(const Register& rd, const Register& rs, int line = 0);
   void ld(const Register& rd, const MemOperand& rs, int line = 0);
   void ld(const Register& rd, const Register& rs, int line = 0);
+  void ld1s(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld1s(const Register& rd, const Register& rs, int line = 0);
   void ld1u(const Register& rd, const MemOperand& rs, int line = 0);
   void ld1u(const Register& rd, const Register& rs, int line = 0);
   void ld2u(const Register& rd, const MemOperand& rs, int line = 0);
   void ld2u(const Register& rd, const Register& rs, int line = 0);
+  void ld2s(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld2s(const Register& rd, const Register& rs, int line = 0);
   void ld4u(const Register& rd, const MemOperand& rs, int line = 0);
   void ld4u(const Register& rd, const Register& rs, int line = 0);
   void ld4s(const Register& rd, const MemOperand& rs, int line = 0);

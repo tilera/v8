@@ -59,22 +59,36 @@ void MacroAssembler::LoadRoot(Register destination,
 void MacroAssembler::LoadRoot(Register destination,
                               Heap::RootListIndex index,
                               Condition cond,
-                              Register src1, const Operand& src2) { UNREACHABLE(); }
-
+                              Register src1, const Operand& src2) {
+  Branch(2, NegateCondition(cond), src1, src2);
+  ld(destination, MemOperand(s6, index << kPointerSizeLog2));
+}
 
 void MacroAssembler::StoreRoot(Register source,
-                               Heap::RootListIndex index) { UNREACHABLE(); }
-
+                               Heap::RootListIndex index) {
+  st(source, MemOperand(s6, index << kPointerSizeLog2));
+}
 
 void MacroAssembler::StoreRoot(Register source,
                                Heap::RootListIndex index,
                                Condition cond,
-                               Register src1, const Operand& src2) { UNREACHABLE(); }
-
+                               Register src1, const Operand& src2) {
+  Branch(2, NegateCondition(cond), src1, src2);
+  st(source, MemOperand(s6, index << kPointerSizeLog2));
+}
 
 void MacroAssembler::LoadHeapObject(Register result,
-                                    Handle<HeapObject> object) { UNREACHABLE(); }
-
+                                    Handle<HeapObject> object) {
+  ALLOW_HANDLE_DEREF(isolate(), "using raw address");
+  if (isolate()->heap()->InNewSpace(*object)) {
+    Handle<JSGlobalPropertyCell> cell =
+        isolate()->factory()->NewJSGlobalPropertyCell(object);
+    li(result, Operand(cell));
+    ld(result, FieldMemOperand(result, JSGlobalPropertyCell::kValueOffset));
+  } else {
+    li(result, Operand(object));
+  }
+}
 
 // Push and pop all registers that can hold pointers.
 void MacroAssembler::PushSafepointRegisters() { UNREACHABLE(); }

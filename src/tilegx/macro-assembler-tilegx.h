@@ -816,6 +816,19 @@ class MacroAssembler: public Assembler {
   // occurred.
   void IllegalOperation(int num_arguments);
 
+  // Load and check the instance type of an object for being a string.
+  // Loads the type into the second argument register.
+  // Returns a condition that will be enabled if the object was a string.
+  Condition IsObjectStringType(Register obj,
+                               Register type,
+                               Register result) {
+    ld(type, FieldMemOperand(obj, HeapObject::kMapOffset));
+    ld1u(type, FieldMemOperand(type, Map::kInstanceTypeOffset));
+    And(type, type, Operand(kIsNotStringMask));
+    ASSERT_EQ(0, kStringTag);
+    return eq;
+  }
+
   void IndexFromHash(Register hash, Register index);
 
   // Get the number of least significant bits from a register.

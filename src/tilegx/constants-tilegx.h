@@ -105,6 +105,29 @@ inline Condition NegateCondition(Condition cc) {
   return static_cast<Condition>(cc ^ 1);
 }
 
+inline Condition ReverseCondition(Condition cc) {
+  switch (cc) {
+    case Uless:
+      return Ugreater;
+    case Ugreater:
+      return Uless;
+    case Ugreater_equal:
+      return Uless_equal;
+    case Uless_equal:
+      return Ugreater_equal;
+    case less:
+      return greater;
+    case greater:
+      return less;
+    case greater_equal:
+      return less_equal;
+    case less_equal:
+      return greater_equal;
+    default:
+      return cc;
+  };
+}
+
 // TileGX has 64bit width instruction encoding.
 typedef int64_t Instr;
 
