@@ -395,6 +395,23 @@ void Assembler::ld4u(const Register& rd, const Register& rs, int line) {
   emit(instr, line);
 }
 
+void Assembler::ld4s(const Register& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  if (rs.offset_ != 0) {
+    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = LD4S_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    emit(instr, line);
+  } else
+    ld4s(rd, rs.rm(), line);
+}
+
+void Assembler::ld4s(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = LD4S_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
+  emit(instr, line);
+}
 void Assembler::add(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = ADD_X1 | DEST_X1(rd.code())

@@ -2093,7 +2093,7 @@ void FullCodeGenerator::EmitGeneratorResume(Expression *generator,
 
   // Push holes for the rest of the arguments to the generator function.
   __ ld(a3, FieldMemOperand(t0, JSFunction::kSharedFunctionInfoOffset));
-  __ ld4u(a3,
+  __ ld4s(a3,
           FieldMemOperand(a3, SharedFunctionInfo::kFormalParameterCountOffset));
   __ LoadRoot(a2, Heap::kTheHoleValueRootIndex);
   Label push_argument_holes, push_frame;

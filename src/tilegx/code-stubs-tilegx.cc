@@ -215,12 +215,10 @@ void ToNumberStub::Generate(MacroAssembler* masm) {
   Label check_heap_number, call_builtin;
   __ JumpIfNotSmi(a0, &check_heap_number);
   __ Ret();
-  __ move(v0, a0);
 
   __ bind(&check_heap_number);
   EmitCheckForHeapNumber(masm, a0, a1, t0, &call_builtin);
   __ Ret();
-  __ move(v0, a0);
 
   __ bind(&call_builtin);
   __ push(a0);
@@ -1041,8 +1039,8 @@ static void EmitSmiNonsmiComparison(MacroAssembler* masm,
   if (strict) {
     // If lhs was not a number and rhs was a Smi then strict equality cannot
     // succeed. Return non-equal (lhs is already not zero).
+    __ move(r0, lhs);
     __ Ret(ne, t4, Operand(HEAP_NUMBER_TYPE));
-    __ move(v0, lhs);
   } else {
     // Smi compared non-strictly with a non-Smi non-heap-number. Call
     // the runtime.
@@ -1065,8 +1063,8 @@ static void EmitSmiNonsmiComparison(MacroAssembler* masm,
   if (strict) {
     // If lhs was not a number and rhs was a Smi then strict equality cannot
     // succeed. Return non-equal.
+    __ li(r0, Operand(1));
     __ Ret(ne, t4, Operand(HEAP_NUMBER_TYPE));
-    __ li(v0, Operand(1));
   } else {
     // Smi compared non-strictly with a non-Smi non-heap-number. Call
     // the runtime.
@@ -1099,8 +1097,8 @@ static void EmitStrictTwoHeapObjectCompare(MacroAssembler* masm,
     // Return non-zero.
     Label return_not_equal;
     __ bind(&return_not_equal);
+    __ li(r0, Operand(1));
     __ Ret();
-    __ li(v0, Operand(1));
 
     __ bind(&first_non_object);
     // Check for oddballs: true, false, null, undefined.
@@ -1168,8 +1166,8 @@ static void EmitCheckForInternalizedStringsOrObjects(MacroAssembler* masm,
 
   // Both are internalized strings. We already checked they weren't the same
   // pointer so they are not equal.
+  __ li(r0, Operand(1));   // Non-zero indicates not equal.
   __ Ret();
-  __ li(v0, Operand(1));   // Non-zero indicates not equal.
 
   __ bind(&object_test);
   __ Branch(not_both_strings, lt, a2, Operand(FIRST_SPEC_OBJECT_TYPE));
@@ -1184,8 +1182,8 @@ static void EmitCheckForInternalizedStringsOrObjects(MacroAssembler* masm,
   __ ld1u(a3, FieldMemOperand(a3, Map::kBitFieldOffset));
   __ and_(a0, a2, a3);
   __ And(a0, a0, Operand(1 << Map::kIsUndetectable));
+  __ xori(r0, a0, 1 << Map::kIsUndetectable);
   __ Ret();
-  __ xori(v0, a0, 1 << Map::kIsUndetectable);
 }
 #endif
 
@@ -4369,8 +4367,8 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
   // If there are no mapped parameters, we do not need the parameter_map.
   Label param_map_size;
   ASSERT_EQ(0, Smi::FromInt(0));
-  __ Branch(&param_map_size, eq, a1, Operand(zero));
   __ move(t5, zero);  // In delay slot: param map size = 0 when a1 == 0.
+  __ Branch(&param_map_size, eq, a1, Operand(zero));
   __ sll(t5, a1, 1);
   __ addli(t5, t5, kParameterMapHeaderSize);
   __ bind(&param_map_size);
@@ -5020,8 +5018,8 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // Store the smi value in the last match info.
   __ sll(a3, a3, kSmiTagSize);  // Convert to Smi.
   __ st(a3, MemOperand(a0, 0));
-  __ Branch(&next_capture);
   __ addli(a0, a0, kPointerSize);  // In branch delay slot.
+  __ Branch(&next_capture);
 
   __ bind(&done);
 
@@ -5153,8 +5151,8 @@ void RegExpConstructResultStub::Generate(MacroAssembler* masm) {
   __ bind(&loop);
   __ Branch(&done, ge, a3, Operand(t1));  // Break when a3 past end of elem.
   __ st(a2, MemOperand(a3));
-  __ Branch(&loop);
   __ addli(a3, a3, kPointerSize);  // In branch delay slot.
+  __ Branch(&loop);
 
   __ bind(&done);
   __ DropAndRet(3);
@@ -5191,11 +5189,12 @@ static void GenerateRecordCallTargetNoArray(MacroAssembler* masm) {
   // megamorphic.
   __ LoadRoot(tt, Heap::kTheHoleValueRootIndex);
 
-  __ Branch(&done, eq, a3, Operand(tt));
   // An uninitialized cache is patched with the function.
   // Store a1 in the delay slot. This may or may not get overwritten depending
   // on the result of the comparison.
   __ st(a1, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+
+  __ Branch(&done, eq, a3, Operand(tt));
   // No need for a write barrier here - cells are rescanned.
 
   // MegamorphicSentinel is an immortal immovable object (undefined) so no
@@ -5981,9 +5980,9 @@ void SubStringStub::Generate(MacroAssembler* masm) {
   STATIC_ASSERT(kIsIndirectStringMask == (kSlicedStringTag & kConsStringTag));
   STATIC_ASSERT(kIsIndirectStringMask != 0);
   __ And(t0, a1, Operand(kIsIndirectStringMask));
-  __ Branch(&seq_or_external_string, eq, t0, Operand(zero));
   // t0 is used as a scratch register and can be overwritten in either case.
   __ And(t0, a1, Operand(kSlicedNotConsMask));
+  __ Branch(&seq_or_external_string, eq, t0, Operand(zero));
   __ Branch(&sliced_string, ne, t0, Operand(zero));
   // Cons string.  Check whether it is flat, then fetch first part.
   __ ld(t1, FieldMemOperand(v0, ConsString::kSecondOffset));
@@ -6519,8 +6518,8 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   STATIC_ASSERT(SeqOneByteString::kHeaderSize == SeqTwoByteString::kHeaderSize);
   Label skip_first_add;
   __ Branch(&skip_first_add, ne, t4, Operand(zero));
-  __ Branch(&first_prepared);
   __ addli(t3, a0, SeqOneByteString::kHeaderSize - kHeapObjectTag);
+  __ Branch(&first_prepared);
   __ bind(&skip_first_add);
   // External string: rule out short external string and load string resource.
   STATIC_ASSERT(kShortExternalStringTag != 0);
@@ -6534,8 +6533,8 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   STATIC_ASSERT(SeqOneByteString::kHeaderSize == SeqTwoByteString::kHeaderSize);
   Label skip_second_add;
   __ Branch(&skip_second_add, ne, t4, Operand(zero));
-  __ Branch(&second_prepared);
   __ addli(a1, a1, SeqOneByteString::kHeaderSize - kHeapObjectTag);
+  __ Branch(&second_prepared);
   __ bind(&skip_second_add);
   // External string: rule out short external string and load string resource.
   STATIC_ASSERT(kShortExternalStringTag != 0);
@@ -7381,17 +7380,17 @@ void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
   // treated as a lookup success. For positive lookup probing failure
   // should be treated as lookup failure.
   if (mode_ == POSITIVE_LOOKUP) {
-    __ Ret();
     __ move(result, zero);
+    __ Ret();
   }
 
   __ bind(&in_dictionary);
-  __ Ret();
   __ li(result, 1);
+  __ Ret();
 
   __ bind(&not_in_dictionary);
-  __ Ret();
   __ move(result, zero);
+  __ Ret();
 }
 
 

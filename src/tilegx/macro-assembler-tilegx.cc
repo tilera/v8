@@ -1506,8 +1506,8 @@ void MacroAssembler::Ret(Condition cond,
 
 
 void MacroAssembler::DropAndRet(int drop) {
-  Ret();
   addli(sp, sp, drop * kPointerSize);
+  Ret();
 }
 
 void MacroAssembler::DropAndRet(int drop,
@@ -2628,7 +2628,7 @@ void MacroAssembler::InvokeFunction(Register function,
 
   ld(code_reg, FieldMemOperand(r1, JSFunction::kSharedFunctionInfoOffset));
   ld(cp, FieldMemOperand(r1, JSFunction::kContextOffset));
-  ld4u(expected_reg,
+  ld4s(expected_reg,
       FieldMemOperand(code_reg,
                       SharedFunctionInfo::kFormalParameterCountOffset));
   //sra(expected_reg, expected_reg, kSmiTagSize + kSmiShiftSize);
@@ -3360,6 +3360,7 @@ void MacroAssembler::LeaveExitFrame(bool save_doubles,
   }
 
   if (do_return) {
+    addi(sp, sp, 8);
     Ret();
     // If returning, the instruction in the delay slot will be the addiu below.
   }

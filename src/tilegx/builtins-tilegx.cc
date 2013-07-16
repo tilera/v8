@@ -234,7 +234,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
       ASSERT_EQ(3 * kPointerSize, JSObject::kHeaderSize);
       __ LoadRoot(t7, Heap::kUndefinedValueRootIndex);
       if (count_constructions) {
-        __ ld4u(a0, FieldMemOperand(a2, Map::kInstanceSizesOffset));
+        __ ld4s(a0, FieldMemOperand(a2, Map::kInstanceSizesOffset));
         __ bfextu(a0, a0, Map::kPreAllocatedPropertyFieldsByte * kBitsPerByte, Map::kPreAllocatedPropertyFieldsByte * kBitsPerByte + kBitsPerByte - 1);
         __ sll(t0, a0, kPointerSizeLog2);
         __ add(a0, t5, t0);
@@ -263,7 +263,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
       __ ld1u(a3, FieldMemOperand(a2, Map::kUnusedPropertyFieldsOffset));
       // The field instance sizes contains both pre-allocated property fields
       // and in-object properties.
-      __ ld4u(a0, FieldMemOperand(a2, Map::kInstanceSizesOffset));
+      __ ld4s(a0, FieldMemOperand(a2, Map::kInstanceSizesOffset));
       __ bfextu(t6, a0, Map::kPreAllocatedPropertyFieldsByte * kBitsPerByte, Map::kPreAllocatedPropertyFieldsByte * kBitsPerByte + kBitsPerByte -1);
       __ Addu(a3, a3, Operand(t6));
       __ bfextu(t6, a0, Map::kInObjectPropertiesByte * kBitsPerByte, Map::kInObjectPropertiesByte * kBitsPerByte + kBitsPerByte - 1);
@@ -924,7 +924,7 @@ void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
 
     // Do not transform the receiver for strict mode functions.
     __ ld(a2, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
-    __ ld4u(a3, FieldMemOperand(a2, SharedFunctionInfo::kCompilerHintsOffset));
+    __ ld4s(a3, FieldMemOperand(a2, SharedFunctionInfo::kCompilerHintsOffset));
     __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kStrictModeFunction +
                                  kSmiTagSize)));
     __ Branch(&shift_arguments, ne, t3, Operand(zero));
@@ -1574,8 +1574,8 @@ void ArrayNativeCode(MacroAssembler* masm, Label* call_generic_code) {
   // sp[0]: last argument
 
   Label loop, entry;
-  __ Branch(&entry);
   __ move(t3, sp);
+  __ Branch(&entry);
   __ bind(&loop);
   __ ld(a2, MemOperand(t3));
   if (FLAG_smi_only_arrays) {

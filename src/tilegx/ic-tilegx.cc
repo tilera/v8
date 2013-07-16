@@ -804,8 +804,8 @@ void KeyedLoadIC::GenerateNonStrictArguments(MacroAssembler* masm) {
   Label slow, notin;
   MemOperand mapped_location =
       GenerateMappedArgumentsLookup(masm, a1, a0, a2, a3, t0, &notin, &slow);
-  __ Ret();
   __ ld(v0, mapped_location);
+  __ Ret();
   __ bind(&notin);
   // The unmapped lookup expects that the parameter map is in a2.
   MemOperand unmapped_location =
@@ -813,8 +813,8 @@ void KeyedLoadIC::GenerateNonStrictArguments(MacroAssembler* masm) {
   __ ld(a2, unmapped_location);
   __ LoadRoot(a3, Heap::kTheHoleValueRootIndex);
   __ Branch(&slow, eq, a2, Operand(a3));
-  __ Ret();
   __ move(v0, a2);
+  __ Ret();
   __ bind(&slow);
   GenerateMiss(masm, MISS);
 }
@@ -836,8 +836,8 @@ void KeyedStoreIC::GenerateNonStrictArguments(MacroAssembler* masm) {
   ASSERT_EQ(mapped_location.offset(), 0);
   __ RecordWrite(a3, mapped_location.rm(), t5,
                  kRAHasNotBeenSaved, kDontSaveFPRegs);
-  __ Ret();
   __ move(v0, a0);  // (In delay slot) return the value stored in v0.
+  __ Ret();
   __ bind(&notin);
   // The unmapped lookup expects that the parameter map is in a3.
   // Store address is returned in register (of MemOperand) unmapped_location.
@@ -848,8 +848,8 @@ void KeyedStoreIC::GenerateNonStrictArguments(MacroAssembler* masm) {
   ASSERT_EQ(unmapped_location.offset(), 0);
   __ RecordWrite(a3, unmapped_location.rm(), t5,
                  kRAHasNotBeenSaved, kDontSaveFPRegs);
-  __ Ret();
   __ move(v0, a0);  // (In delay slot) return the value stored in v0.
+  __ Ret();
   __ bind(&slow);
   GenerateMiss(masm, MISS);
 }
@@ -1490,8 +1490,8 @@ void KeyedStoreIC::GenerateTransitionElementsSmiToDouble(MacroAssembler* masm) {
     AllocationSiteMode mode = AllocationSiteInfo::GetMode(FAST_SMI_ELEMENTS,
                                                           FAST_DOUBLE_ELEMENTS);
     ElementsTransitionGenerator::GenerateSmiToDouble(masm, mode, &fail);
-    __ Ret();
     __ move(v0, a2);
+    __ Ret();
     __ bind(&fail);
   }
 
@@ -1513,8 +1513,8 @@ void KeyedStoreIC::GenerateTransitionElementsDoubleToObject(
     AllocationSiteMode mode = AllocationSiteInfo::GetMode(FAST_DOUBLE_ELEMENTS,
                                                           FAST_ELEMENTS);
     ElementsTransitionGenerator::GenerateDoubleToObject(masm, mode, &fail);
-    __ Ret();
     __ move(v0, a2);
+    __ Ret();
     __ bind(&fail);
   }
 
