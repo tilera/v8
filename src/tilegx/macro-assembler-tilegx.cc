@@ -648,7 +648,7 @@ void MacroAssembler::MultiPop(RegList regs) {
       stack_offset += kPointerSize;
     }
   }
-  addi(sp, sp, stack_offset);
+  addli(sp, sp, stack_offset);
 }
 
 void MacroAssembler::MultiPopReversed(RegList regs) { UNREACHABLE(); }
