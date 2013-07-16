@@ -479,6 +479,12 @@ void Assembler::addli(const Register& rd, const Register& rs, int16_t imm, int l
   emit(instr, line);
 }
 
+void Assembler::info(const int16_t imm16, int line) {
+  ASSERT(is_int16(imm16));
+  Instr instr = INFOL_X1 | IMM16_X1(imm16);
+  emit(instr, line);
+}
+
 void Assembler::shl16insli(const Register& rd, const Register& rs, int16_t imm, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && is_int16(imm));
   Instr instr = SHL16INSLI_X1 | DEST_X1(rd.code())

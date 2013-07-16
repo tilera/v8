@@ -129,6 +129,10 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 #define SHL16INSLI_X1                                                          \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHL16INSLI_OPCODE_X1) | FNOP_X0
 
+#define INFOL_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHL16INSLI_OPCODE_X1) |        \
+      SRCA_X1(0x3F) | DEST_X1(0x3F) | FNOP_X0
+
 #define LNK_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(UNARY_RRR_0_OPCODE_X1) |                    \
@@ -846,6 +850,7 @@ class Assembler : public AssemblerBase {
   void cmpltui(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
   void cmpleu(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 
+  void info(const int16_t imm16, int line = 0);
   void lnk(const Register& rd, int line = 0);
   void st(const Register& rd, const MemOperand& rs, int line = 0);
   void st(const Register& rd, const Register& rs, int line = 0);

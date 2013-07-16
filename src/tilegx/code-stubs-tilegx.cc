@@ -3599,6 +3599,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
   Isolate* isolate = masm->isolate();
 
+  __ info(__LINE__);
   if (do_gc) {
     __ PrepareCallCFunction(1, r1);
     __ CallCFunction(ExternalReference::perform_gc_function(isolate), 1);
@@ -3710,6 +3711,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
 
 void CEntryStub::Generate(MacroAssembler* masm) {
+  __ info(__LINE__);
   // Called from JavaScript; parameters are on stack as if calling JS function
   // s0: number of arguments including receiver
   // s1: size of arguments excluding receiver
@@ -3808,7 +3810,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   // r4: args
 
   // Save callee saved registers on the stack.
-  __ MultiPush(kCalleeSaved | lr.bit());
+  __ MultiPush(kCalleeSaved | fp.bit() | lr.bit());
 
   __ InitializeRootRegister();
 

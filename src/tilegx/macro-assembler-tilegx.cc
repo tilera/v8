@@ -2627,7 +2627,7 @@ void MacroAssembler::InvokeFunction(Register function,
   Register code_reg = r3;
 
   ld(code_reg, FieldMemOperand(r1, JSFunction::kSharedFunctionInfoOffset));
-  ld(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
+  ld(cp, FieldMemOperand(r1, JSFunction::kContextOffset));
   ld(expected_reg,
       FieldMemOperand(code_reg,
                       SharedFunctionInfo::kFormalParameterCountOffset));

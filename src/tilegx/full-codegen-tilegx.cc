@@ -126,14 +126,14 @@ class JumpPatchSite BASE_EMBEDDED {
 // function.
 //
 // The live registers are:
-//   o a1: the JS function object being called (i.e. ourselves)
+//   o r1: the JS function object being called (i.e. ourselves)
 //   o cp: our context
 //   o fp: our caller's frame pointer
 //   o sp: stack pointer
-//   o ra: return address
+//   o lr: return address
 //
 // The function builds a JS frame.  Please see JavaScriptFrameConstants in
-// frames-mips.h for its layout.
+// frames-tilegx.h for its layout.
 void FullCodeGenerator::Generate() {
   CompilationInfo* info = info_;
   handler_table_ =
@@ -152,6 +152,7 @@ void FullCodeGenerator::Generate() {
   }
 #endif
 
+  __ info(__LINE__);
   // Strict mode functions and builtins need to replace the receiver
   // with undefined when called as functions (without an explicit
   // receiver object). t1 is zero for method calls and non-zero for
@@ -173,7 +174,7 @@ void FullCodeGenerator::Generate() {
   info->set_prologue_offset(masm_->pc_offset());
   // The following three instructions must remain together and unmodified for
   // code aging to work properly.
-  __ Push(ra, fp, cp, a1);
+  __ Push(lr, fp, cp, a1);
   // Load undefined value here, so the value is ready for the loop
   // below.
   __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
@@ -977,6 +978,7 @@ void FullCodeGenerator::VisitExportDeclaration(ExportDeclaration* declaration) {
 void FullCodeGenerator::DeclareGlobals(Handle<FixedArray> pairs) {
   // Call the runtime to declare the globals.
   // The context is the first argument.
+  __ info(__LINE__);
   __ li(r1, Operand(pairs));
   __ li(r0, Operand(Smi::FromInt(DeclareGlobalsFlags())));
   __ Push(cp, r1, r0);
@@ -986,6 +988,7 @@ void FullCodeGenerator::DeclareGlobals(Handle<FixedArray> pairs) {
 
 
 void FullCodeGenerator::DeclareModules(Handle<FixedArray> descriptions) {
+  __ info(__LINE__);
   // Call the runtime to declare the modules.
   __ Push(descriptions);
   __ CallRuntime(Runtime::kDeclareModules, 1);

@@ -794,8 +794,8 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
       CallConstructStub stub(NO_CALL_FUNCTION_FLAGS);
       __ CallStub(&stub);
     } else {
-      ParameterCount actual(a0);
-      __ InvokeFunction(a1, actual, CALL_FUNCTION,
+      ParameterCount actual(r0);
+      __ InvokeFunction(r1, actual, CALL_FUNCTION,
                         NullCallWrapper(), CALL_AS_METHOD);
     }
 
