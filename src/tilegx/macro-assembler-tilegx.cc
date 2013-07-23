@@ -91,11 +91,24 @@ void MacroAssembler::LoadHeapObject(Register result,
 }
 
 // Push and pop all registers that can hold pointers.
-void MacroAssembler::PushSafepointRegisters() { UNREACHABLE(); }
+void MacroAssembler::PushSafepointRegisters() {
+  // Safepoints expect a block of kNumSafepointRegisters values on the
+  // stack, so adjust the stack for unsaved registers.
+  const int num_unsaved = kNumSafepointRegisters - kNumSafepointSavedRegisters;
+  ASSERT(num_unsaved >= 0);
+  if (num_unsaved > 0) {
+    Subu(sp, sp, Operand(num_unsaved * kPointerSize));
+  }
+  MultiPush(kSafepointSavedRegisters);
+}
 
-
-void MacroAssembler::PopSafepointRegisters() { UNREACHABLE(); }
-
+void MacroAssembler::PopSafepointRegisters() {
+  const int num_unsaved = kNumSafepointRegisters - kNumSafepointSavedRegisters;
+  MultiPop(kSafepointSavedRegisters);
+  if (num_unsaved > 0) {
+    Addu(sp, sp, Operand(num_unsaved * kPointerSize));
+  }
+}
 
 void MacroAssembler::PushSafepointRegistersAndDoubles() { UNREACHABLE(); }
 
@@ -104,20 +117,25 @@ void MacroAssembler::PopSafepointRegistersAndDoubles() { UNREACHABLE(); }
 
 
 void MacroAssembler::StoreToSafepointRegistersAndDoublesSlot(Register src,
-                                                             Register dst) { UNREACHABLE(); }
+                                                             Register dst) {
+  st(src, SafepointRegistersAndDoublesSlot(dst));
+}
 
+void MacroAssembler::StoreToSafepointRegisterSlot(Register src, Register dst) {
+  st(src, SafepointRegisterSlot(dst));
+}
 
-void MacroAssembler::StoreToSafepointRegisterSlot(Register src, Register dst) { UNREACHABLE(); }
+void MacroAssembler::LoadFromSafepointRegisterSlot(Register dst, Register src) {
+  ld(dst, SafepointRegisterSlot(src));
+}
 
+int MacroAssembler::SafepointRegisterStackIndex(int reg_code) {
+  return kSafepointRegisterStackIndexMap[reg_code];
+}
 
-void MacroAssembler::LoadFromSafepointRegisterSlot(Register dst, Register src) { UNREACHABLE(); }
-
-
-int MacroAssembler::SafepointRegisterStackIndex(int reg_code) { UNREACHABLE(); return -1; }
-
-
-MemOperand MacroAssembler::SafepointRegisterSlot(Register reg) { UNREACHABLE(); return MemOperand(fp); }
-
+MemOperand MacroAssembler::SafepointRegisterSlot(Register reg) {
+  return MemOperand(sp, SafepointRegisterStackIndex(reg.code()) * kPointerSize);
+}
 
 MemOperand MacroAssembler::SafepointRegistersAndDoublesSlot(Register reg) { UNREACHABLE(); return MemOperand(fp); }
 
@@ -618,10 +636,16 @@ void MacroAssembler::li(Register rd, Operand j, int line, LiFlags mode) {
     return;
   }
 
-  ASSERT(is_lintn(j.imm64_, 48));
-  moveli(rd, (j.imm64_ >> 32) & 0xFFFF, line);
-  shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF, line);
-  shl16insli(rd, rd, j.imm64_ & 0xFFFF, line);
+  if (is_lintn(j.imm64_, 48)) {
+    moveli(rd, (j.imm64_ >> 32) & 0xFFFF, line);
+    shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF, line);
+    shl16insli(rd, rd, j.imm64_ & 0xFFFF, line);
+  } else {
+    moveli(rd, (j.imm64_ >> 48) & 0xFFFF, line);
+    shl16insli(rd, rd, (j.imm64_ >> 32) & 0xFFFF, line);
+    shl16insli(rd, rd, (j.imm64_ >> 16) & 0xFFFF, line);
+    shl16insli(rd, rd, j.imm64_ & 0xFFFF, line);
+  }
 }
 
 
@@ -1581,8 +1605,10 @@ void MacroAssembler::Call(Label* target) {
   BranchAndLink(target);
 }
 
-void MacroAssembler::Push(Handle<Object> handle) { UNREACHABLE(); }
-
+void MacroAssembler::Push(Handle<Object> handle) {
+  li(at, Operand(handle));
+  push(at);
+}
 
 #ifdef ENABLE_DEBUGGER_SUPPORT
 
@@ -2925,8 +2951,13 @@ void MacroAssembler::CallRuntime(const Runtime::Function* f,
 }
 
 
-void MacroAssembler::CallRuntimeSaveDoubles(Runtime::FunctionId id) { UNREACHABLE(); }
-
+void MacroAssembler::CallRuntimeSaveDoubles(Runtime::FunctionId id) {
+  const Runtime::Function* function = Runtime::FunctionForId(id);
+  PrepareCEntryArgs(function->nargs);
+  PrepareCEntryFunction(ExternalReference(function, isolate()));
+  CEntryStub stub(1, kDontSaveFPRegs);
+  CallStub(&stub);
+}
 
 void MacroAssembler::CallRuntime(Runtime::FunctionId fid, int num_arguments) {
   CallRuntime(Runtime::FunctionForId(fid), num_arguments);

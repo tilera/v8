@@ -494,12 +494,8 @@ void FullCodeGenerator::AccumulatorValueContext::Plug(
 
 void FullCodeGenerator::StackValueContext::Plug(
     Heap::RootListIndex index) const {
-#if 0
   __ LoadRoot(result_register(), index);
   __ push(result_register());
-#else
-    UNREACHABLE();
-#endif
 }
 
 
@@ -521,7 +517,8 @@ void FullCodeGenerator::TestContext::Plug(Heap::RootListIndex index) const {
 }
 
 
-void FullCodeGenerator::EffectContext::Plug(Handle<Object> lit) const { UNREACHABLE(); }
+void FullCodeGenerator::EffectContext::Plug(Handle<Object> lit) const {
+}
 
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(

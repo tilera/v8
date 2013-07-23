@@ -459,7 +459,7 @@ Register LCodeGen::EmitLoadRegister(LOperand* op, Register scratch) {
 }
 
 
-DoubleRegister LCodeGen::ToDoubleRegister(LOperand* op) const {  UNREACHABLE();
+DoubleRegister LCodeGen::ToDoubleRegister(LOperand* op) const {
   return Register::FromAllocationIndex(0);
 }
 
@@ -928,27 +928,56 @@ void LCodeGen::PopulateDeoptimizationLiteralsWithInlinedFunctions() {
 
 
 void LCodeGen::RecordSafepointWithLazyDeopt(
-    LInstruction* instr, SafepointMode safepoint_mode) {  UNREACHABLE();  }
-
+    LInstruction* instr, SafepointMode safepoint_mode) {
+  if (safepoint_mode == RECORD_SIMPLE_SAFEPOINT) {
+    RecordSafepoint(instr->pointer_map(), Safepoint::kLazyDeopt);
+  } else {
+    ASSERT(safepoint_mode == RECORD_SAFEPOINT_WITH_REGISTERS_AND_NO_ARGUMENTS);
+    RecordSafepointWithRegisters(
+        instr->pointer_map(), 0, Safepoint::kLazyDeopt);
+  }
+}
 
 void LCodeGen::RecordSafepoint(
     LPointerMap* pointers,
     Safepoint::Kind kind,
     int arguments,
-    Safepoint::DeoptMode deopt_mode) {  UNREACHABLE();  }
+    Safepoint::DeoptMode deopt_mode) {
+  ASSERT(expected_safepoint_kind_ == kind);
 
+  const ZoneList<LOperand*>* operands = pointers->GetNormalizedOperands();
+  Safepoint safepoint = safepoints_.DefineSafepoint(masm(),
+      kind, arguments, deopt_mode);
+  for (int i = 0; i < operands->length(); i++) {
+    LOperand* pointer = operands->at(i);
+    if (pointer->IsStackSlot()) {
+      safepoint.DefinePointerSlot(pointer->index(), zone());
+    } else if (pointer->IsRegister() && (kind & Safepoint::kWithRegisters)) {
+      safepoint.DefinePointerRegister(ToRegister(pointer), zone());
+    }
+  }
+  if (kind & Safepoint::kWithRegisters) {
+    // Register cp always contains a pointer to the context.
+    safepoint.DefinePointerRegister(cp, zone());
+  }
+}
 
 void LCodeGen::RecordSafepoint(LPointerMap* pointers,
-                               Safepoint::DeoptMode deopt_mode) {  UNREACHABLE();  }
+                               Safepoint::DeoptMode deopt_mode) {
+  RecordSafepoint(pointers, Safepoint::kSimple, 0, deopt_mode);
+}
 
-
-void LCodeGen::RecordSafepoint(Safepoint::DeoptMode deopt_mode) {  UNREACHABLE();  }
-
+void LCodeGen::RecordSafepoint(Safepoint::DeoptMode deopt_mode) {
+  LPointerMap empty_pointers(RelocInfo::kNoPosition, zone());
+  RecordSafepoint(&empty_pointers, deopt_mode);
+}
 
 void LCodeGen::RecordSafepointWithRegisters(LPointerMap* pointers,
                                             int arguments,
-                                            Safepoint::DeoptMode deopt_mode) {  UNREACHABLE();  }
-
+                                            Safepoint::DeoptMode deopt_mode) {
+  RecordSafepoint(
+      pointers, Safepoint::kWithRegisters, arguments, deopt_mode);
+}
 
 void LCodeGen::RecordSafepointWithRegistersAndDoubles(
     LPointerMap* pointers,
@@ -1588,21 +1617,112 @@ void LCodeGen::DoIsStringAndBranch(LIsStringAndBranch* instr) {  UNREACHABLE(); 
 void LCodeGen::DoIsSmiAndBranch(LIsSmiAndBranch* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoIsUndetectableAndBranch(LIsUndetectableAndBranch* instr) {  UNREACHABLE();  }
+void LCodeGen::DoIsUndetectableAndBranch(LIsUndetectableAndBranch* instr) {
+  Register input = ToRegister(instr->value());
+  Register temp = ToRegister(instr->temp());
 
+  int true_block = chunk_->LookupDestination(instr->true_block_id());
+  int false_block = chunk_->LookupDestination(instr->false_block_id());
 
-void LCodeGen::DoStringCompareAndBranch(LStringCompareAndBranch* instr) {  UNREACHABLE();  }
+  __ JumpIfSmi(input, chunk_->GetAssemblyLabel(false_block));
+  __ ld(temp, FieldMemOperand(input, HeapObject::kMapOffset));
+  __ ld1u(temp, FieldMemOperand(temp, Map::kBitFieldOffset));
+  __ And(at, temp, Operand(1 << Map::kIsUndetectable));
+  EmitBranch(true_block, false_block, ne, at, Operand(zero));
+}
 
+static Condition ComputeCompareCondition(Token::Value op) {
+  switch (op) {
+    case Token::EQ_STRICT:
+    case Token::EQ:
+      return eq;
+    case Token::LT:
+      return lt;
+    case Token::GT:
+      return gt;
+    case Token::LTE:
+      return le;
+    case Token::GTE:
+      return ge;
+    default:
+      UNREACHABLE();
+      return kNoCondition;
+  }
+}
 
-void LCodeGen::DoHasInstanceTypeAndBranch(LHasInstanceTypeAndBranch* instr) {  UNREACHABLE();  }
+void LCodeGen::DoStringCompareAndBranch(LStringCompareAndBranch* instr) {
+  Token::Value op = instr->op();
+  int true_block = chunk_->LookupDestination(instr->true_block_id());
+  int false_block = chunk_->LookupDestination(instr->false_block_id());
 
+  Handle<Code> ic = CompareIC::GetUninitialized(isolate(), op);
+  CallCode(ic, RelocInfo::CODE_TARGET, instr);
 
-void LCodeGen::DoGetCachedArrayIndex(LGetCachedArrayIndex* instr) {  UNREACHABLE();  }
+  Condition condition = ComputeCompareCondition(op);
 
+  EmitBranch(true_block, false_block, condition, v0, Operand(zero));
+}
+
+static InstanceType TestType(HHasInstanceTypeAndBranch* instr) {
+  InstanceType from = instr->from();
+  InstanceType to = instr->to();
+  if (from == FIRST_TYPE) return to;
+  ASSERT(from == to || to == LAST_TYPE);
+  return from;
+}
+
+static Condition BranchCondition(HHasInstanceTypeAndBranch* instr) {
+  InstanceType from = instr->from();
+  InstanceType to = instr->to();
+  if (from == to) return eq;
+  if (to == LAST_TYPE) return hs;
+  if (from == FIRST_TYPE) return ls;
+  UNREACHABLE();
+  return eq;
+}
+
+void LCodeGen::DoHasInstanceTypeAndBranch(LHasInstanceTypeAndBranch* instr) {
+  Register scratch = scratch0();
+  Register input = ToRegister(instr->value());
+
+  int true_block = chunk_->LookupDestination(instr->true_block_id());
+  int false_block = chunk_->LookupDestination(instr->false_block_id());
+
+  Label* false_label = chunk_->GetAssemblyLabel(false_block);
+
+  __ JumpIfSmi(input, false_label);
+
+  __ GetObjectType(input, scratch, scratch);
+  EmitBranch(true_block,
+             false_block,
+             BranchCondition(instr->hydrogen()),
+             scratch,
+             Operand(TestType(instr->hydrogen())));
+}
+
+void LCodeGen::DoGetCachedArrayIndex(LGetCachedArrayIndex* instr) {
+  Register input = ToRegister(instr->value());
+  Register result = ToRegister(instr->result());
+
+  __ AssertString(input);
+
+  __ ld(result, FieldMemOperand(input, String::kHashFieldOffset));
+  __ IndexFromHash(result, result);
+}
 
 void LCodeGen::DoHasCachedArrayIndexAndBranch(
-    LHasCachedArrayIndexAndBranch* instr) {  UNREACHABLE();  }
+    LHasCachedArrayIndexAndBranch* instr) {
+  Register input = ToRegister(instr->value());
+  Register scratch = scratch0();
 
+  int true_block = chunk_->LookupDestination(instr->true_block_id());
+  int false_block = chunk_->LookupDestination(instr->false_block_id());
+
+  __ ld(scratch,
+         FieldMemOperand(input, String::kHashFieldOffset));
+  __ And(at, scratch, Operand(String::kContainsCachedArrayIndexMask));
+  EmitBranch(true_block, false_block, eq, at, Operand(zero));
+}
 
 // Branches to a label or falls through with the answer in flags.  Trashes
 // the temp registers, but not the input.
@@ -1790,7 +1910,56 @@ void LCodeGen::DoInstanceSize(LInstanceSize* instr) {
 void LCodeGen::DoCmpT(LCmpT* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoReturn(LReturn* instr) {  UNREACHABLE();  }
+void LCodeGen::DoReturn(LReturn* instr) {
+  if (FLAG_trace && info()->IsOptimizing()) {
+    // Push the return value on the stack as the parameter.
+    // Runtime::TraceExit returns its parameter in v0.
+    __ push(v0);
+    __ CallRuntime(Runtime::kTraceExit, 1);
+  }
+
+  //FIXME
+#if 0 
+  if (info()->saves_caller_doubles()) {
+    ASSERT(NeedsEagerFrame());
+    BitVector* doubles = chunk()->allocated_double_registers();
+    BitVector::Iterator save_iterator(doubles);
+    int count = 0;
+    while (!save_iterator.Done()) {
+      __ ldc1(DoubleRegister::FromAllocationIndex(save_iterator.Current()),
+              MemOperand(sp, count * kDoubleSize));
+      save_iterator.Advance();
+      count++;
+    }
+  }
+#endif
+
+  int no_frame_start = -1;
+  if (NeedsEagerFrame()) {
+    __ move(sp, fp);
+    __ Pop(ra, fp);
+    no_frame_start = masm_->pc_offset();
+  }
+  if (instr->has_constant_parameter_count()) {
+    int parameter_count = ToInteger32(instr->constant_parameter_count());
+    int32_t sp_delta = (parameter_count + 1) * kPointerSize;
+    if (sp_delta != 0) {
+      __ Addu(sp, sp, Operand(sp_delta));
+    }
+  } else {
+    Register reg = ToRegister(instr->parameter_count());
+    // The argument count parameter is a smi
+    __ SmiUntag(reg);
+    __ sll(at, reg, kPointerSizeLog2);
+    __ Addu(sp, sp, at);
+  }
+
+  __ Jump(ra);
+
+  if (no_frame_start != -1) {
+    info_->AddNoFrameRange(no_frame_start, masm_->pc_offset());
+  }
+}
 
 
 void LCodeGen::DoLoadGlobalCell(LLoadGlobalCell* instr) {
@@ -2185,7 +2354,6 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
 
 
 void LCodeGen::DoLoadKeyedFixedDoubleArray(LLoadKeyed* instr) {
-#if 0
   Register elements = ToRegister(instr->elements());
   bool key_is_constant = instr->key()->IsConstantOperand();
   Register key = no_reg;
@@ -2212,16 +2380,12 @@ void LCodeGen::DoLoadKeyedFixedDoubleArray(LLoadKeyed* instr) {
     __ Addu(elements, elements, scratch);
   }
   __ Addu(elements, elements, Operand(base_offset));
-  __ ldc1(result, MemOperand(elements));
+  __ ld(result, MemOperand(elements));
   if (instr->hydrogen()->RequiresHoleCheck()) {
-    __ ld(scratch, MemOperand(elements, sizeof(kHoleNanLower32)));
+    __ ld4u(scratch, MemOperand(elements, sizeof(kHoleNanLower32)));
     DeoptimizeIf(eq, instr->environment(), scratch, Operand(kHoleNanUpper32));
   }
-#else
-  UNREACHABLE();
-#endif
 }
-
 
 void LCodeGen::DoLoadKeyedFixedArray(LLoadKeyed* instr) {
   Register elements = ToRegister(instr->elements());
@@ -2405,56 +2569,436 @@ void LCodeGen::DoMathCos(LMathCos* instr) {  UNREACHABLE();  }
 void LCodeGen::DoMathSin(LMathSin* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoInvokeFunction(LInvokeFunction* instr) {  UNREACHABLE();  }
+void LCodeGen::DoInvokeFunction(LInvokeFunction* instr) {
+  ASSERT(ToRegister(instr->function()).is(a1));
+  ASSERT(instr->HasPointerMap());
+
+  Handle<JSFunction> known_function = instr->hydrogen()->known_function();
+  if (known_function.is_null()) {
+    LPointerMap* pointers = instr->pointer_map();
+    RecordPosition(pointers->position());
+    SafepointGenerator generator(this, pointers, Safepoint::kLazyDeopt);
+    ParameterCount count(instr->arity());
+    __ InvokeFunction(a1, count, CALL_FUNCTION, generator, CALL_AS_METHOD);
+    __ ld(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+  } else {
+    CallKnownFunction(known_function,
+                      instr->hydrogen()->formal_parameter_count(),
+                      instr->arity(),
+                      instr,
+                      CALL_AS_METHOD,
+                      A1_CONTAINS_TARGET);
+  }
+}
+
+void LCodeGen::DoCallKeyed(LCallKeyed* instr) {
+  ASSERT(ToRegister(instr->result()).is(v0));
+
+  int arity = instr->arity();
+  Handle<Code> ic =
+      isolate()->stub_cache()->ComputeKeyedCallInitialize(arity);
+  CallCode(ic, RelocInfo::CODE_TARGET, instr);
+  __ ld(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+}
+
+void LCodeGen::DoCallNamed(LCallNamed* instr) {
+  ASSERT(ToRegister(instr->result()).is(v0));
+
+  int arity = instr->arity();
+  RelocInfo::Mode mode = RelocInfo::CODE_TARGET;
+  Handle<Code> ic =
+      isolate()->stub_cache()->ComputeCallInitialize(arity, mode);
+  __ li(a2, Operand(instr->name()));
+  CallCode(ic, mode, instr);
+  // Restore context register.
+  __ ld(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+}
+
+void LCodeGen::DoCallFunction(LCallFunction* instr) {
+  ASSERT(ToRegister(instr->function()).is(a1));
+  ASSERT(ToRegister(instr->result()).is(v0));
+
+  int arity = instr->arity();
+  CallFunctionStub stub(arity, NO_CALL_FUNCTION_FLAGS);
+  CallCode(stub.GetCode(isolate()), RelocInfo::CODE_TARGET, instr);
+  __ ld(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+}
+
+void LCodeGen::DoCallGlobal(LCallGlobal* instr) {
+  ASSERT(ToRegister(instr->result()).is(v0));
+
+  int arity = instr->arity();
+  RelocInfo::Mode mode = RelocInfo::CODE_TARGET_CONTEXT;
+  Handle<Code> ic =
+      isolate()->stub_cache()->ComputeCallInitialize(arity, mode);
+  __ li(a2, Operand(instr->name()));
+  CallCode(ic, mode, instr);
+  __ ld(cp, MemOperand(fp, StandardFrameConstants::kContextOffset));
+}
+
+void LCodeGen::DoCallKnownGlobal(LCallKnownGlobal* instr) {
+  ASSERT(ToRegister(instr->result()).is(v0));
+  CallKnownFunction(instr->hydrogen()->target(),
+                    instr->hydrogen()->formal_parameter_count(),
+                    instr->arity(),
+                    instr,
+                    CALL_AS_FUNCTION,
+                    A1_UNINITIALIZED);
+}
+
+void LCodeGen::DoCallNew(LCallNew* instr) {
+  ASSERT(ToRegister(instr->constructor()).is(a1));
+  ASSERT(ToRegister(instr->result()).is(v0));
+
+  __ li(a0, Operand(instr->arity()));
+  if (FLAG_optimize_constructed_arrays) {
+    // No cell in a2 for construct type feedback in optimized code
+    Handle<Object> undefined_value(isolate()->heap()->undefined_value(),
+                                   isolate());
+    __ li(a2, Operand(undefined_value));
+  }
+  CallConstructStub stub(NO_CALL_FUNCTION_FLAGS);
+  CallCode(stub.GetCode(isolate()), RelocInfo::CONSTRUCT_CALL, instr);
+}
+
+void LCodeGen::DoCallNewArray(LCallNewArray* instr) {
+  ASSERT(ToRegister(instr->constructor()).is(a1));
+  ASSERT(ToRegister(instr->result()).is(v0));
+  ASSERT(FLAG_optimize_constructed_arrays);
+
+  __ li(a0, Operand(instr->arity()));
+  __ li(a2, Operand(instr->hydrogen()->property_cell()));
+  ElementsKind kind = instr->hydrogen()->elements_kind();
+  if (instr->arity() == 0) {
+    ArrayNoArgumentConstructorStub stub(kind);
+    CallCode(stub.GetCode(isolate()), RelocInfo::CONSTRUCT_CALL, instr);
+  } else if (instr->arity() == 1) {
+    ArraySingleArgumentConstructorStub stub(kind);
+    CallCode(stub.GetCode(isolate()), RelocInfo::CONSTRUCT_CALL, instr);
+  } else {
+    ArrayNArgumentsConstructorStub stub(kind);
+    CallCode(stub.GetCode(isolate()), RelocInfo::CONSTRUCT_CALL, instr);
+  }
+}
+
+void LCodeGen::DoCallRuntime(LCallRuntime* instr) {
+  CallRuntime(instr->function(), instr->arity(), instr);
+}
+
+void LCodeGen::DoInnerAllocatedObject(LInnerAllocatedObject* instr) {
+  Register result = ToRegister(instr->result());
+  Register base = ToRegister(instr->base_object());
+  __ Addu(result, base, Operand(instr->offset()));
+}
+
+void LCodeGen::DoStoreNamedField(LStoreNamedField* instr) {
+  Representation representation = instr->representation();
+
+  Register object = ToRegister(instr->object());
+  Register scratch = scratch0();
+  HObjectAccess access = instr->hydrogen()->access();
+  int offset = access.offset();
+
+  Handle<Map> transition = instr->transition();
+
+  if (FLAG_track_heap_object_fields && representation.IsHeapObject()) {
+    Register value = ToRegister(instr->value());
+    if (!instr->hydrogen()->value()->type().IsHeapObject()) {
+      __ And(scratch, value, Operand(kSmiTagMask));
+      DeoptimizeIf(eq, instr->environment(), scratch, Operand(zero));
+    }
+  } else if (FLAG_track_double_fields && representation.IsDouble()) {
+    ASSERT(transition.is_null());
+    ASSERT(access.IsInobject());
+    ASSERT(!instr->hydrogen()->NeedsWriteBarrier());
+    DoubleRegister value = ToDoubleRegister(instr->value());
+    __ st(value, FieldMemOperand(object, offset));
+    return;
+  }
+
+  if (!transition.is_null()) {
+    if (transition->CanBeDeprecated()) {
+      transition_maps_.Add(transition, info()->zone());
+    }
+    __ li(scratch, Operand(transition));
+    __ st(scratch, FieldMemOperand(object, HeapObject::kMapOffset));
+    if (instr->hydrogen()->NeedsWriteBarrierForMap()) {
+      Register temp = ToRegister(instr->temp());
+      // Update the write barrier for the map field.
+      __ RecordWriteField(object,
+                          HeapObject::kMapOffset,
+                          scratch,
+                          temp,
+                          GetRAState(),
+                          kSaveFPRegs,
+                          OMIT_REMEMBERED_SET,
+                          OMIT_SMI_CHECK);
+    }
+  }
+
+  // Do the store.
+  Register value = ToRegister(instr->value());
+  ASSERT(!object.is(value));
+  HType type = instr->hydrogen()->value()->type();
+  SmiCheck check_needed =
+      type.IsHeapObject() ? OMIT_SMI_CHECK : INLINE_SMI_CHECK;
+  if (access.IsInobject()) {
+    __ st(value, FieldMemOperand(object, offset));
+    if (instr->hydrogen()->NeedsWriteBarrier()) {
+      // Update the write barrier for the object for in-object properties.
+      __ RecordWriteField(object,
+                          offset,
+                          value,
+                          scratch,
+                          GetRAState(),
+                          kSaveFPRegs,
+                          EMIT_REMEMBERED_SET,
+                          check_needed);
+    }
+  } else {
+    __ ld(scratch, FieldMemOperand(object, JSObject::kPropertiesOffset));
+    __ st(value, FieldMemOperand(scratch, offset));
+    if (instr->hydrogen()->NeedsWriteBarrier()) {
+      // Update the write barrier for the properties array.
+      // object is used as a scratch register.
+      __ RecordWriteField(scratch,
+                          offset,
+                          value,
+                          object,
+                          GetRAState(),
+                          kSaveFPRegs,
+                          EMIT_REMEMBERED_SET,
+                          check_needed);
+    }
+  }
+}
+
+void LCodeGen::DoStoreNamedGeneric(LStoreNamedGeneric* instr) {
+  ASSERT(ToRegister(instr->object()).is(a1));
+  ASSERT(ToRegister(instr->value()).is(a0));
+
+  // Name is always in a2.
+  __ li(a2, Operand(instr->name()));
+  Handle<Code> ic = (instr->strict_mode_flag() == kStrictMode)
+      ? isolate()->builtins()->StoreIC_Initialize_Strict()
+      : isolate()->builtins()->StoreIC_Initialize();
+  CallCode(ic, RelocInfo::CODE_TARGET, instr);
+}
+
+void LCodeGen::DoBoundsCheck(LBoundsCheck* instr) {
+  if (instr->hydrogen()->skip_check()) return;
+
+  if (instr->index()->IsConstantOperand()) {
+    int constant_index =
+        ToInteger32(LConstantOperand::cast(instr->index()));
+    if (instr->hydrogen()->length()->representation().IsSmi()) {
+      __ li(at, Operand(Smi::FromInt(constant_index)));
+    } else {
+      __ li(at, Operand(constant_index));
+    }
+    DeoptimizeIf(hs,
+                 instr->environment(),
+                 at,
+                 Operand(ToRegister(instr->length())));
+  } else {
+    DeoptimizeIf(hs,
+                 instr->environment(),
+                 ToRegister(instr->index()),
+                 Operand(ToRegister(instr->length())));
+  }
+}
+
+void LCodeGen::DoStoreKeyedExternalArray(LStoreKeyed* instr) {
+  Register external_pointer = ToRegister(instr->elements());
+  Register key = no_reg;
+  ElementsKind elements_kind = instr->elements_kind();
+  bool key_is_constant = instr->key()->IsConstantOperand();
+  int constant_key = 0;
+  if (key_is_constant) {
+    constant_key = ToInteger32(LConstantOperand::cast(instr->key()));
+    if (constant_key & 0xF0000000) {
+      Abort("array index constant value too big.");
+    }
+  } else {
+    key = ToRegister(instr->key());
+  }
+  int element_size_shift = ElementsKindToShiftSize(elements_kind);
+  int shift_size = (instr->hydrogen()->key()->representation().IsSmi())
+      ? (element_size_shift - kSmiTagSize) : element_size_shift;
+  int additional_offset = instr->additional_index() << element_size_shift;
+
+  if (elements_kind == EXTERNAL_FLOAT_ELEMENTS ||
+      elements_kind == EXTERNAL_DOUBLE_ELEMENTS) {
+    Register value(ToDoubleRegister(instr->value()));
+    if (key_is_constant) {
+      __ Addu(scratch0(), external_pointer, constant_key <<
+          element_size_shift);
+    } else {
+      __ sll(scratch0(), key, shift_size);
+      __ Addu(scratch0(), scratch0(), external_pointer);
+    }
+
+    if (elements_kind == EXTERNAL_FLOAT_ELEMENTS) {
+#if 0
+      __ cvt_s_d(double_scratch0(), value);
+      __ swc1(double_scratch0(), MemOperand(scratch0(), additional_offset));
+#else
+      UNREACHABLE();
+#endif
+    } else {  // i.e. elements_kind == EXTERNAL_DOUBLE_ELEMENTS
+      __ st(value, MemOperand(scratch0(), additional_offset));
+    }
+  } else {
+    Register value(ToRegister(instr->value()));
+    MemOperand mem_operand = PrepareKeyedOperand(
+        key, external_pointer, key_is_constant, constant_key,
+        element_size_shift, shift_size,
+        instr->additional_index(), additional_offset);
+    switch (elements_kind) {
+      case EXTERNAL_PIXEL_ELEMENTS:
+      case EXTERNAL_BYTE_ELEMENTS:
+      case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
+        __ st1(value, mem_operand);
+        break;
+      case EXTERNAL_SHORT_ELEMENTS:
+      case EXTERNAL_UNSIGNED_SHORT_ELEMENTS:
+        __ st2(value, mem_operand);
+        break;
+      case EXTERNAL_INT_ELEMENTS:
+      case EXTERNAL_UNSIGNED_INT_ELEMENTS:
+        __ st4(value, mem_operand);
+        break;
+      case EXTERNAL_FLOAT_ELEMENTS:
+      case EXTERNAL_DOUBLE_ELEMENTS:
+      case FAST_DOUBLE_ELEMENTS:
+      case FAST_ELEMENTS:
+      case FAST_SMI_ELEMENTS:
+      case FAST_HOLEY_DOUBLE_ELEMENTS:
+      case FAST_HOLEY_ELEMENTS:
+      case FAST_HOLEY_SMI_ELEMENTS:
+      case DICTIONARY_ELEMENTS:
+      case NON_STRICT_ARGUMENTS_ELEMENTS:
+        UNREACHABLE();
+        break;
+    }
+  }
+}
 
 
-void LCodeGen::DoCallKeyed(LCallKeyed* instr) {  UNREACHABLE();  }
+void LCodeGen::DoStoreKeyedFixedDoubleArray(LStoreKeyed* instr) {
+  DoubleRegister value = ToDoubleRegister(instr->value());
+  Register elements = ToRegister(instr->elements());
+  Register key = no_reg;
+  Register scratch = scratch0();
+  bool key_is_constant = instr->key()->IsConstantOperand();
+  int constant_key = 0;
+  Label not_nan;
+
+  // Calculate the effective address of the slot in the array to store the
+  // double value.
+  if (key_is_constant) {
+    constant_key = ToInteger32(LConstantOperand::cast(instr->key()));
+    if (constant_key & 0xF0000000) {
+      Abort("array index constant value too big.");
+    }
+  } else {
+    key = ToRegister(instr->key());
+  }
+  int element_size_shift = ElementsKindToShiftSize(FAST_DOUBLE_ELEMENTS);
+  int shift_size = (instr->hydrogen()->key()->representation().IsSmi())
+      ? (element_size_shift - kSmiTagSize) : element_size_shift;
+  if (key_is_constant) {
+    __ Addu(scratch, elements, Operand((constant_key << element_size_shift) +
+            FixedDoubleArray::kHeaderSize - kHeapObjectTag));
+  } else {
+    __ sll(scratch, key, shift_size);
+    __ Addu(scratch, elements, Operand(scratch));
+    __ Addu(scratch, scratch,
+            Operand(FixedDoubleArray::kHeaderSize - kHeapObjectTag));
+  }
+
+  if (instr->NeedsCanonicalization()) {
+    Label is_nan;
+// FIXME:
+#if 0 
+    // Check for NaN. All NaNs must be canonicalized.
+    __ BranchF(NULL, &is_nan, eq, value, value);
+#endif
+    __ Branch(&not_nan);
+
+    // Only load canonical NaN if the comparison above set the overflow.
+    __ bind(&is_nan);
+#if 0
+    __ Move(value, FixedDoubleArray::canonical_not_the_hole_nan_as_double());
+#else
+    UNREACHABLE();
+#endif
+  }
+
+  __ bind(&not_nan);
+  __ st(value, MemOperand(scratch, instr->additional_index() <<
+      element_size_shift));
+}
 
 
-void LCodeGen::DoCallNamed(LCallNamed* instr) {  UNREACHABLE();  }
+void LCodeGen::DoStoreKeyedFixedArray(LStoreKeyed* instr) {
+  Register value = ToRegister(instr->value());
+  Register elements = ToRegister(instr->elements());
+  Register key = instr->key()->IsRegister() ? ToRegister(instr->key())
+      : no_reg;
+  Register scratch = scratch0();
+  Register store_base = scratch;
+  int offset = 0;
 
+  // Do the store.
+  if (instr->key()->IsConstantOperand()) {
+    ASSERT(!instr->hydrogen()->NeedsWriteBarrier());
+    LConstantOperand* const_operand = LConstantOperand::cast(instr->key());
+    offset = FixedArray::OffsetOfElementAt(ToInteger32(const_operand) +
+                                           instr->additional_index());
+    store_base = elements;
+  } else {
+    // Even though the HLoadKeyed instruction forces the input
+    // representation for the key to be an integer, the input gets replaced
+    // during bound check elimination with the index argument to the bounds
+    // check, which can be tagged, so that case must be handled here, too.
+    if (instr->hydrogen()->key()->representation().IsSmi()) {
+      __ sll(scratch, key, kPointerSizeLog2 - kSmiTagSize);
+      __ add(scratch, elements, scratch);
+    } else {
+      __ sll(scratch, key, kPointerSizeLog2);
+      __ add(scratch, elements, scratch);
+    }
+    offset = FixedArray::OffsetOfElementAt(instr->additional_index());
+  }
+  __ st(value, FieldMemOperand(store_base, offset));
 
-void LCodeGen::DoCallFunction(LCallFunction* instr) {  UNREACHABLE();  }
+  if (instr->hydrogen()->NeedsWriteBarrier()) {
+    HType type = instr->hydrogen()->value()->type();
+    SmiCheck check_needed =
+       type.IsHeapObject() ? OMIT_SMI_CHECK : INLINE_SMI_CHECK;
+    // Compute address of modified element and store it into key register.
+    __ Addu(key, store_base, Operand(offset - kHeapObjectTag));
+    __ RecordWrite(elements,
+                   key,
+                   value,
+                   GetRAState(),
+                   kSaveFPRegs,
+                   EMIT_REMEMBERED_SET,
+                   check_needed);
+  }
+}
 
-
-void LCodeGen::DoCallGlobal(LCallGlobal* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoCallKnownGlobal(LCallKnownGlobal* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoCallNew(LCallNew* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoCallNewArray(LCallNewArray* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoCallRuntime(LCallRuntime* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoInnerAllocatedObject(LInnerAllocatedObject* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoStoreNamedField(LStoreNamedField* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoStoreNamedGeneric(LStoreNamedGeneric* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoBoundsCheck(LBoundsCheck* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoStoreKeyedExternalArray(LStoreKeyed* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoStoreKeyedFixedDoubleArray(LStoreKeyed* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoStoreKeyedFixedArray(LStoreKeyed* instr) {  UNREACHABLE();  }
-
-
-void LCodeGen::DoStoreKeyed(LStoreKeyed* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoStoreKeyed(LStoreKeyed* instr) {
+  // By cases: external, fast double
+  if (instr->is_external()) {
+    DoStoreKeyedExternalArray(instr);
+  } else if (instr->hydrogen()->value()->representation().IsDouble()) {
+    DoStoreKeyedFixedDoubleArray(instr);
+  } else {
+    DoStoreKeyedFixedArray(instr);
+  }
+}
 
 void LCodeGen::DoStoreKeyedGeneric(LStoreKeyedGeneric* instr) {  UNREACHABLE();  }
 

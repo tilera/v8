@@ -514,7 +514,7 @@ void ConvertToDoubleStub::Generate(MacroAssembler* masm) {
   __ And(exponent, source_, Operand(HeapNumber::kSignMask));
   // Subtract from 0 if source was negative.
   __ sub(at, zero, source_);
-  __ Movn(source_, at, exponent);
+  __ movn(source_, at, exponent);
 
   // We have -1, 0 or 1, which we treat specially. Register source_ contains
   // absolute value: it is either equal to 1 (special case of -1 and 1),
@@ -526,7 +526,7 @@ void ConvertToDoubleStub::Generate(MacroAssembler* masm) {
       HeapNumber::kExponentBias << HeapNumber::kExponentShift;
   // Safe to use 'at' as dest reg here.
   __ Or(at, exponent, Operand(exponent_word_for_1));
-  __ Movn(exponent, at, source_);  // Write exp when source not 0.
+  __ movn(exponent, at, source_);  // Write exp when source not 0.
   // 1, 0 and -1 all have 0 for the second word.
   __ Ret();
   __ move(mantissa, zero);
@@ -1498,7 +1498,6 @@ void ICCompareStub::GenerateGeneric(MacroAssembler* masm) {
 // The stub expects its argument in the tos_ register and returns its result in
 // it, too: zero for false, and a non-zero value for true.
 void ToBooleanStub::Generate(MacroAssembler* masm) {
-#if 0
   Label patch;
   const Register map = t5.is(tos_) ? t3 : t5;
 
@@ -1529,7 +1528,7 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
       __ ld1u(at, FieldMemOperand(map, Map::kBitFieldOffset));
       __ And(at, at, Operand(1 << Map::kIsUndetectable));
       // Undetectable -> false.
-      __ Movn(tos_, zero, at);
+      __ movn(tos_, zero, at);
       __ Ret(ne, at, Operand(zero));
     }
   }
@@ -1552,6 +1551,7 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
   }
 
   if (types_.Contains(HEAP_NUMBER)) {
+#if 0
     // Heap number -> false iff +0, -0, or NaN.
     Label not_heap_number;
     __ LoadRoot(at, Heap::kHeapNumberMapRootIndex);
@@ -1567,14 +1567,13 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
     __ bind(&number);
     __ Ret();
     __ bind(&not_heap_number);
+#else
+    UNREACHABLE();
+#endif
   }
 
   __ bind(&patch);
   GenerateTypeTransition(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1582,7 +1581,6 @@ void ToBooleanStub::CheckOddball(MacroAssembler* masm,
                                  Type type,
                                  Heap::RootListIndex value,
                                  bool result) {
-#if 0
   if (types_.Contains(type)) {
     // If we see an expected oddball, return its ToBoolean value tos_.
     __ LoadRoot(at, value);
@@ -1590,19 +1588,14 @@ void ToBooleanStub::CheckOddball(MacroAssembler* masm,
     // The value of a root is never NULL, so we can avoid loading a non-null
     // value into tos_ when we want to return 'true'.
     if (!result) {
-      __ Movz(tos_, zero, at);
+      __ movz(tos_, zero, at);
     }
     __ Ret(eq, at, Operand(zero));
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void ToBooleanStub::GenerateTypeTransition(MacroAssembler* masm) {
-#if 0
   __ Move(a3, tos_);
   __ li(a2, Operand(Smi::FromInt(tos_.code())));
   __ li(a1, Operand(Smi::FromInt(types_.ToByte())));
@@ -1613,10 +1606,6 @@ void ToBooleanStub::GenerateTypeTransition(MacroAssembler* masm) {
       ExternalReference(IC_Utility(IC::kToBoolean_Patch), masm->isolate()),
       3,
       1);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1641,7 +1630,6 @@ void StoreBufferOverflowStub::Generate(MacroAssembler* masm) {
 
 
 void UnaryOpStub::PrintName(StringStream* stream) {
-#if 0
   const char* op_name = Token::Name(op_);
   const char* overwrite_name = NULL;  // Make g++ happy.
   switch (mode_) {
@@ -1652,16 +1640,11 @@ void UnaryOpStub::PrintName(StringStream* stream) {
               op_name,
               overwrite_name,
               UnaryOpIC::GetName(operand_type_));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 // TODO(svenpanne): Use virtual functions instead of switch.
 void UnaryOpStub::Generate(MacroAssembler* masm) {
-#if 0
   switch (operand_type_) {
     case UnaryOpIC::UNINITIALIZED:
       GenerateTypeTransition(masm);
@@ -1676,15 +1659,10 @@ void UnaryOpStub::Generate(MacroAssembler* masm) {
       GenerateGenericStub(masm);
       break;
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
-#if 0
   // Argument is in a0 and v0 at this point, so we can overwrite a0.
   __ li(a2, Operand(Smi::FromInt(op_)));
   __ li(a1, Operand(Smi::FromInt(mode_)));
@@ -1693,16 +1671,11 @@ void UnaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
 
   __ TailCallExternalReference(
       ExternalReference(IC_Utility(IC::kUnaryOp_Patch), masm->isolate()), 4, 1);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 // TODO(svenpanne): Use virtual functions instead of switch.
 void UnaryOpStub::GenerateSmiStub(MacroAssembler* masm) {
-#if 0
   switch (op_) {
     case Token::SUB:
       GenerateSmiStubSub(masm);
@@ -1713,44 +1686,29 @@ void UnaryOpStub::GenerateSmiStub(MacroAssembler* masm) {
     default:
       UNREACHABLE();
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateSmiStubSub(MacroAssembler* masm) {
-#if 0
   Label non_smi, slow;
   GenerateSmiCodeSub(masm, &non_smi, &slow);
   __ bind(&non_smi);
   __ bind(&slow);
   GenerateTypeTransition(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateSmiStubBitNot(MacroAssembler* masm) {
-#if 0
   Label non_smi;
   GenerateSmiCodeBitNot(masm, &non_smi);
   __ bind(&non_smi);
   GenerateTypeTransition(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateSmiCodeSub(MacroAssembler* masm,
                                      Label* non_smi,
                                      Label* slow) {
-#if 0
   __ JumpIfNotSmi(a0, non_smi);
 
   // The result of negating zero or the smallest negative smi is not a smi.
@@ -1760,31 +1718,21 @@ void UnaryOpStub::GenerateSmiCodeSub(MacroAssembler* masm,
   // Return '0 - value'.
   __ Ret();
   __ sub(v0, zero, a0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateSmiCodeBitNot(MacroAssembler* masm,
                                         Label* non_smi) {
-#if 0
   __ JumpIfNotSmi(a0, non_smi);
 
   // Flip bits and revert inverted smi-tag.
   __ Neg(v0, a0);
   __ And(v0, v0, ~kSmiTagMask);
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 // TODO(svenpanne): Use virtual functions instead of switch.
 void UnaryOpStub::GenerateNumberStub(MacroAssembler* masm) {
-#if 0
   switch (op_) {
     case Token::SUB:
       GenerateNumberStubSub(masm);
@@ -1795,15 +1743,10 @@ void UnaryOpStub::GenerateNumberStub(MacroAssembler* masm) {
     default:
       UNREACHABLE();
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateNumberStubSub(MacroAssembler* masm) {
-#if 0
   Label non_smi, slow, call_builtin;
   GenerateSmiCodeSub(masm, &non_smi, &call_builtin);
   __ bind(&non_smi);
@@ -1812,31 +1755,21 @@ void UnaryOpStub::GenerateNumberStubSub(MacroAssembler* masm) {
   GenerateTypeTransition(masm);
   __ bind(&call_builtin);
   GenerateGenericCodeFallback(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateNumberStubBitNot(MacroAssembler* masm) {
-#if 0
   Label non_smi, slow;
   GenerateSmiCodeBitNot(masm, &non_smi);
   __ bind(&non_smi);
   GenerateHeapNumberCodeBitNot(masm, &slow);
   __ bind(&slow);
   GenerateTypeTransition(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateHeapNumberCodeSub(MacroAssembler* masm,
                                             Label* slow) {
-#if 0
   EmitCheckForHeapNumber(masm, a0, a1, t2, slow);
   // a0 is a heap number.  Get a new heap number in a1.
   if (mode_ == UNARY_OVERWRITE) {
@@ -1866,10 +1799,6 @@ void UnaryOpStub::GenerateHeapNumberCodeSub(MacroAssembler* masm,
     __ move(v0, a1);
   }
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1941,7 +1870,6 @@ void UnaryOpStub::GenerateHeapNumberCodeBitNot(
 
 // TODO(svenpanne): Use virtual functions instead of switch.
 void UnaryOpStub::GenerateGenericStub(MacroAssembler* masm) {
-#if 0
   switch (op_) {
     case Token::SUB:
       GenerateGenericStubSub(masm);
@@ -1952,46 +1880,31 @@ void UnaryOpStub::GenerateGenericStub(MacroAssembler* masm) {
     default:
       UNREACHABLE();
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateGenericStubSub(MacroAssembler* masm) {
-#if 0
   Label non_smi, slow;
   GenerateSmiCodeSub(masm, &non_smi, &slow);
   __ bind(&non_smi);
   GenerateHeapNumberCodeSub(masm, &slow);
   __ bind(&slow);
   GenerateGenericCodeFallback(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateGenericStubBitNot(MacroAssembler* masm) {
-#if 0
   Label non_smi, slow;
   GenerateSmiCodeBitNot(masm, &non_smi);
   __ bind(&non_smi);
   GenerateHeapNumberCodeBitNot(masm, &slow);
   __ bind(&slow);
   GenerateGenericCodeFallback(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void UnaryOpStub::GenerateGenericCodeFallback(
     MacroAssembler* masm) {
-#if 0
   // Handle the slow case by jumping to the JavaScript builtin.
   __ push(a0);
   switch (op_) {
@@ -2004,10 +1917,6 @@ void UnaryOpStub::GenerateGenericCodeFallback(
     default:
       UNREACHABLE();
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2017,7 +1926,6 @@ void BinaryOpStub::Initialize() {
 
 
 void BinaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
-#if 0
   Label get_result;
 
   __ Push(a1, a0);
@@ -2030,10 +1938,6 @@ void BinaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
                         masm->isolate()),
       3,
       1);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

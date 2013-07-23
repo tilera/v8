@@ -243,7 +243,7 @@ class EntryFrameConstants : public AllStatic {
 
 // Number of registers for which space is reserved in safepoints. Must be a
 // multiple of 8.
-const int kNumSafepointRegisters = 24;
+const int kNumSafepointRegisters = 56;
 
 // Define the list of registers actually saved at safepoints.
 // Note that the number of saved registers may be smaller than the reserved
