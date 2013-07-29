@@ -72,16 +72,14 @@ inline MemOperand FieldMemOperand(Register object, int offset) {
   return MemOperand(object, offset - kHeapObjectTag);
 }
 
-#if 0
-// Generate a MemOperand for storing arguments 5..N on the stack
+// Generate a MemOperand for storing arguments 11..N on the stack
 // when calling CallCFunction().
 inline MemOperand CFunctionArgumentOperand(int index) {
-  ASSERT(index > kCArgSlotCount);
+  ASSERT(index > kArgByRegNum);
   // Argument 5 takes the slot just past the four Arg-slots.
-  int offset = (index - 5) * kPointerSize + kCArgsSlotsSize;
+  int offset = (index - kArgByRegNum - 1) * kPointerSize + kStackLowReserve;
   return MemOperand(sp, offset);
 }
-#endif
 
 // MacroAssembler implements a collection of frequently used macros.
 class MacroAssembler: public Assembler {
@@ -181,10 +179,11 @@ class MacroAssembler: public Assembler {
 
   template<typename Field>
   void DecodeField(Register reg) {
-    static const int shift = Field::kShift;
-    static const int mask = (Field::kMask >> shift) << kSmiTagSize;
+    static const int shift = Field::kShift + kSmiShift;
+    static const int mask = Field::kMask >> Field::kShift;
     srl(reg, reg, shift);
     And(reg, reg, Operand(mask));
+    sll(reg, reg, kSmiShift);
   }
 
   // Untag the source value into destination and jump if source is a smi.
@@ -332,11 +331,11 @@ class MacroAssembler: public Assembler {
   }
 
   void SmiUntag(Register reg) {
-    sra(reg, reg, kSmiTagSize);
+    sra(reg, reg, kSmiTagSize + kSmiShiftSize);
   }
 
   void SmiUntag(Register dst, Register src) {
-    sra(dst, src, kSmiTagSize);
+    sra(dst, src, kSmiTagSize + kSmiShiftSize);
   }
 
   // Helper for throwing exceptions.  Compute a handler address and jump to
@@ -629,6 +628,14 @@ class MacroAssembler: public Assembler {
                                Register scratch,
                                Label* miss,
                                bool miss_on_bound_function = false);
+
+  void RetOnOverflow(Register overflow_check) {
+    Ret(lt, overflow_check, Operand(zero));
+  }
+
+  void RetOnNoOverflow(Register overflow_check) {
+    Ret(ge, overflow_check, Operand(zero));
+  }
 
   // See comments at the beginning of CEntryStub::Generate.
   inline void PrepareCEntryArgs(int num_args) {
@@ -1108,6 +1115,8 @@ class MacroAssembler: public Assembler {
   void Jr(Label* L);
 
  private:
+  static const int kSmiShift = kSmiTagSize + kSmiShiftSize;
+
   void CallCFunctionHelper(Register function,
                            int num_reg_arguments);
   void BranchShort(Label* L);

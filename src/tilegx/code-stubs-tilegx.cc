@@ -545,7 +545,7 @@ void ConvertToDoubleStub::Generate(MacroAssembler* masm) {
   // Shift up the source chopping the top bit off.
   __ Addu(zeros_, zeros_, Operand(1));
   // This wouldn't work for 1.0 or -1.0 as the shift would be 32 which means 0.
-  __ sllv(source_, source_, zeros_);
+  __ sll(source_, source_, zeros_);
   // Compute lower part of fraction (last 12 bits).
   __ sll(mantissa, source_, HeapNumber::kMantissaBitsInTopWord);
   // And the top (top 20 bits).
@@ -1949,7 +1949,6 @@ void BinaryOpStub::GenerateTypeTransitionWithSavedArgs(
 
 void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
                                           Token::Value op) {
-#if 0
   Register left = a1;
   Register right = a0;
 
@@ -1972,6 +1971,8 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // No need to revert anything - right and left are intact.
       break;
     case Token::MUL: {
+      UNREACHABLE();
+#if 0
       // Remove tag from one of the operands. This way the multiplication result
       // will be a smi if it fits the smi range.
       __ SmiUntag(scratch1, right);
@@ -2001,9 +2002,12 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ bind(&skip);
       // We fall through here if we multiplied a negative number with 0, because
       // that would mean we should produce -0.
+#endif
       }
       break;
     case Token::DIV: {
+      UNREACHABLE();
+#if 0
       Label done;
       __ SmiUntag(scratch2, right);
       __ SmiUntag(scratch1, left);
@@ -2026,9 +2030,12 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ Branch(&not_smi_result, lt, scratch2, Operand(zero));
       __ SmiTag(v0, scratch1);
       __ Ret();
+#endif
       }
       break;
     case Token::MOD: {
+      UNREACHABLE();
+#if 0
       Label done;
       __ SmiUntag(scratch2, right);
       __ SmiUntag(scratch1, left);
@@ -2049,6 +2056,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ Branch(&not_smi_result, lt, scratch1, Operand(zero));
       __ SmiTag(v0, scratch2);
       __ Ret();
+#endif
       }
       break;
     case Token::BIT_OR:
@@ -2066,7 +2074,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
     case Token::SAR:
       // Remove tags from right operand.
       __ GetLeastBitsFromSmi(scratch1, right, 5);
-      __ srav(scratch1, left, scratch1);
+      __ sra(scratch1, left, scratch1);
       // Smi tag result.
       __ And(v0, scratch1, ~kSmiTagMask);
       __ Ret();
@@ -2076,7 +2084,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // because then the 0s get shifted into bit 30 instead of bit 31.
       __ SmiUntag(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
-      __ srlv(v0, scratch1, scratch2);
+      __ srl(v0, scratch1, scratch2);
       // Unsigned shift is not allowed to produce a negative number, so
       // check the sign bit and the sign bit after Smi tagging.
       __ And(scratch1, v0, Operand(0xc0000000));
@@ -2089,7 +2097,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // Remove tags from operands.
       __ SmiUntag(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
-      __ sllv(scratch1, scratch1, scratch2);
+      __ sll(scratch1, scratch1, scratch2);
       // Check that the signed result fits in a Smi.
       __ Addu(scratch2, scratch1, Operand(0x40000000));
       __ Branch(&not_smi_result, lt, scratch2, Operand(zero));
@@ -2100,10 +2108,6 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       UNREACHABLE();
   }
   __ bind(&not_smi_result);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2278,12 +2282,12 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
         case Token::SAR:
           // Use only the 5 least significant bits of the shift count.
           __ GetLeastBitsFromInt32(a2, a2, 5);
-          __ srav(a2, a3, a2);
+          __ sra(a2, a3, a2);
           break;
         case Token::SHR:
           // Use only the 5 least significant bits of the shift count.
           __ GetLeastBitsFromInt32(a2, a2, 5);
-          __ srlv(a2, a3, a2);
+          __ srl(a2, a3, a2);
           // SHR is special because it is required to produce a positive answer.
           // The code below for writing into heap numbers isn't capable of
           // writing the register as an unsigned int so we go to slow case if we
@@ -2293,7 +2297,7 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
         case Token::SHL:
           // Use only the 5 least significant bits of the shift count.
           __ GetLeastBitsFromInt32(a2, a2, 5);
-          __ sllv(a2, a3, a2);
+          __ sll(a2, a3, a2);
           break;
         default:
           UNREACHABLE();
@@ -2358,7 +2362,6 @@ void BinaryOpStub_GenerateSmiCode(
     Token::Value op,
     BinaryOpStub::SmiCodeGenerateHeapNumberResults allow_heapnumber_results,
     OverwriteMode mode) {
-#if 0
   Label not_smis;
 
   Register left = a1;
@@ -2381,15 +2384,10 @@ void BinaryOpStub_GenerateSmiCode(
         use_runtime, gc_required, &not_smis, op, mode);
   }
   __ bind(&not_smis);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BinaryOpStub::GenerateSmiStub(MacroAssembler* masm) {
-#if 0
   Label not_smis, call_runtime;
 
   if (result_type_ == BinaryOpIC::UNINITIALIZED ||
@@ -2416,15 +2414,10 @@ void BinaryOpStub::GenerateSmiStub(MacroAssembler* masm) {
     GenerateCallRuntime(masm);
   }
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BinaryOpStub::GenerateBothStringStub(MacroAssembler* masm) {
-#if 0
   Label call_runtime;
   ASSERT(left_type_ == BinaryOpIC::STRING && right_type_ == BinaryOpIC::STRING);
   ASSERT(op_ == Token::ADD);
@@ -2452,10 +2445,6 @@ void BinaryOpStub::GenerateBothStringStub(MacroAssembler* masm) {
 
   __ bind(&call_runtime);
   GenerateTypeTransition(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2697,11 +2686,11 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
           break;
         case Token::SAR:
           __ And(a2, a2, Operand(0x1f));
-          __ srav(a2, a3, a2);
+          __ sra(a2, a3, a2);
           break;
         case Token::SHR:
           __ And(a2, a2, Operand(0x1f));
-          __ srlv(a2, a3, a2);
+          __ srl(a2, a3, a2);
           // SHR is special because it is required to produce a positive answer.
           // We only get a negative result if the shift value (a2) is 0.
           // This result cannot be respresented as a signed 32-bit integer, try
@@ -2715,7 +2704,7 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
           break;
         case Token::SHL:
           __ And(a2, a2, Operand(0x1f));
-          __ sllv(a2, a3, a2);
+          __ sll(a2, a3, a2);
           break;
         default:
           UNREACHABLE();
@@ -2924,7 +2913,6 @@ void BinaryOpStub_GenerateHeapResultAllocation(MacroAssembler* masm,
                                                Register scratch2,
                                                Label* gc_required,
                                                OverwriteMode mode) {
-#if 0
   // Code below will scratch result if allocation fails. To keep both arguments
   // intact for the runtime call result cannot be one of these.
   ASSERT(!result.is(a0) && !result.is(a1));
@@ -2948,20 +2936,10 @@ void BinaryOpStub_GenerateHeapResultAllocation(MacroAssembler* masm,
     __ AllocateHeapNumber(
         result, scratch1, scratch2, heap_number_map, gc_required);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
-
 void BinaryOpStub::GenerateRegisterArgsPush(MacroAssembler* masm) {
-#if 0
   __ Push(a1, a0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -3549,6 +3527,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
     // Stack space reservation moved to the branch delay slot below.
     // Stack is still aligned.
 
+    masm->addi(sp, sp, -16);
     // Call the C routine.
     masm->jalr(s2);
   }
@@ -3566,6 +3545,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
   STATIC_ASSERT(((kFailureTag + 1) & kFailureTagMask) == 0);
   __ addi(r2, r0, 1);
   __ andi(t0, r2, kFailureTagMask);
+  __ addi(sp, sp, 16);
   __ Branch(&failure_returned, eq, t0, Operand(zero));
 
 
@@ -6616,6 +6596,7 @@ void ICCompareStub::GenerateNumbers(MacroAssembler* masm) {
     __ JumpIfNotSmi(a0, &miss);
   }
 
+  __ bpt();
   //FIXME:
 #if 0
   // Inlining the double comparison and falling back to the general compare
@@ -6940,8 +6921,8 @@ void ICCompareStub::GenerateMiss(MacroAssembler* masm) {
     __ Push(a1, a0);
     __ li(t0, Operand(Smi::FromInt(op_)));
     __ addli(sp, sp, -kPointerSize);
+    __ st(t0, MemOperand(sp));
     __ CallExternalReference(miss, 3);
-    __ st(t0, MemOperand(sp));  // In the delay slot.
     // Compute the entry point of the rewritten stub.
     __ Addu(a2, v0, Operand(Code::kHeaderSize - kHeapObjectTag));
     // Restore registers.

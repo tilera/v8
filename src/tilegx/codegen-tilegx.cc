@@ -609,7 +609,7 @@ static byte* GetNoCodeAgeSequence(uint32_t* length) {
   // The sequence of instructions that is patched out for aging code is the
   // following boilerplate stack-building prologue that is found in FUNCTIONS
   static bool initialized = false;
-  static uint32_t sequence[kNoCodeAgeSequenceLength];
+  static uint64_t sequence[kNoCodeAgeSequenceLength];
   byte* byte_sequence = reinterpret_cast<byte*>(sequence);
   *length = kNoCodeAgeSequenceLength * Assembler::kInstrSize;
   if (!initialized) {
@@ -627,7 +627,7 @@ bool Code::IsYoungSequence(byte* sequence) {
   byte* young_sequence = GetNoCodeAgeSequence(&young_length);
   bool result = !memcmp(sequence, young_sequence, young_length);
   ASSERT(result ||
-         Memory::uint32_at(sequence) == kCodeAgePatchFirstInstruction);
+         Memory::uint64_at(sequence) == kCodeAgePatchFirstInstruction);
   return result;
 }
 

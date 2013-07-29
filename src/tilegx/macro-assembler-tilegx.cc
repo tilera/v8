@@ -4155,14 +4155,27 @@ CodePatcher::~CodePatcher() {
 }
 
 
-void CodePatcher::Emit(Instr instr) { UNREACHABLE(); }
+void CodePatcher::Emit(Instr instr) {
+  masm()->emit(instr);
+}
 
+void CodePatcher::Emit(Address addr) {
+  masm()->emit(reinterpret_cast<Instr>(addr));
+}
 
-void CodePatcher::Emit(Address addr) { UNREACHABLE(); }
-
-
-void CodePatcher::ChangeBranchCondition(Condition cond) { UNREACHABLE(); }
-
+void CodePatcher::ChangeBranchCondition(Condition cond) {
+  Instr instr = Assembler::instr_at(masm_.pc_);
+  ASSERT(Assembler::IsBranch(instr));
+  // Currently only the 'eq' and 'ne' cond values are supported and the simple
+  // branch instructions (with opcode being the branch type).
+  // There are some special cases (see Assembler::IsBranch()) so extending this
+  // would be tricky.
+  ASSERT(Assembler::IsBnez(instr) || Assembler::IsBeqz(instr));
+  instr = (instr & ~create_BrType_X1(-1)) | ((cond == eq) ?
+                                             create_BrType_X1(BEQZ_BRANCH_OPCODE_X1)
+                                             : create_BrType_X1(BNEZ_BRANCH_OPCODE_X1));
+  masm_.emit(instr);
+}
 
 } }  // namespace v8::internal
 

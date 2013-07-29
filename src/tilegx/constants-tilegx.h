@@ -131,6 +131,8 @@ inline Condition ReverseCondition(Condition cc) {
 // TileGX has 64bit width instruction encoding.
 typedef int64_t Instr;
 
+const int kArgByRegNum = 10;
+const int kStackLowReserve = 2 * kPointerSize;
 const int kNumRegisters = 64;
 const int kInvalidRegister = -1;
 

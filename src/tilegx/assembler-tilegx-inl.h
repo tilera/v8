@@ -224,7 +224,7 @@ JSGlobalPropertyCell* RelocInfo::target_cell() {
   return JSGlobalPropertyCell::FromValueAddress(Memory::Address_at(pc_));
 }
 
-static const int kNoCodeAgeSequenceLength = 7;
+static const int kNoCodeAgeSequenceLength = 11;
 
 Code* RelocInfo::code_age_stub() {
   ASSERT(rmode_ == RelocInfo::CODE_AGE_SEQUENCE);
