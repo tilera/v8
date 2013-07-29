@@ -245,7 +245,7 @@ bool LCodeGen::GeneratePrologue() {
         __ st(a0, target);
         // Update the write barrier. This clobbers a3 and a0.
         __ RecordWriteContextSlot(
-            cp, target.offset(), a0, a3, GetRAState(), kSaveFPRegs);
+            cp, target.offset(), a0, a3, GetRAState(), kDontSaveFPRegs);
       }
     }
     Comment(";;; End allocate local context");
@@ -2067,7 +2067,7 @@ void LCodeGen::DoStoreContextSlot(LStoreContextSlot* instr) {
                               value,
                               scratch0(),
                               GetRAState(),
-                              kSaveFPRegs,
+                              kDontSaveFPRegs,
                               EMIT_REMEMBERED_SET,
                               check_needed);
   }
@@ -2318,6 +2318,7 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
         break;
       case EXTERNAL_PIXEL_ELEMENTS:
       case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
+        __ info(__LINE__);
         __ ld1u(result, mem_operand);
         break;
       case EXTERNAL_SHORT_ELEMENTS:
@@ -2730,7 +2731,7 @@ void LCodeGen::DoStoreNamedField(LStoreNamedField* instr) {
                           scratch,
                           temp,
                           GetRAState(),
-                          kSaveFPRegs,
+                          kDontSaveFPRegs,
                           OMIT_REMEMBERED_SET,
                           OMIT_SMI_CHECK);
     }
@@ -2751,7 +2752,7 @@ void LCodeGen::DoStoreNamedField(LStoreNamedField* instr) {
                           value,
                           scratch,
                           GetRAState(),
-                          kSaveFPRegs,
+                          kDontSaveFPRegs,
                           EMIT_REMEMBERED_SET,
                           check_needed);
     }
@@ -2766,7 +2767,7 @@ void LCodeGen::DoStoreNamedField(LStoreNamedField* instr) {
                           value,
                           object,
                           GetRAState(),
-                          kSaveFPRegs,
+                          kDontSaveFPRegs,
                           EMIT_REMEMBERED_SET,
                           check_needed);
     }
@@ -2983,7 +2984,7 @@ void LCodeGen::DoStoreKeyedFixedArray(LStoreKeyed* instr) {
                    key,
                    value,
                    GetRAState(),
-                   kSaveFPRegs,
+                   kDontSaveFPRegs,
                    EMIT_REMEMBERED_SET,
                    check_needed);
   }
@@ -3494,6 +3495,7 @@ Condition LCodeGen::EmitTypeofIs(Label* true_label,
     __ GetObjectType(input, input, scratch);
     // input is an object so we can load the BitFieldOffset even if we take the
     // other branch.
+    __ info(__LINE__);
     __ ld1u(at, FieldMemOperand(input, Map::kBitFieldOffset));
     __ Branch(false_label, ge, scratch, Operand(FIRST_NONSTRING_TYPE));
     __ And(at, at, 1 << Map::kIsUndetectable);

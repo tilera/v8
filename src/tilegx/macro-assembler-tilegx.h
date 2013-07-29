@@ -197,7 +197,7 @@ class MacroAssembler: public Assembler {
   // Jump the register contains a smi.
   void JumpIfSmi(Register value,
                  Label* smi_label,
-                 Register scratch = r0);
+                 Register scratch = at);
 
   // Jump if the register contains a non-smi.
   void JumpIfNotSmi(Register value,
