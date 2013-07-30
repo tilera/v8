@@ -152,7 +152,6 @@ void FullCodeGenerator::Generate() {
   }
 #endif
 
-  __ info(__LINE__);
   // Strict mode functions and builtins need to replace the receiver
   // with undefined when called as functions (without an explicit
   // receiver object). t1 is zero for method calls and non-zero for
@@ -1197,7 +1196,8 @@ void FullCodeGenerator::VisitForInStatement(ForInStatement* stmt) {
   // Get the current entry of the array into register a3.
   __ ld(a2, MemOperand(sp, 2 * kPointerSize));
   __ Addu(a2, a2, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ sll(t0, a0, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t0, a0, kSmiTagSize + kSmiShiftSize);
+  __ sll(t0, t0, kPointerSizeLog2);
   __ add(t0, a2, t0);  // Array base + scaled (smi) index.
   __ ld(a3, MemOperand(t0));  // Current entry.
 
@@ -3004,7 +3004,8 @@ void FullCodeGenerator::EmitIsStringWrapperSafeForDefaultValueOf(
   __ Addu(t0, t0, Operand(DescriptorArray::kFirstOffset - kHeapObjectTag));
   // Calculate the end of the descriptor array.
   __ move(a2, t0);
-  __ sll(t1, a3, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t1, a3, kSmiTagSize + kSmiShiftSize);
+  __ sll(t1, t1, kPointerSizeLog2);
   __ Addu(a2, a2, t1);
 
   // Loop through all the keys in the descriptor array. If one of these is the
@@ -3809,7 +3810,8 @@ void FullCodeGenerator::EmitGetFromCache(CallRuntime* expr) {
   // a2 now holds finger offset as a smi.
   __ Addu(a3, cache, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
   // a3 now points to the start of fixed array elements.
-  __ sll(at, a2, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(at, a2, kSmiTagSize + kSmiShiftSize);
+  __ sll(at, at, kPointerSizeLog2);
   __ add(a3, a3, at);
   // a3 now points to key of indexed element of cache.
   __ ld(a2, MemOperand(a3));

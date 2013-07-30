@@ -2407,7 +2407,8 @@ void LCodeGen::DoLoadKeyedFixedArray(LLoadKeyed* instr) {
     // during bound check elimination with the index argument to the bounds
     // check, which can be tagged, so that case must be handled here, too.
     if (instr->hydrogen()->key()->representation().IsSmi()) {
-      __ sll(scratch, key, kPointerSizeLog2 - kSmiTagSize);
+      __ srl(scratch, key, kSmiTagSize + kSmiShiftSize);
+      __ sll(scratch, scratch, kPointerSizeLog2);
       __ add(scratch, elements, scratch);
     } else {
       __ sll(scratch, key, kPointerSizeLog2);
@@ -2415,6 +2416,7 @@ void LCodeGen::DoLoadKeyedFixedArray(LLoadKeyed* instr) {
     }
     offset = FixedArray::OffsetOfElementAt(instr->additional_index());
   }
+  __ info(__LINE__);
   __ ld(result, FieldMemOperand(store_base, offset));
 
   // Check for the hole value.
@@ -2964,7 +2966,8 @@ void LCodeGen::DoStoreKeyedFixedArray(LStoreKeyed* instr) {
     // during bound check elimination with the index argument to the bounds
     // check, which can be tagged, so that case must be handled here, too.
     if (instr->hydrogen()->key()->representation().IsSmi()) {
-      __ sll(scratch, key, kPointerSizeLog2 - kSmiTagSize);
+      __ srl(scratch, key, kSmiTagSize + kSmiShiftSize);
+      __ sll(scratch, scratch, kPointerSizeLog2);
       __ add(scratch, elements, scratch);
     } else {
       __ sll(scratch, key, kPointerSizeLog2);
@@ -3694,7 +3697,8 @@ void LCodeGen::DoLoadFieldByIndex(LLoadFieldByIndex* instr) {
   Register scratch = scratch0();
 
   Label out_of_object, done;
-  __ sll(scratch, index, kPointerSizeLog2 - kSmiTagSize);  // In delay slot.
+  __ srl(scratch, index, kSmiTagSize + kSmiShiftSize);  // In delay slot.
+  __ sll(scratch, scratch, kPointerSizeLog2);  // In delay slot.
   __ Branch(&out_of_object, lt, index, Operand(zero));
 
   STATIC_ASSERT(kPointerSizeLog2 > kSmiTagSize);

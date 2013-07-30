@@ -293,7 +293,8 @@ static void GenerateFastArrayLoad(MacroAssembler* masm,
           Operand(FixedArray::kHeaderSize - kHeapObjectTag));
   // The key is a smi.
   STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-  __ sll(at, key, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(at, key, kSmiTagSize + kSmiShiftSize);
+  __ sll(at, at, kPointerSizeLog2);
   __ add(at, at, scratch1);
   __ ld(scratch2, MemOperand(at));
 
@@ -563,7 +564,7 @@ void KeyedCallIC::GenerateMegamorphic(MacroAssembler* masm, int argc) {
   // Check whether the elements is a number dictionary.
   __ LoadRoot(at, Heap::kHashTableMapRootIndex);
   __ Branch(&slow_load, ne, a3, Operand(at));
-  __ sra(a0, a2, kSmiTagSize);
+  __ sra(a0, a2, kSmiTagSize + kSmiShiftSize);
   // a0: untagged index
   __ LoadFromNumberDictionary(&slow_load, t0, a2, a1, a0, a3, t1);
   __ IncrementCounter(counters->keyed_call_generic_smi_dict(), 1, a0, a3);
@@ -960,7 +961,7 @@ void KeyedLoadIC::GenerateGeneric(MacroAssembler* masm) {
   // t0: elements
   __ LoadRoot(at, Heap::kHashTableMapRootIndex);
   __ Branch(&slow, ne, a3, Operand(at));
-  __ sra(a2, a0, kSmiTagSize);
+  __ sra(a2, a0, kSmiTagSize + kSmiShiftSize);
   __ LoadFromNumberDictionary(&slow, t0, a0, v0, a2, a3, t1);
   __ Ret();
 
@@ -1184,7 +1185,8 @@ static void KeyedStoreGenerateGenericHelper(
   }
   // It's irrelevant whether array is smi-only or not when writing a smi.
   __ Addu(address, elements, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ sll(scratch_value, key, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(scratch_value, key, kSmiTagSize + kSmiShiftSize);
+  __ sll(scratch_value, scratch_value, kPointerSizeLog2);
   __ Addu(address, address, scratch_value);
   __ st(value, MemOperand(address));
   __ Ret();
@@ -1202,7 +1204,8 @@ static void KeyedStoreGenerateGenericHelper(
     __ st(scratch_value, FieldMemOperand(receiver, JSArray::kLengthOffset));
   }
   __ Addu(address, elements, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ sll(scratch_value, key, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(scratch_value, key, kSmiTagSize + kSmiShiftSize);
+  __ sll(scratch_value, scratch_value, kPointerSizeLog2);
   __ Addu(address, address, scratch_value);
   __ st(value, MemOperand(address));
   // Update write barrier for the elements array address.

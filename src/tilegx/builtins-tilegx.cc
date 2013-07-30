@@ -144,7 +144,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     FrameScope scope(masm, StackFrame::CONSTRUCT);
 
     // Preserve the two incoming parameters on the stack.
-    __ sll(a0, a0, kSmiTagSize);  // Tag arguments count.
+    __ sll(a0, a0, kSmiTagSize + kSmiShiftSize);  // Tag arguments count.
     __ MultiPushReversed(a0.bit() | a1.bit());
 
     // Use t7 to hold undefined, which is used in several places below.
@@ -297,7 +297,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
       __ LoadRoot(t6, Heap::kFixedArrayMapRootIndex);
       __ move(a2, t5);
       __ st(t6, MemOperand(a2, JSObject::kMapOffset));
-      __ sll(a0, a3, kSmiTagSize);
+      __ sll(a0, a3, kSmiTagSize + kSmiShiftSize);
       __ st(a0, MemOperand(a2, FixedArray::kLengthOffset));
       __ Addu(a2, a2, Operand(2 * kPointerSize));
 
@@ -374,7 +374,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     __ Addu(a2, fp, Operand(StandardFrameConstants::kCallerSPOffset));
 
     // Set up number of arguments for function call below.
-    __ srl(a0, a3, kSmiTagSize);
+    __ srl(a0, a3, kSmiTagSize + kSmiShiftSize);
 
     // Copy arguments and receiver to the expression stack.
     // a0: number of arguments
@@ -388,7 +388,8 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     Label loop, entry;
     __ jmp(&entry);
     __ bind(&loop);
-    __ sll(t0, a3, kPointerSizeLog2 - kSmiTagSize);
+    __ srl(t0, a3, kSmiTagSize + kSmiShiftSize);
+    __ sll(t0, t0, kPointerSizeLog2);
     __ Addu(t0, a2, Operand(t0));
     __ ld(t1, MemOperand(t0));
     __ push(t1);
@@ -454,7 +455,8 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     // Leave construct frame.
   }
 
-  __ sll(t0, a1, kPointerSizeLog2 - 1);
+  __ srl(t0, a1, kSmiTagSize + kSmiShiftSize);
+  __ sll(t0, t0, kPointerSizeLog2);
   __ Addu(sp, sp, t0);
   __ Addu(sp, sp, kPointerSize);
   __ IncrementCounter(isolate->counters()->constructed_objects(), 1, a1, a2);
@@ -515,7 +517,7 @@ void Builtins::Generate_InstallRecompiledCode(MacroAssembler* masm) {
 }
 
 static void EnterArgumentsAdaptorFrame(MacroAssembler* masm) {
-  __ sll(a0, a0, kSmiTagSize);
+  __ sll(a0, a0, kSmiTagSize + kSmiShiftSize);
   __ li(t0, Operand(Smi::FromInt(StackFrame::ARGUMENTS_ADAPTOR)));
   __ MultiPush(a0.bit() | a1.bit() | t0.bit() | fp.bit() | lr.bit());
   __ Addu(fp, sp, Operand(3 * kPointerSize));
@@ -530,7 +532,8 @@ static void LeaveArgumentsAdaptorFrame(MacroAssembler* masm) {
   __ ld(a1, MemOperand(fp, -3 * kPointerSize));
   __ move(sp, fp);
   __ MultiPop(fp.bit() | lr.bit());
-  __ sll(t0, a1, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t0, a1, kSmiTagSize + kSmiShiftSize);
+  __ sll(t0, t0, kPointerSizeLog2);
   __ Addu(sp, sp, t0);
   // Adjust for the receiver.
   __ Addu(sp, sp, Operand(kPointerSize));
@@ -563,7 +566,8 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     EnterArgumentsAdaptorFrame(masm);
 
     // Calculate copy start address into a0 and copy end address into a2.
-    __ sll(a0, a0, kPointerSizeLog2 - kSmiTagSize);
+    __ srl(a0, a0, kSmiTagSize + kSmiShiftSize);
+    __ sll(a0, a0, kPointerSizeLog2);
     __ Addu(a0, fp, a0);
     // Adjust for return address and receiver.
     __ Addu(a0, a0, Operand(2 * kPointerSize));
@@ -596,7 +600,8 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     // a1: function
     // a2: expected number of arguments
     // a3: code entry to call
-    __ sll(a0, a0, kPointerSizeLog2 - kSmiTagSize);
+    __ srl(a0, a0, kSmiTagSize + kSmiShiftSize);
+    __ sll(a0, a0, kPointerSizeLog2);
     __ Addu(a0, fp, a0);
     // Adjust for return address and receiver.
     __ Addu(a0, a0, Operand(2 * kPointerSize));
@@ -956,7 +961,7 @@ void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
     // Enter an internal frame in order to preserve argument count.
     {
       FrameScope scope(masm, StackFrame::INTERNAL);
-      __ sll(a0, a0, kSmiTagSize);  // Smi tagged.
+      __ sll(a0, a0, kSmiTagSize + kSmiShiftSize);  // Smi tagged.
       __ push(a0);
 
       __ push(a2);
@@ -964,7 +969,7 @@ void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
       __ move(a2, r0);
 
       __ pop(a0);
-      __ sra(a0, a0, kSmiTagSize);  // Un-tag.
+      __ sra(a0, a0, kSmiTagSize + kSmiShiftSize);  // Un-tag.
       // Leave internal frame.
     }
     // Restore the function to a1, and the flag to t0.
@@ -1067,7 +1072,7 @@ void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
   __ ld(a3, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
   __ ld(a2,
          FieldMemOperand(a3, SharedFunctionInfo::kFormalParameterCountOffset));
-  __ sra(a2, a2, kSmiTagSize);
+  __ sra(a2, a2, kSmiTagSize + kSmiShiftSize);
   __ ld(a3, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
   __ SetCallKind(t1, CALL_AS_METHOD);
   // Check formal and actual parameter counts.
@@ -1105,7 +1110,8 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
     // here which will cause a2 to become negative.
     __ sub(a2, sp, a2);
     // Check if the arguments will overflow the stack.
-    __ sll(t3, r0, kPointerSizeLog2 - kSmiTagSize);
+    __ srl(t3, r0, kSmiTagSize + kSmiShiftSize);
+    __ sll(t3, t3, kPointerSizeLog2);
     __ Branch(&okay, gt, a2, Operand(t3));  // Signed comparison.
 
     // Out of stack space.
@@ -1213,7 +1219,7 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
     // Invoke the function.
     Label call_proxy;
     ParameterCount actual(a0);
-    __ sra(a0, a0, kSmiTagSize);
+    __ sra(a0, a0, kSmiTagSize + kSmiShiftSize);
     __ ld(a1, MemOperand(fp, kFunctionOffset));
     __ GetObjectType(a1, a2, a2);
     __ Branch(&call_proxy, ne, a2, Operand(JS_FUNCTION_TYPE));
@@ -1388,7 +1394,7 @@ static void AllocateJSArray(MacroAssembler* masm,
   STATIC_ASSERT(kSmiTagSize == 1 && kSmiTag == 0);
   __ li(elements_array_end,
         (JSArray::kSize + FixedArray::kHeaderSize) / kPointerSize);
-  __ sra(scratch1, array_size, kSmiTagSize);
+  __ sra(scratch1, array_size, kSmiTagSize + kSmiShiftSize);
   __ Addu(elements_array_end, elements_array_end, scratch1);
   __ Allocate(elements_array_end,
               result,
@@ -1445,7 +1451,8 @@ static void AllocateJSArray(MacroAssembler* masm,
   // elements_array_storage: elements array element storage
   // array_size: smi-tagged size of elements array
   STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-  __ sll(elements_array_end, array_size, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(elements_array_end, array_size, kSmiTagSize + kSmiShiftSize);
+  __ sll(elements_array_end, elements_array_end, kPointerSizeLog2);
   __ Addu(elements_array_end, elements_array_storage, elements_array_end);
 
   // Fill the allocated FixedArray with the hole value if requested.

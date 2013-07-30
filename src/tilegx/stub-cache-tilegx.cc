@@ -3474,7 +3474,7 @@ void KeyedLoadStubCompiler::GenerateLoadDictionaryElement(
 
   __ JumpIfNotSmi(key, &miss_force_generic);
   __ ld(t0, FieldMemOperand(receiver, JSObject::kElementsOffset));
-  __ sra(a2, a0, kSmiTagSize);
+  __ sra(a2, a0, kSmiTagSize + kSmiShiftSize);
   __ LoadFromNumberDictionary(&slow, t0, a0, v0, a2, a3, t1);
   __ Ret();
 
