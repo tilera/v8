@@ -1546,7 +1546,7 @@ void ArrayNativeCode(MacroAssembler* masm, Label* call_generic_code) {
 
   // Handle construction of an array from a list of arguments.
   __ bind(&argc_two_or_more);
-  __ sll(a2, a0, kSmiTagSize);  // Convert argc to a smi.
+  __ sll(a2, a0, kSmiTagSize + kSmiShiftSize);  // Convert argc to a smi.
 
   // a0: argc
   // a1: constructor
