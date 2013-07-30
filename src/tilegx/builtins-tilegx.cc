@@ -386,15 +386,15 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     // sp[2]: constructor function
     // sp[3]: number of arguments (smi-tagged)
     Label loop, entry;
+    __ srl(a3, a3, kSmiTagSize + kSmiShiftSize);
     __ jmp(&entry);
     __ bind(&loop);
-    __ srl(t0, a3, kSmiTagSize + kSmiShiftSize);
-    __ sll(t0, t0, kPointerSizeLog2);
+    __ sll(t0, a3, kPointerSizeLog2);
     __ Addu(t0, a2, Operand(t0));
     __ ld(t1, MemOperand(t0));
     __ push(t1);
     __ bind(&entry);
-    __ Addu(a3, a3, Operand(-2));
+    __ Addu(a3, a3, Operand(-1));
     __ Branch(&loop, greater_equal, a3, Operand(zero));
 
     // Call the function.
