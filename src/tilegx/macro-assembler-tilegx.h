@@ -319,7 +319,7 @@ class MacroAssembler: public Assembler {
   // Smi utilities.
 
   void SmiTag(Register reg) {
-    Addu(reg, reg, reg);
+    sll(reg, reg, kSmiTagSize + kSmiShiftSize);
   }
 
   // Test for overflow < 0: use BranchOnOverflow() or BranchOnNoOverflow().
@@ -327,7 +327,7 @@ class MacroAssembler: public Assembler {
   void SmiTagCheckOverflow(Register dst, Register src, Register overflow);
 
   void SmiTag(Register dst, Register src) {
-    Addu(dst, src, src);
+    sll(dst, src, kSmiTagSize + kSmiShiftSize);
   }
 
   void SmiUntag(Register reg) {
