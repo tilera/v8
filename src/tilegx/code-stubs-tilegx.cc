@@ -6937,7 +6937,7 @@ void ICCompareStub::GenerateMiss(MacroAssembler* masm) {
     __ push(ra);
     __ Push(a1, a0);
     __ li(t0, Operand(Smi::FromInt(op_)));
-    __ addli(sp, sp, -kPointerSize);
+    __ addi(sp, sp, -kPointerSize);
     __ st(t0, MemOperand(sp));
     __ CallExternalReference(miss, 3);
     // Compute the entry point of the rewritten stub.
