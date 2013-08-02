@@ -581,12 +581,19 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     // a2: copy end address
     // a3: code entry to call
 
-    Label copy;
-    __ bind(&copy);
+    // Copy the receiver.
     __ ld(t0, MemOperand(a0));
     __ push(t0);
-    __ addi(a0, a0, -kPointerSize);  // In delay slot.
+
+    // Copy arguments.
+    Label copy, finish;
+    __ Branch(&finish, eq, a0, Operand(a2));
+    __ bind(&copy);
+    __ addi(a0, a0, -kPointerSize);
+    __ ld(t0, MemOperand(a0));
+    __ push(t0);
     __ Branch(&copy, ne, a0, Operand(a2));
+    __ bind(&finish);
 
     __ jmp(&invoke);
   }
