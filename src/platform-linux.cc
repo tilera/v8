@@ -310,7 +310,8 @@ int OS::ActivationFrameAlignment() {
 
 void OS::ReleaseStore(volatile AtomicWord* ptr, AtomicWord value) {
 #if (defined(V8_TARGET_ARCH_ARM) && defined(__arm__)) || \
-    (defined(V8_TARGET_ARCH_MIPS) && defined(__mips__))
+    (defined(V8_TARGET_ARCH_MIPS) && defined(__mips__)) || \
+    (defined(V8_TARGET_ARCH_TILEGX))
   // Only use on ARM or MIPS hardware.
   MemoryBarrier();
 #else

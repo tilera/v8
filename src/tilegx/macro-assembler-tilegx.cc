@@ -3700,7 +3700,7 @@ void MacroAssembler::CheckPageFlag(
     Condition cc,
     Label* condition_met) {
   And(scratch, object, Operand(~Page::kPageAlignmentMask));
-  ld(scratch, MemOperand(scratch, MemoryChunk::kFlagsOffset));
+  ld4s(scratch, MemOperand(scratch, MemoryChunk::kFlagsOffset));
   And(scratch, scratch, Operand(mask));
   Branch(condition_met, cc, scratch, Operand(zero));
 }

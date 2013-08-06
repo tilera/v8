@@ -1007,7 +1007,7 @@ void Deserializer::ReadChunk(Object** current,
       // allocation point and write a pointer to it to the current object.
       ALL_SPACES(kBackref, kPlain, kStartOfObject)
       ALL_SPACES(kBackrefWithSkip, kPlain, kStartOfObject)
-#if V8_TARGET_ARCH_MIPS
+#if defined(V8_TARGET_ARCH_MIPS) || defined(V8_TARGET_ARCH_TILEGX)
       // Deserialize a new object from pointer found in code and write
       // a pointer to it to the current object. Required only for MIPS, and
       // omitted on the other architectures because it is fully unrolled and

@@ -96,7 +96,7 @@ static void ProbeTable(Isolate* isolate,
   // Check that the flags match what we're looking for.
   Register flags_reg = base_addr;
   base_addr = no_reg;
-  __ ld(flags_reg, FieldMemOperand(code, Code::kFlagsOffset));
+  __ ld4s(flags_reg, FieldMemOperand(code, Code::kFlagsOffset));
   __ And(flags_reg, flags_reg, Operand(~Code::kFlagsNotUsedInLookup));
   __ Branch(&miss, ne, flags_reg, Operand(flags));
 

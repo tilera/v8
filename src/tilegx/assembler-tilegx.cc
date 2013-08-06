@@ -1132,13 +1132,13 @@ void Assembler::bltz(const Register& rs, int32_t offset, int line) {
 
 void Assembler::bfins(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
-  Instr instr = BFINS_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFSTART_X0(offset2);
+  Instr instr = BFINS_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFEND_X0(offset2);
   emit(instr, line);
 }
 
 void Assembler::bfextu(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
-  Instr instr = BFEXTU_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFSTART_X0(offset2);
+  Instr instr = BFEXTU_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFEND_X0(offset2);
   emit(instr, line);
 }
 
