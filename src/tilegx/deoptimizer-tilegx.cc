@@ -485,7 +485,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   // Leave gaps for other registers.
   __ Subu(sp, sp, kNumberOfRegisters * kPointerSize);
   for (int16_t i = kNumberOfRegisters - 1; i >= 0; i--) {
-    if ((saved_regs & (1 << i)) != 0) {
+    if ((saved_regs & (1L << i)) != 0) {
       __ st(ToRegister(i), MemOperand(sp, kPointerSize * i));
     }
   }
@@ -542,7 +542,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   ASSERT(Register::kNumRegisters == kNumberOfRegisters);
   for (int i = 0; i < kNumberOfRegisters; i++) {
     int offset = (i * kPointerSize) + FrameDescription::registers_offset();
-    if ((saved_regs & (1 << i)) != 0) {
+    if ((saved_regs & (1L << i)) != 0) {
       __ ld(a2, MemOperand(sp, i * kPointerSize));
       __ st(a2, MemOperand(a1, offset));
     } else if (FLAG_debug_code) {
@@ -660,7 +660,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ move(at, a2);
   for (int i = kNumberOfRegisters - 1; i >= 0; i--) {
     int offset = (i * kPointerSize) + FrameDescription::registers_offset();
-    if ((restored_regs & (1 << i)) != 0) {
+    if ((restored_regs & (1L << i)) != 0) {
       __ ld(ToRegister(i), MemOperand(at, offset));
     }
   }
@@ -701,8 +701,8 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
     __ Addu(t9, t9, remaining_entries);
     // 'at' was clobbered so we can only load the current entry value here.
     __ li(at, i);
-    __ jr(t9);  // Expose delay slot.
-    __ st(at, MemOperand(sp, 0 * kPointerSize));  // In the delay slot.
+    __ st(at, MemOperand(sp, 0 * kPointerSize));
+    __ jr(t9);
 
     // Pad the rest of the code.
     while (table_entry_size_ > (masm()->SizeOfCodeGeneratedSince(&start))) {

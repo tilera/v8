@@ -169,7 +169,7 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
       for (int i = 0; i < kNumJSCallerSaved; i++) {
         int r = JSCallerSavedCode(i);
         Register reg = { r };
-        if ((non_object_regs & (1 << r)) != 0) {
+        if ((non_object_regs & (1L << r)) != 0) {
           if (FLAG_debug_code) {
             __ And(at, reg, 0xc0000000);
             __ Assert(
@@ -196,11 +196,11 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
       for (int i = 0; i < kNumJSCallerSaved; i++) {
         int r = JSCallerSavedCode(i);
         Register reg = { r };
-        if ((non_object_regs & (1 << r)) != 0) {
+        if ((non_object_regs & (1L << r)) != 0) {
           __ srl(reg, reg, kSmiTagSize);
         }
         if (FLAG_debug_code &&
-            (((object_regs |non_object_regs) & (1 << r)) == 0)) {
+            (((object_regs |non_object_regs) & (1L << r)) == 0)) {
           __ li(reg, kDebugZapValue);
         }
       }
