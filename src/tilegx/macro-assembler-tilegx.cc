@@ -3636,8 +3636,10 @@ void MacroAssembler::PrepareCallCFunction(int num_reg_arguments,
     ASSERT(IsPowerOf2(frame_alignment));
     And(sp, sp, Operand(-frame_alignment));
     st(scratch, MemOperand(sp, stack_passed_arguments * kPointerSize));
+    // TileGX special stack reserve area on the bottom of stack.
+    addi(sp, sp, -16);
   } else {
-    Subu(sp, sp, Operand(stack_passed_arguments * kPointerSize));
+    Subu(sp, sp, Operand((stack_passed_arguments + 2 ) * kPointerSize));
   }
 }
 
@@ -3684,9 +3686,11 @@ void MacroAssembler::CallCFunctionHelper(Register function,
   int stack_passed_arguments = CalculateStackPassedWords(num_reg_arguments);
 
   if (OS::ActivationFrameAlignment() > kPointerSize) {
+    // Restore TileGX special stack zone first.
+    Addu(sp, sp, 16);
     ld(sp, MemOperand(sp, stack_passed_arguments * kPointerSize));
   } else {
-    Addu(sp, sp, Operand(stack_passed_arguments * sizeof(kPointerSize)));
+    Addu(sp, sp, Operand((stack_passed_arguments + 2) * kPointerSize));
   }
 }
 

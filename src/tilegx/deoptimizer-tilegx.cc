@@ -391,7 +391,6 @@ void Deoptimizer::DoComputeOsrOutputFrame() {
 
 
 void Deoptimizer::FillInputFrame(Address tos, JavaScriptFrame* frame) {
-#if 0
   // Set the register values. The values are not important as there are no
   // callee saved registers in JavaScript frames, so all registers are
   // spilled. Registers fp and sp are set to the correct values though.
@@ -401,23 +400,22 @@ void Deoptimizer::FillInputFrame(Address tos, JavaScriptFrame* frame) {
   }
   input_->SetRegister(sp.code(), reinterpret_cast<intptr_t>(frame->sp()));
   input_->SetRegister(fp.code(), reinterpret_cast<intptr_t>(frame->fp()));
+  // FIXME
+#if 0
   for (int i = 0; i < DoubleRegister::NumAllocatableRegisters(); i++) {
     input_->SetDoubleRegister(i, 0.0);
   }
+#endif
 
   // Fill the frame content from the actual data on the frame.
   for (unsigned i = 0; i < input_->GetFrameSize(); i += kPointerSize) {
     input_->SetFrameSlot(i, Memory::uint32_at(tos + i));
   }
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
 
 void Deoptimizer::SetPlatformCompiledStubRegisters(
     FrameDescription* output_frame, CodeStubInterfaceDescriptor* descriptor) {
-#if 0
   ApiFunction function(descriptor->deoptimization_handler_);
   ExternalReference xref(&function, ExternalReference::BUILTIN_CALL, isolate_);
   intptr_t handler = reinterpret_cast<intptr_t>(xref.address());
@@ -428,21 +426,18 @@ void Deoptimizer::SetPlatformCompiledStubRegisters(
   output_frame->SetRegister(s0.code(), params);
   output_frame->SetRegister(s1.code(), (params - 1) * kPointerSize);
   output_frame->SetRegister(s2.code(), handler);
-#else
-  UNIMPLEMENTED();
-#endif
 }
 
 
 void Deoptimizer::CopyDoubleRegisters(FrameDescription* output_frame) {
+  // FIXME
 #if 0
   for (int i = 0; i < DoubleRegister::kMaxNumRegisters; ++i) {
     double double_value = input_->GetDoubleRegister(i);
     output_frame->SetDoubleRegister(i, double_value);
   }
-#else
-  UNIMPLEMENTED();
 #endif
+ // Nothing to do for TileGX.
 }
 
 

@@ -301,6 +301,10 @@ int OS::ActivationFrameAlignment() {
   return 8;
 #elif V8_TARGET_ARCH_MIPS
   return 8;
+#elif V8_TARGET_ARCH_TILEGX
+  // Even for vectorization, TileGX use general purpose
+  // registers, so 8byte stack alignment is enough.
+  return 8;
 #endif
   // With gcc 4.4 the tree vectorization optimizer can generate code
   // that requires 16 byte alignment such as movdqa on x86.
