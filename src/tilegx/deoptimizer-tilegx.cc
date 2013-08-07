@@ -582,7 +582,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ bind(&pop_loop);
   __ pop(t0);
   __ st(t0, MemOperand(a3, 0));
-  __ addli(a3, a3, sizeof(uint32_t));
+  __ addi(a3, a3, 8);
   __ bind(&pop_loop_header);
   __ Branch(&pop_loop, ne, a2, Operand(sp));
 
@@ -614,7 +614,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ ld(a3, MemOperand(a2, FrameDescription::frame_size_offset()));
   __ jmp(&inner_loop_header);
   __ bind(&inner_push_loop);
-  __ Subu(a3, a3, Operand(sizeof(uint32_t)));
+  __ addi(a3, a3, -8);
   __ Addu(t2, a2, Operand(a3));
   __ ld(t3, MemOperand(t2, FrameDescription::frame_content_offset()));
   __ push(t3);
@@ -649,8 +649,8 @@ void Deoptimizer::EntryGenerator::Generate() {
 
   // Technically restoring 'at' should work unless zero is also restored
   // but it's safer to check for this.
-  // FIXME
-  //ASSERT(!(at.bit() & restored_regs));
+  
+  ASSERT(!(at.bit() & restored_regs));
   // Restore the registers from the last output frame.
   __ move(at, a2);
   for (int i = kNumberOfRegisters - 1; i >= 0; i--) {
@@ -684,10 +684,10 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
     __ bind(&start);
     if (type() != EAGER && type() != SOFT) {
       // Emulate ia32 like call by pushing return address to stack.
-      __ addli(sp, sp, -2 * kPointerSize);
+      __ addi(sp, sp, -2 * kPointerSize);
       __ st(ra, MemOperand(sp, 1 * kPointerSize));
     } else {
-      __ addli(sp, sp, -1 * kPointerSize);
+      __ addi(sp, sp, -1 * kPointerSize);
     }
     // Jump over the remaining deopt entries (including this one).
     // This code is always reached by calling Jump, which puts the target (label

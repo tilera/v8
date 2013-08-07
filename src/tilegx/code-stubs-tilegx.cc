@@ -3538,7 +3538,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
     // Adjust the value in lr to point to the correct return location, 2nd
     // instruction past the real call into C code (the jalr(t9)), and push it.
     // This is the return address of the exit frame.
-    const int kNumInstructionsToJump = 3;
+    const int kNumInstructionsToJump = 4;
     masm->Addu(lr, lr, kNumInstructionsToJump * kPointerSize);
     masm->st(lr, MemOperand(sp));  // This spot was reserved in EnterExitFrame.
     // Stack space reservation moved to the branch delay slot below.

@@ -526,17 +526,17 @@ const int kRegister_a1_Code = 1;
 const int kRegister_a2_Code = 2;
 const int kRegister_a3_Code = 3;
 
-const int kRegister_t0_Code = 22;
-const int kRegister_t1_Code = 23;
-const int kRegister_t2_Code = 24;
-const int kRegister_t3_Code = 25;
-const int kRegister_t4_Code = 26;
-const int kRegister_t5_Code = 27;
-const int kRegister_t6_Code = 28;
-const int kRegister_t7_Code = 29;
+const int kRegister_t0_Code = 19;
+const int kRegister_t1_Code = 20;
+const int kRegister_t2_Code = 21;
+const int kRegister_t3_Code = 22;
+const int kRegister_t4_Code = 23;
+const int kRegister_t5_Code = 24;
+const int kRegister_t6_Code = 25;
+const int kRegister_t7_Code = 26;
 
-const int kRegister_t8_Code = 20;
-const int kRegister_t9_Code = 21;
+const int kRegister_t8_Code = 27;
+const int kRegister_t9_Code = 28;
 
 const int kRegister_s0_Code = 39;
 const int kRegister_s1_Code = 40;
@@ -547,7 +547,7 @@ const int kRegister_s5_Code = 44;
 const int kRegister_s6_Code = 45;
 const int kRegister_s7_Code = 46;
 
-const int kRegister_tt_Code = 19;
+const int kRegister_tt_Code = 29;
 
 const int kRegister_pc_Code = 50;
 const int kRegister_gp_Code = 51;

@@ -3687,7 +3687,7 @@ void MacroAssembler::CallCFunctionHelper(Register function,
 
   if (OS::ActivationFrameAlignment() > kPointerSize) {
     // Restore TileGX special stack zone first.
-    Addu(sp, sp, 16);
+    addi(sp, sp, 16);
     ld(sp, MemOperand(sp, stack_passed_arguments * kPointerSize));
   } else {
     Addu(sp, sp, Operand((stack_passed_arguments + 2) * kPointerSize));
