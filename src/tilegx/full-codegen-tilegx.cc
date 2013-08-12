@@ -4760,7 +4760,7 @@ void FullCodeGenerator::EnterFinallyBlock() {
   __ push(result_register());
   // Cook return address in link register to stack (smi encoded Code* delta).
   __ Subu(a1, ra, Operand(masm_->CodeObject()));
-  ASSERT_EQ(1, kSmiTagSize + kSmiShiftSize);
+  ASSERT_EQ(32, kSmiTagSize + kSmiShiftSize);
   STATIC_ASSERT(0 == kSmiTag);
   __ Addu(a1, a1, Operand(a1));  // Convert to smi.
 
@@ -4815,7 +4815,7 @@ void FullCodeGenerator::ExitFinallyBlock() {
 
   // Uncook return address and return.
   __ pop(result_register());
-  ASSERT_EQ(1, kSmiTagSize + kSmiShiftSize);
+  ASSERT_EQ(32, kSmiTagSize + kSmiShiftSize);
   __ sra(a1, a1, 1);  // Un-smi-tag value.
   __ Addu(at, a1, Operand(masm_->CodeObject()));
   __ Jump(at);

@@ -801,7 +801,6 @@ void BaseStoreStubCompiler::GenerateRestoreName(MacroAssembler* masm,
 }
 
 
-#if 0
 static void GenerateCallFunction(MacroAssembler* masm,
                                  Handle<Object> object,
                                  const ParameterCount& arguments,
@@ -870,6 +869,7 @@ static void CompileCallLoadPropertyWithInterceptor(
 
 static const int kFastApiCallArguments = FunctionCallbackArguments::kArgsLength;
 
+#if 0
 // Reserves space for the extra arguments to API function in the
 // caller's frame.
 //
@@ -1353,16 +1353,11 @@ Register StubCompiler::CheckPrototypes(Handle<JSObject> object,
 
 void BaseLoadStubCompiler::HandlerFrontendFooter(Label* success,
                                                  Label* miss) {
-#if 0
   if (!miss->is_unused()) {
     __ Branch(success);
     __ bind(miss);
     TailCallBuiltin(masm(), MissBuiltin(kind()));
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1373,7 +1368,6 @@ Register BaseLoadStubCompiler::CallbackHandlerFrontend(
     Handle<Name> name,
     Label* success,
     Handle<ExecutableAccessorInfo> callback) {
-#if 0
   Label miss;
 
   Register reg = HandlerFrontendHeader(object, object_reg, holder, name, &miss);
@@ -1410,10 +1404,6 @@ Register BaseLoadStubCompiler::CallbackHandlerFrontend(
 
   HandlerFrontendFooter(success, &miss);
   return reg;
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1423,7 +1413,6 @@ void BaseLoadStubCompiler::NonexistentHandlerFrontend(
     Handle<Name> name,
     Label* success,
     Handle<GlobalObject> global) {
-#if 0
   Label miss;
 
   HandlerFrontendHeader(object, receiver(), last, name, &miss);
@@ -1435,10 +1424,6 @@ void BaseLoadStubCompiler::NonexistentHandlerFrontend(
   }
 
   HandlerFrontendFooter(success, &miss);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1446,7 +1431,6 @@ void BaseLoadStubCompiler::GenerateLoadField(Register reg,
                                              Handle<JSObject> holder,
                                              PropertyIndex field,
                                              Representation representation) {
-#if 0
   if (!reg.is(receiver())) __ move(receiver(), reg);
   if (kind() == Code::LOAD_IC) {
     LoadFieldStub stub(field.is_inobject(holder),
@@ -1459,22 +1443,13 @@ void BaseLoadStubCompiler::GenerateLoadField(Register reg,
                             representation);
     GenerateTailCall(masm(), stub.GetCode(isolate()));
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BaseLoadStubCompiler::GenerateLoadConstant(Handle<JSFunction> value) {
-#if 0
   // Return the constant value.
   __ LoadHeapObject(v0, value);
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1553,7 +1528,6 @@ void BaseLoadStubCompiler::GenerateLoadInterceptor(
     Handle<JSObject> interceptor_holder,
     LookupResult* lookup,
     Handle<Name> name) {
-#if 0
   ASSERT(interceptor_holder->HasNamedInterceptor());
   ASSERT(!interceptor_holder->GetNamedInterceptor()->getter()->IsUndefined());
 
@@ -1631,22 +1605,13 @@ void BaseLoadStubCompiler::GenerateLoadInterceptor(
         IC_Utility(IC::kLoadPropertyWithInterceptorForLoad), isolate());
     __ TailCallExternalReference(ref, 6, 1);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void CallStubCompiler::GenerateNameCheck(Handle<Name> name, Label* miss) {
-#if 0
   if (kind_ == Code::KEYED_CALL_IC) {
     __ Branch(miss, ne, a2, Operand(name));
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1654,7 +1619,6 @@ void CallStubCompiler::GenerateGlobalReceiverCheck(Handle<JSObject> object,
                                                    Handle<JSObject> holder,
                                                    Handle<Name> name,
                                                    Label* miss) {
-#if 0
   ASSERT(holder->IsGlobalObject());
 
   // Get the number of arguments.
@@ -1666,10 +1630,6 @@ void CallStubCompiler::GenerateGlobalReceiverCheck(Handle<JSObject> object,
   // Check that the maps haven't changed.
   __ JumpIfSmi(a0, miss);
   CheckPrototypes(object, a0, holder, a3, a1, t0, name, miss);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1677,7 +1637,6 @@ void CallStubCompiler::GenerateLoadFunctionFromCell(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Label* miss) {
-#if 0
   // Get the value from the cell.
   __ li(a3, Operand(cell));
   __ ld(a1, FieldMemOperand(a3, JSGlobalPropertyCell::kValueOffset));
@@ -1700,24 +1659,15 @@ void CallStubCompiler::GenerateLoadFunctionFromCell(
   } else {
     __ Branch(miss, ne, a1, Operand(function));
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void CallStubCompiler::GenerateMissBranch() {
-#if 0
   Handle<Code> code =
       isolate()->stub_cache()->ComputeCallMiss(arguments().immediate(),
                                                kind_,
                                                extra_state_);
   __ Jump(code, RelocInfo::CODE_TARGET);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1725,7 +1675,6 @@ Handle<Code> CallStubCompiler::CompileCallField(Handle<JSObject> object,
                                                 Handle<JSObject> holder,
                                                 PropertyIndex index,
                                                 Handle<Name> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2    : name
   //  -- ra    : return address
@@ -1754,10 +1703,6 @@ Handle<Code> CallStubCompiler::CompileCallField(Handle<JSObject> object,
 
   // Return the generated code.
   return GetCode(Code::FIELD, name);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1767,7 +1712,6 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2    : name
   //  -- ra    : return address
@@ -2018,10 +1962,6 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
 
   // Return the generated code.
   return GetCode(function);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2031,7 +1971,6 @@ Handle<Code> CallStubCompiler::CompileArrayPopCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2    : name
   //  -- ra    : return address
@@ -2107,10 +2046,6 @@ Handle<Code> CallStubCompiler::CompileArrayPopCall(
 
   // Return the generated code.
   return GetCode(function);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2676,7 +2611,6 @@ void CallStubCompiler::CompileHandlerFrontend(Handle<Object> object,
                                               Handle<Name> name,
                                               CheckType check,
                                               Label* success) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2    : name
   //  -- ra    : return address
@@ -2775,25 +2709,16 @@ void CallStubCompiler::CompileHandlerFrontend(Handle<Object> object,
   __ bind(&miss);
 
   GenerateMissBranch();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void CallStubCompiler::CompileHandlerBackend(Handle<JSFunction> function) {
-#if 0
   CallKind call_kind = CallICBase::Contextual::decode(extra_state_)
       ? CALL_AS_FUNCTION
       : CALL_AS_METHOD;
   ParameterCount expected(function);
   __ InvokeFunction(function, expected, arguments(),
                     JUMP_FUNCTION, NullCallWrapper(), call_kind);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2803,7 +2728,6 @@ Handle<Code> CallStubCompiler::CompileCallConstant(
     Handle<Name> name,
     CheckType check,
     Handle<JSFunction> function) {
-#if 0
   if (HasCustomCallGenerator(function)) {
     Handle<Code> code = CompileCustomCall(object, holder,
                                           Handle<JSGlobalPropertyCell>::null(),
@@ -2820,10 +2744,6 @@ Handle<Code> CallStubCompiler::CompileCallConstant(
 
   // Return the generated code.
   return GetCode(function);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2878,7 +2798,6 @@ Handle<Code> CallStubCompiler::CompileCallGlobal(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<Name> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2    : name
   //  -- ra    : return address
@@ -2930,10 +2849,6 @@ Handle<Code> CallStubCompiler::CompileCallGlobal(
 
   // Return the generated code.
   return GetCode(Code::NORMAL, name);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2942,7 +2857,6 @@ Handle<Code> StoreStubCompiler::CompileStoreCallback(
     Handle<JSObject> object,
     Handle<JSObject> holder,
     Handle<ExecutableAccessorInfo> callback) {
-#if 0
   Label miss;
   // Check that the maps haven't changed.
   __ JumpIfSmi(receiver(), &miss);
@@ -2968,10 +2882,6 @@ Handle<Code> StoreStubCompiler::CompileStoreCallback(
 
   // Return the generated code.
   return GetICCode(kind(), Code::CALLBACKS, name);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
