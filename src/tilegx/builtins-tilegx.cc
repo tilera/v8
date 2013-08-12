@@ -633,6 +633,7 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     // a1: function
     // a2: expected number of arguments
     // a3: code entry to call
+    __ bpt();
     __ LoadRoot(t0, Heap::kUndefinedValueRootIndex);
     __ sll(t2, a2, kPointerSizeLog2);
     __ Subu(a2, fp, Operand(t2));

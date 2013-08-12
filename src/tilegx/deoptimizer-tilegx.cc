@@ -409,7 +409,7 @@ void Deoptimizer::FillInputFrame(Address tos, JavaScriptFrame* frame) {
 
   // Fill the frame content from the actual data on the frame.
   for (unsigned i = 0; i < input_->GetFrameSize(); i += kPointerSize) {
-    input_->SetFrameSlot(i, Memory::uint32_at(tos + i));
+    input_->SetFrameSlot(i, Memory::uint64_at(tos + i));
   }
 }
 
@@ -603,7 +603,7 @@ void Deoptimizer::EntryGenerator::Generate() {
       outer_loop_header, inner_loop_header;
   // Outer loop state: t0 = current "FrameDescription** output_",
   // a1 = one past the last FrameDescription**.
-  __ ld(a1, MemOperand(a0, Deoptimizer::output_count_offset()));
+  __ ld4s(a1, MemOperand(a0, Deoptimizer::output_count_offset()));
   __ ld(t0, MemOperand(a0, Deoptimizer::output_offset()));  // t0 is output_.
   __ sll(a1, a1, kPointerSizeLog2);  // Count to offset.
   __ add(a1, t0, a1);  // a1 = one past the last FrameDescription**.
@@ -652,11 +652,11 @@ void Deoptimizer::EntryGenerator::Generate() {
   
   ASSERT(!(at.bit() & restored_regs));
   // Restore the registers from the last output frame.
-  __ move(at, a2);
+  __ move(at2, a2);
   for (int i = kNumberOfRegisters - 1; i >= 0; i--) {
     int offset = (i * kPointerSize) + FrameDescription::registers_offset();
     if ((restored_regs & (1L << i)) != 0) {
-      __ ld(ToRegister(i), MemOperand(at, offset));
+      __ ld(ToRegister(i), MemOperand(at2, offset));
     }
   }
 

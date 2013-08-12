@@ -66,10 +66,9 @@ const RegList kJSCallerSaved =
   1L << 24 |  // r24
   1L << 25 |  // r25
   1L << 26 |  // r26
-  1L << 27 |  // r27
-  1L << 28 ;  // r28
+  1L << 27 ;  // r27
 
-const int kNumJSCallerSaved = 29;
+const int kNumJSCallerSaved = 28;
 
 int JSCallerSavedCode(int n);
 
