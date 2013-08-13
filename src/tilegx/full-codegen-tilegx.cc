@@ -3564,11 +3564,11 @@ void FullCodeGenerator::EmitStringCharCodeAt(CallRuntime* expr) {
 
   VisitForStackValue(args->at(0));
   VisitForAccumulatorValue(args->at(1));
-  __ move(a0, result_register());
+  //__ move(a0, result_register());
 
   Register object = a1;
   Register index = a0;
-  Register result = v0;
+  Register result = a2;
 
   __ pop(object);
 

@@ -921,7 +921,6 @@ void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
 }
 
 
-#if 0
 // Handle the case where the lhs and rhs are the same object.
 // Equality is almost reflexive (everything but NaN), so this is a test
 // for "identity and not NaN".
@@ -1185,7 +1184,6 @@ static void EmitCheckForInternalizedStringsOrObjects(MacroAssembler* masm,
   __ xori(r0, a0, 1 << Map::kIsUndetectable);
   __ Ret();
 }
-#endif
 
 
 void NumberToStringStub::GenerateLookupNumberStringCache(MacroAssembler* masm,
@@ -1254,7 +1252,7 @@ void NumberToStringStub::GenerateLookupNumberStringCache(MacroAssembler* masm,
 
   __ bind(&is_smi);
   Register scratch = scratch1;
-  __ sra(scratch, object, 1);   // Shift away the tag.
+  __ sra(scratch, object, 32);   // Shift away the tag.
   __ And(scratch, mask, Operand(scratch));
 
   // Calculate address of entry in string cache: each entry consists
@@ -1293,7 +1291,6 @@ void NumberToStringStub::Generate(MacroAssembler* masm) {
   __ TailCallRuntime(Runtime::kNumberToString, 1, 1);
 }
 
-#if 0
 
 static void ICCompareStub_CheckInputType(MacroAssembler* masm,
                                          Register input,
@@ -1313,13 +1310,11 @@ static void ICCompareStub_CheckInputType(MacroAssembler* masm,
   __ bind(&ok);
 }
 
-#endif
 
 // On entry a1 and a2 are the values to be compared.
 // On exit a0 is 0, positive or negative to indicate the result of
 // the comparison.
 void ICCompareStub::GenerateGeneric(MacroAssembler* masm) {
-#if 0
   Register lhs = a1;
   Register rhs = a0;
   Condition cc = GetCondition();
@@ -1488,10 +1483,6 @@ void ICCompareStub::GenerateGeneric(MacroAssembler* masm) {
 
   __ bind(&miss);
   GenerateMiss(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2774,7 +2765,6 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
 
 
 void BinaryOpStub::GenerateOddballStub(MacroAssembler* masm) {
-#if 0
   Label call_runtime;
 
   if (op_ == Token::ADD) {
@@ -2804,15 +2794,10 @@ void BinaryOpStub::GenerateOddballStub(MacroAssembler* masm) {
   __ bind(&done);
 
   GenerateNumberStub(masm);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BinaryOpStub::GenerateNumberStub(MacroAssembler* masm) {
-#if 0 
   Label call_runtime, transition;
   BinaryOpStub_GenerateFPOperation(
       masm, left_type_, right_type_, false,
@@ -2828,15 +2813,10 @@ void BinaryOpStub::GenerateNumberStub(MacroAssembler* masm) {
     GenerateCallRuntime(masm);
   }
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BinaryOpStub::GenerateGeneric(MacroAssembler* masm) {
-#if 0
   Label call_runtime, call_string_add_or_runtime, transition;
 
   BinaryOpStub_GenerateSmiCode(
@@ -2861,15 +2841,10 @@ void BinaryOpStub::GenerateGeneric(MacroAssembler* masm) {
     GenerateCallRuntime(masm);
   }
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BinaryOpStub::GenerateAddStrings(MacroAssembler* masm) {
-#if 0
   ASSERT(op_ == Token::ADD);
   Label left_not_string, call_runtime;
 
@@ -2899,10 +2874,6 @@ void BinaryOpStub::GenerateAddStrings(MacroAssembler* masm) {
 
   // At least one argument is not a string.
   __ bind(&call_runtime);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

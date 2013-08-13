@@ -660,7 +660,6 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
                                       Register scratch1,
                                       Register scratch2,
                                       Label* miss_label) {
-#if 0
   // a0 : value
   Label exit;
 
@@ -691,6 +690,8 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
   } else if (FLAG_track_heap_object_fields && representation.IsHeapObject()) {
     __ JumpIfSmi(value_reg, miss_label);
   } else if (FLAG_track_double_fields && representation.IsDouble()) {
+    UNREACHABLE();
+#if 0
     // Load the double storage.
     if (index < 0) {
       int offset = object->map()->instance_size() + (index * kPointerSize);
@@ -722,6 +723,7 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
     __ move(v0, a0);
     __ Ret();
     return;
+#endif
   }
 
   // TODO(verwaest): Share this code as a code stub.
@@ -777,12 +779,8 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
   // Return the value (register v0).
   ASSERT(value_reg.is(a0));
   __ bind(&exit);
-  __ move(v0, a0);
+  //__ move(v0, a0);
   __ Ret();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
