@@ -1253,11 +1253,17 @@ void LCodeGen::DoConstantT(LConstantT* instr) {
 }
 
 
-void LCodeGen::DoFixedArrayBaseLength(LFixedArrayBaseLength* instr) {  UNREACHABLE();  }
+void LCodeGen::DoFixedArrayBaseLength(LFixedArrayBaseLength* instr) {
+  Register result = ToRegister(instr->result());
+  Register array = ToRegister(instr->value());
+  __ ld(result, FieldMemOperand(array, FixedArrayBase::kLengthOffset));
+}
 
-
-void LCodeGen::DoMapEnumLength(LMapEnumLength* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoMapEnumLength(LMapEnumLength* instr) {
+  Register result = ToRegister(instr->result());
+  Register map = ToRegister(instr->value());
+  __ EnumLength(result, map);
+}
 
 void LCodeGen::DoElementsKind(LElementsKind* instr) {  UNREACHABLE();  }
 

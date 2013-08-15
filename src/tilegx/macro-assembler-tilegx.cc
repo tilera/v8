@@ -1049,7 +1049,7 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
 
   int32_t offset = 0;
   Register r2 = no_reg;
-  Register scratch = tt;
+  Register scratch = at2;
   if (rt.is_reg()) {
     r2 = rt.rm_;
     // Be careful to always use shifted_branch_offset only just before the
