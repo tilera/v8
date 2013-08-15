@@ -68,6 +68,14 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 
 #define NOP create_Mode(TILEGX_X_MODE) | FNOP_X0 | FNOP_X1
 
+#define FDOUBLE_PACK1_X0                                                       \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(FDOUBLE_PACK1_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define FDOUBLE_PACK2_X0                                                       \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(FDOUBLE_PACK2_RRR_0_OPCODE_X0) | FNOP_X1
+
 #define ADD_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(ADD_RRR_0_OPCODE_X1) | FNOP_X0
@@ -869,6 +877,7 @@ class Assembler : public AssemblerBase {
   void cmpne(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmplts(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmpltsi(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
+  Instr cmpltsi_b(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
   void cmples(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmpltu(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void cmpltui(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
@@ -922,6 +931,10 @@ class Assembler : public AssemblerBase {
   void andi(const Register& rd, const Register& rs, int8_t imm8, int line = 0);
   void movn(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void movz(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void clz(const Register& rd, const Register& rs, int line = 0);
+
+  void fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void fdouble_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 
   void break_(uint32_t code, bool break_as_stop = false);
   void stop(const char* msg, uint32_t code = kMaxStopCode);

@@ -306,6 +306,11 @@ class MacroAssembler: public Assembler {
                        Heap::RootListIndex root_value_index,
                        const char* message);
 
+  void JumpIfNotHeapNumber(Register object,
+                           Register heap_number_map,
+                           Register scratch,
+                           Label* on_not_heap_number);
+
   // Debug Purpose
   void set_generating_stub(bool value) { generating_stub_ = value; }
   bool generating_stub() { return generating_stub_; }
@@ -598,6 +603,26 @@ class MacroAssembler: public Assembler {
     st(src3, MemOperand(sp, 1 * kPointerSize));
     st(src4, MemOperand(sp, 0 * kPointerSize));
   }
+
+  // Convert the HeapNumber pointed to by source to a 32bits signed integer
+  // dest. If the HeapNumber does not fit into a 32bits signed integer branch
+  // to not_int32 label. If FPU is available double_scratch is used but not
+  // scratch2.
+  void ConvertToInt32(Register source,
+                      Register dest,
+                      Register scratch,
+                      Register scratch2,
+                      Label *not_int32);
+
+  // Helper for EmitECMATruncate.
+  // This will truncate a floating-point value outside of the singed 32bit
+  // integer range to a 32bit signed integer.
+  // Expects the double value loaded in input_high and input_low.
+  // Exits with the answer in 'result'.
+  // Note that this code does not work for values in the 32bit range!
+  void EmitOutOfInt32RangeTruncate(Register result,
+                                   Register input,
+                                   Register scratch);
 
   // Check if the map of an object is equal to a specified map and branch to a
   // specified target if equal. Skip the smi check if not required (object is

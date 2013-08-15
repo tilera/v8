@@ -3447,15 +3447,15 @@ void MacroAssembler::AssertStackIsAligned() {
 void MacroAssembler::UntagAndJumpIfSmi(Register dst,
                                        Register src,
                                        Label* smi_case) {
-  JumpIfSmi(src, smi_case, at);
   SmiUntag(dst, src);
+  JumpIfSmi(src, smi_case, at);
 }
 
 void MacroAssembler::UntagAndJumpIfNotSmi(Register dst,
                                           Register src,
                                           Label* non_smi_case) {
-  JumpIfNotSmi(src, non_smi_case, at);
   SmiUntag(dst, src);
+  JumpIfNotSmi(src, non_smi_case, at);
 }
 
 void MacroAssembler::JumpIfSmi(Register value,
@@ -3464,6 +3464,15 @@ void MacroAssembler::JumpIfSmi(Register value,
   ASSERT_EQ(0, kSmiTag);
   andi(scratch, value, kSmiTagMask);
   Branch(smi_label, eq, scratch, Operand(zero));
+}
+
+void MacroAssembler::JumpIfNotHeapNumber(Register object,
+                                         Register heap_number_map,
+                                         Register scratch,
+                                         Label* on_not_heap_number) {
+  ld(scratch, FieldMemOperand(object, HeapObject::kMapOffset));
+  AssertRegisterIsRoot(heap_number_map, Heap::kHeapNumberMapRootIndex);
+  Branch(on_not_heap_number, ne, scratch, Operand(heap_number_map));
 }
 
 void MacroAssembler::JumpIfNotSmi(Register value,
@@ -4126,6 +4135,163 @@ void MacroAssembler::GetRelocatedValue(Register li_location,
   or_(value, value, scratch);
 }
 
+// Tries to get a signed int32 out of a double precision floating point heap
+// number. Rounds towards 0. Branch to 'not_int32' if the double is out of the
+// 32bits signed integer range.
+// This method implementation differs from the ARM version for performance
+// reasons.
+void MacroAssembler::ConvertToInt32(Register source,
+                                    Register dest,
+                                    Register scratch,
+                                    Register scratch2,
+                                    Label *not_int32) {
+  Label right_exponent, done;
+  // Get exponent word (ENDIAN issues).
+  ld(scratch, FieldMemOperand(source, HeapNumber::kValueOffset));
+  // Get exponent alone in scratch2.
+  And(scratch2, scratch, Operand(0x7FFL << 52));
+  // Load dest with zero.  We use this either for the final shift or
+  // for the answer.
+  move(dest, zero);
+  // Check whether the exponent matches a 32 bit signed int that is not a Smi.
+  // A non-Smi integer is 1.xxx * 2^30 so the exponent is 30 (biased).  This is
+  // the exponent that we are fastest at and also the highest exponent we can
+  // handle here.
+  const uint64_t non_smi_exponent = 1053L << 52;
+  // If we have a match of the int32-but-not-Smi exponent then skip some logic.
+  Branch(&right_exponent, eq, scratch2, Operand(non_smi_exponent));
+  // If the exponent is higher than that then go to not_int32 case.  This
+  // catches numbers that don't fit in a signed int32, infinities and NaNs.
+  Branch(not_int32, gt, scratch2, Operand(non_smi_exponent));
+
+  // We know the exponent is smaller than 30 (biased).  If it is less than
+  // 0 (biased) then the number is smaller in magnitude than 1.0 * 2^0, i.e.
+  // it rounds to zero.
+  const uint64_t zero_exponent = 1023L << 52;
+  Subu(scratch2, scratch2, Operand(zero_exponent));
+  // Dest already has a Smi zero.
+  Branch(&done, lt, scratch2, Operand(zero));
+
+  // We have a shifted exponent between 0 and 30 in scratch2.
+  srl(dest, scratch2, 52);
+  // We now have the exponent in dest.  Subtract from 30 to get
+  // how much to shift down.
+  addi(at, zero, 30);
+  sub(dest, at, dest);
+
+  bind(&right_exponent);
+
+  // On entry, dest has final downshift, scratch has original sign/exp/mant.
+  // Save sign bit in top bit of dest.
+  And(scratch2, scratch, Operand(0x8000000000000000L));
+  Or(dest, dest, Operand(scratch2));
+  // Put back the implicit 1, just above mantissa field.
+  Or(scratch, scratch, Operand(1 << HeapNumber::kExponentShift));
+
+  // Shift up the mantissa bits to take up the space the exponent used to
+  // take. We just orred in the implicit bit so that took care of one and
+  // we want to leave the sign bit 0 so we subtract 2 bits from the shift
+  // distance. But we want to clear the sign-bit so shift one more bit
+  // left, then shift right one bit.
+  const int shift_distance = HeapNumber::kNonMantissaBitsInTopWord - 2;
+  sll(scratch, scratch, shift_distance + 1);
+  srl(scratch, scratch, 1);
+
+  // Move down according to the exponent.
+  srl(scratch, scratch, dest);
+  // Prepare the negative version of our integer.
+  sub(scratch2, zero, scratch);
+  // Trick to check sign bit (msb) held in dest, count leading zero.
+  // 0 indicates negative, save negative version with conditional move.
+  clz(dest, dest);
+  movz(scratch, scratch2, dest);
+  move(dest, scratch);
+
+  bind(&done);
+}
+
+void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
+                                                 Register input,
+                                                 Register scratch) {
+#if 0
+  Label done, normal_exponent, restore_sign;
+  // Extract the biased exponent in result.
+  bfextu(result, input_high, 52, 62);
+
+  // Check for Infinity and NaNs, which should return 0.
+  Subu(scratch, result, 0x7FF);
+  movz(result, zero_reg, scratch);
+  Branch(&done, eq, scratch, Operand(zero));
+
+  // Express exponent as delta to (number of mantissa bits + 31).
+  Subu(result,
+       result,
+       Operand(HeapNumber::kExponentBias + HeapNumber::kMantissaBits + 31));
+
+  // If the delta is strictly positive, all bits would be shifted away,
+  // which means that we can return 0.
+  Branch(&normal_exponent, le, result, Operand(zero_reg));
+  mov(result, zero_reg);
+  Branch(&done);
+
+  bind(&normal_exponent);
+  const int kShiftBase = HeapNumber::kNonMantissaBitsInTopWord - 1;
+  // Calculate shift.
+  Addu(scratch, result, Operand(kShiftBase + HeapNumber::kMantissaBits));
+
+  // Save the sign.
+  Register sign = result;
+  result = no_reg;
+  And(sign, input_high, Operand(HeapNumber::kSignMask));
+
+  // On ARM shifts > 31 bits are valid and will result in zero. On MIPS we need
+  // to check for this specific case.
+  Label high_shift_needed, high_shift_done;
+  Branch(&high_shift_needed, lt, scratch, Operand(32));
+  mov(input_high, zero_reg);
+  Branch(&high_shift_done);
+  bind(&high_shift_needed);
+
+  // Set the implicit 1 before the mantissa part in input_high.
+  Or(input_high,
+     input_high,
+     Operand(1 << HeapNumber::kMantissaBitsInTopWord));
+  // Shift the mantissa bits to the correct position.
+  // We don't need to clear non-mantissa bits as they will be shifted away.
+  // If they weren't, it would mean that the answer is in the 32bit range.
+  sllv(input_high, input_high, scratch);
+
+  bind(&high_shift_done);
+
+  // Replace the shifted bits with bits from the lower mantissa word.
+  Label pos_shift, shift_done;
+  li(at, 32);
+  subu(scratch, at, scratch);
+  Branch(&pos_shift, ge, scratch, Operand(zero_reg));
+
+  // Negate scratch.
+  Subu(scratch, zero_reg, scratch);
+  sllv(input_low, input_low, scratch);
+  Branch(&shift_done);
+
+  bind(&pos_shift);
+  srlv(input_low, input_low, scratch);
+
+  bind(&shift_done);
+  Or(input_high, input_high, Operand(input_low));
+  // Restore sign if necessary.
+  mov(scratch, sign);
+  result = sign;
+  sign = no_reg;
+  Subu(result, zero_reg, input_high);
+  Movz(result, input_high, scratch);
+  bind(&done);
+#else
+  info(__LINE__);
+  bpt();
+#endif
+}
+
 bool AreAliased(Register r1, Register r2, Register r3, Register r4) {
   if (r1.is(r2)) return true;
   if (r1.is(r3)) return true;
@@ -4135,8 +4301,6 @@ bool AreAliased(Register r1, Register r2, Register r3, Register r4) {
   if (r3.is(r4)) return true;
   return false;
 }
-
-
 
 CodePatcher::CodePatcher(byte* address, int instructions)
     : address_(address),

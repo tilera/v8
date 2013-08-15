@@ -447,6 +447,21 @@ void Assembler::ld4s(const Register& rd, const Register& rs, int line) {
   Instr instr = LD4S_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
   emit(instr, line);
 }
+
+void Assembler::fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = FDOUBLE_PACK1_X0 | DEST_X0(rd.code())
+	               | SRCA_X0(rsa.code()) | SRCB_X0(rsb.code());
+  emit(instr, line);
+}
+
+void Assembler::fdouble_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = FDOUBLE_PACK2_X0 | DEST_X0(rd.code())
+	               | SRCA_X0(rsa.code()) | SRCB_X0(rsb.code());
+  emit(instr, line);
+}
+
 void Assembler::add(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = ADD_X1 | DEST_X1(rd.code())
@@ -566,6 +581,12 @@ void Assembler::movn(const Register& rd, const Register& rs, const Register& rt,
   ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
   Instr instr = CMOVNEZ_X0 | DEST_X0(rd.code())
 	                   | SRCA_X0(rt.code()) | SRCB_X0(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::clz(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = CLZ_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code());
   emit(instr, line);
 }
 
@@ -1164,6 +1185,12 @@ void Assembler::cmpltsi(const Register& rd, const Register& rsa, int8_t imm, int
   ASSERT(rd.is_valid() && rsa.is_valid() && is_int8(imm));
   Instr instr = CMPLTSI_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | IMM8_X1(imm);
   emit(instr, line);
+}
+
+Instr Assembler::cmpltsi_b(const Register& rd, const Register& rsa, int8_t imm, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && is_int8(imm));
+  Instr instr = CMPLTSI_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | IMM8_X1(imm);
+  return instr;
 }
 
 void Assembler::cmples(const Register& rd, const Register& rsa, const Register& rsb, int line) {
