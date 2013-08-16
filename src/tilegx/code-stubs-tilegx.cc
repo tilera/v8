@@ -1261,7 +1261,7 @@ void NumberToStringStub::GenerateLookupNumberStringCache(MacroAssembler* masm,
   // contains two elements (number and string) for each cache entry.
   __ ld(mask, FieldMemOperand(number_string_cache, FixedArray::kLengthOffset));
   // Divide length by two (length is a smi).
-  __ sra(mask, mask, kSmiTagSize + 1);
+  __ sra(mask, mask, 32 + 1);
   __ Addu(mask, mask, -1);  // Make mask.
 
   // Calculate the entry in the number string cache. The hash value in the
