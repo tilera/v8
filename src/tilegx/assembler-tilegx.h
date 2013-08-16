@@ -68,6 +68,22 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 
 #define NOP create_Mode(TILEGX_X_MODE) | FNOP_X0 | FNOP_X1
 
+#define MUL_LU_LU_X0                                                           \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(MUL_LU_LU_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define MUL_LS_LS_X0                                                           \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(MUL_LU_LU_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define MUL_HS_LS_X0                                                           \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(MUL_HS_LS_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define MUL_HS_HS_X0                                                           \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(MUL_HS_HS_RRR_0_OPCODE_X0) | FNOP_X1
+
 #define FDOUBLE_PACK1_X0                                                       \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
       create_RRROpcodeExtension_X0(FDOUBLE_PACK1_RRR_0_OPCODE_X0) | FNOP_X1
@@ -932,6 +948,11 @@ class Assembler : public AssemblerBase {
   void movn(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void movz(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void clz(const Register& rd, const Register& rs, int line = 0);
+
+  void mul_lu_lu(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void mul_ls_ls(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void mul_hs_ls(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void mul_hs_hs(const Register& rd, const Register& rs, const Register& rt, int line = 0);
 
   void fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);

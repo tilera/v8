@@ -633,9 +633,37 @@ void Assembler::sll(const Register& rd, const Register& rs, int16_t imm, int lin
 }
 
 void Assembler::sll(const Register& rd, const Register& rs, const Register& rt, int line) {
-  ASSERT(rd.is_valid() && rs.is_valid());
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
   Instr instr = SHL_X1 | DEST_X1(rd.code())
 	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
+  emit(instr, line);
+}
+
+void Assembler::mul_hs_hs(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = MUL_HS_HS_X0 | DEST_X0(rd.code())
+	                | SRCA_X0(rs.code()) | SRCB_X0(rt.code());
+  emit(instr, line);
+}
+
+void Assembler::mul_ls_ls(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = MUL_LS_LS_X0 | DEST_X0(rd.code())
+	                | SRCA_X0(rs.code()) | SRCB_X0(rt.code());
+  emit(instr, line);
+}
+
+void Assembler::mul_lu_lu(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = MUL_LU_LU_X0 | DEST_X0(rd.code())
+	                | SRCA_X0(rs.code()) | SRCB_X0(rt.code());
+  emit(instr, line);
+}
+
+void Assembler::mul_hs_ls(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = MUL_HS_LS_X0 | DEST_X0(rd.code())
+	                | SRCA_X0(rs.code()) | SRCB_X0(rt.code());
   emit(instr, line);
 }
 

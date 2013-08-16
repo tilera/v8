@@ -2091,6 +2091,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
 
   Register scratch1 = t0;
   Register scratch2 = t1;
+  Register scratch3 = t2;
 
   ASSERT(right.is(a0));
   STATIC_ASSERT(kSmiTag == 0);
@@ -2108,23 +2109,14 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // No need to revert anything - right and left are intact.
       break;
     case Token::MUL: {
-      UNREACHABLE();
-#if 0
-      // Remove tag from one of the operands. This way the multiplication result
-      // will be a smi if it fits the smi range.
-      __ SmiUntag(scratch1, right);
-      // Do multiplication.
-      // lo = lower 32 bits of scratch1 * left.
-      // hi = higher 32 bits of scratch1 * left.
-      __ Mult(left, scratch1);
-      // Check for overflowing the smi range - no overflow if higher 33 bits of
+      __ mul_hs_hs(scratch1, left, right);
+      // Check for overflowing the smi range - no overflow if higher 34 bits of
       // the result are identical.
-      __ mflo(scratch1);
-      __ mfhi(scratch2);
-      __ sra(scratch1, scratch1, 31);
-      __ Branch(&not_smi_result, ne, scratch1, Operand(scratch2));
+      __ sra(scratch2, scratch1, 32);
+      __ sra(scratch3, scratch1, 30);
+      __ Branch(&not_smi_result, ne, scratch3, Operand(scratch2));
       // Go slow on zero result to handle -0.
-      __ mflo(v0);
+      __ move(v0, scratch1);
       __ Ret(ne, v0, Operand(zero));
       // We need -0 if we were multiplying a negative number with 0 to get 0.
       // We know one of them was zero.
@@ -2134,67 +2126,16 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // Negating it results in 'lt'.
       __ Branch(&skip, lt, scratch2, Operand(zero));
       ASSERT(Smi::FromInt(0) == 0);
-      __ Ret();
       __ move(v0, zero);  // Return smi 0 if the non-zero one was positive.
+      __ Ret();
       __ bind(&skip);
       // We fall through here if we multiplied a negative number with 0, because
       // that would mean we should produce -0.
-#endif
       }
       break;
-    case Token::DIV: {
-      UNREACHABLE();
-#if 0
-      Label done;
-      __ SmiUntag(scratch2, right);
-      __ SmiUntag(scratch1, left);
-      __ Div(scratch1, scratch2);
-      // A minor optimization: div may be calculated asynchronously, so we check
-      // for division by zero before getting the result.
-      __ Branch(&not_smi_result, eq, scratch2, Operand(zero));
-      // If the result is 0, we need to make sure the dividsor (right) is
-      // positive, otherwise it is a -0 case.
-      // Quotient is in 'lo', remainder is in 'hi'.
-      // Check for no remainder first.
-      __ mfhi(scratch1);
-      __ Branch(&not_smi_result, ne, scratch1, Operand(zero));
-      __ mflo(scratch1);
-      __ Branch(&done, ne, scratch1, Operand(zero));
-      __ Branch(&not_smi_result, lt, scratch2, Operand(zero));
-      __ bind(&done);
-      // Check that the signed result fits in a Smi.
-      __ Addu(scratch2, scratch1, Operand(0x40000000));
-      __ Branch(&not_smi_result, lt, scratch2, Operand(zero));
-      __ SmiTag(v0, scratch1);
-      __ Ret();
-#endif
-      }
-      break;
-    case Token::MOD: {
-      UNREACHABLE();
-#if 0
-      Label done;
-      __ SmiUntag(scratch2, right);
-      __ SmiUntag(scratch1, left);
-      __ Div(scratch1, scratch2);
-      // A minor optimization: div may be calculated asynchronously, so we check
-      // for division by 0 before calling mfhi.
-      // Check for zero on the right hand side.
-      __ Branch(&not_smi_result, eq, scratch2, Operand(zero));
-      // If the result is 0, we need to make sure the dividend (left) is
-      // positive (or 0), otherwise it is a -0 case.
-      // Remainder is in 'hi'.
-      __ mfhi(scratch2);
-      __ Branch(&done, ne, scratch2, Operand(zero));
-      __ Branch(&not_smi_result, lt, scratch1, Operand(zero));
-      __ bind(&done);
-      // Check that the signed result fits in a Smi.
-      __ Addu(scratch1, scratch2, Operand(0x40000000));
-      __ Branch(&not_smi_result, lt, scratch1, Operand(zero));
-      __ SmiTag(v0, scratch2);
-      __ Ret();
-#endif
-      }
+      // For DIV/MOD, call C function, not JIT support for TileGX.
+    case Token::DIV:
+    case Token::MOD:
       break;
     case Token::BIT_OR:
       __ Ret();
