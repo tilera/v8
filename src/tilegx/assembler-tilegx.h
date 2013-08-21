@@ -803,6 +803,8 @@ class Assembler : public AssemblerBase {
   static Address target_address_at(Address pc);
   static void set_target_address_at(Address pc, Address target);
 
+  static void JumpLabelToJumpRegister(Address pc);
+
   // Here we are patching the address in the LUI/ORI instruction pair.
   // These values are used in the serialization process and must be zero for
   // MIPS platform, as Code, Embedded Object or External-reference pointers

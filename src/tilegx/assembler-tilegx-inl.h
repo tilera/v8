@@ -54,16 +54,14 @@ int Register::NumAllocatableRegisters() {
 // RelocInfo.
 
 void RelocInfo::apply(intptr_t delta) {
-#if 0
   if (IsCodeTarget(rmode_)) {
-    uint32_t scope1 = (uint32_t) target_address() & ~kImm28Mask;
-    uint32_t scope2 = reinterpret_cast<uint32_t>(pc_) & ~kImm28Mask;
+    uint64_t scope1 = (uint64_t) target_address() & ~kImm30Mask;
+    uint64_t scope2 = reinterpret_cast<uint64_t>(pc_) & ~kImm30Mask;
 
     if (scope1 != scope2) {
       Assembler::JumpLabelToJumpRegister(pc_);
     }
   }
-#endif
   if (IsInternalReference(rmode_)) {
     // Absolute code pointer inside code object moves with the code object.
     byte* p = reinterpret_cast<byte*>(pc_);
@@ -85,6 +83,7 @@ bool RelocInfo::IsPatchedReturnSequence() {
                            (instr2 & kFunctionFieldMask) == JALR)));
   return patched_return;
 #else
+  UNREACHABLE();
   return true;;
 #endif
 }

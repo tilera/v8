@@ -2115,6 +2115,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ sra(scratch2, scratch1, 32);
       __ sra(scratch3, scratch1, 30);
       __ Branch(&not_smi_result, ne, scratch3, Operand(scratch2));
+      __ sll(scratch1, scratch1, 32); // Convert to Smi
       // Go slow on zero result to handle -0.
       __ move(v0, scratch1);
       __ Ret(ne, v0, Operand(zero));
