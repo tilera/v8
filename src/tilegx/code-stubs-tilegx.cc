@@ -500,15 +500,16 @@ void ConvertToDoubleStub::Generate(MacroAssembler* masm) {
   // }
   // {
   __ moveli(scratch2_, 539);
-  __ movn(source_, result_, scratch1_);
+  __ movn(source_, scratch1_, result_);
   // }
   // {
   __ sll(scratch2_, scratch2_, 8);
   __ sll(scratch1_, source_, 4);
   // }
   __ bfins(scratch2_, result_, 20, 20);
-  __ fdouble_pack1(result_, scratch1_, scratch2_);
-  __ fdouble_pack2(result_, scratch1_, zero);
+  __ fdouble_pack1(source_, scratch1_, scratch2_);
+  __ fdouble_pack2(source_, scratch1_, zero);
+  __ move(result_, source_);
   __ Ret();
 }
 
@@ -623,7 +624,7 @@ void FloatingPointHelper::ConvertIntToDouble(MacroAssembler* masm,
   // }
   // {
   __ moveli(scratch3, 539);
-  __ movn(int_scratch, dst, scratch2);
+  __ movn(int_scratch, scratch2, dst);
   // }
   // {
   __ sll(scratch3, scratch3, 8);
