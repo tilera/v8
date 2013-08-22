@@ -2856,8 +2856,8 @@ Handle<Code> StoreStubCompiler::CompileStoreCallback(
   ASSERT(holder->IsJSGlobalProxy() || !holder->IsAccessCheckNeeded());
 
   __ push(receiver());  // Receiver.
-  __ li(at, Operand(callback));  // Callback info.
-  __ Push(at, this->name(), value());
+  __ li(at2, Operand(callback));  // Callback info.
+  __ Push(at2, this->name(), value());
 
   // Do tail-call to the runtime system.
   ExternalReference store_callback_property =
