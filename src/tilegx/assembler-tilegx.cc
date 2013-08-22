@@ -1531,40 +1531,11 @@ void Assembler::stop(const char* msg, uint32_t code) {
 }
 
 void Assembler::JumpLabelToJumpRegister(Address pc) {
-#if 0
-  // Address pc points to lui/ori instructions.
-  // Jump to label may follow at pc + 2 * kInstrSize.
-  uint32_t* p = reinterpret_cast<uint32_t*>(pc);
-#ifdef DEBUG
-  Instr instr1 = instr_at(pc);
-#endif
-  Instr instr2 = instr_at(pc + 1 * kInstrSize);
-  Instr instr3 = instr_at(pc + 2 * kInstrSize);
-  bool patched = false;
+  uint64_t* p = reinterpret_cast<uint64_t*>(pc);
+  Instr instr4 = instr_at(pc + 3 * kInstrSize);
 
-  if (IsJal(instr3)) {
-    ASSERT(GetOpcodeField(instr1) == LUI);
-    ASSERT(GetOpcodeField(instr2) == ORI);
-
-    uint32_t rs_field = GetRt(instr2) << kRsShift;
-    uint32_t rd_field = ra.code() << kRdShift;  // Return-address (ra) reg.
-    *(p+2) = SPECIAL | rs_field | rd_field | JALR;
-    patched = true;
-  } else if (IsJ(instr3)) {
-    ASSERT(GetOpcodeField(instr1) == LUI);
-    ASSERT(GetOpcodeField(instr2) == ORI);
-
-    uint32_t rs_field = GetRt(instr2) << kRsShift;
-    *(p+2) = SPECIAL | rs_field | JR;
-    patched = true;
-  }
-
-  if (patched) {
-      CPU::FlushICache(pc+2, sizeof(Address));
-  }
-#else
-  UNREACHABLE();
-#endif
+  if (IsJAL(instr4) || IsJ(instr4))
+    UNREACHABLE();
 }
 
 } }  // namespace v8::internal
