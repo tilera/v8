@@ -71,21 +71,13 @@ void RelocInfo::apply(intptr_t delta) {
 }
 
 bool RelocInfo::IsPatchedReturnSequence() {
-#if 0
-  // FIXME 
   Instr instr0 = Assembler::instr_at(pc_);
   Instr instr1 = Assembler::instr_at(pc_ + 1 * Assembler::kInstrSize);
   Instr instr2 = Assembler::instr_at(pc_ + 2 * Assembler::kInstrSize);
-  bool patched_return = ((instr0 & kOpcodeMask) == LUI &&
-                         (instr1 & kOpcodeMask) == ORI &&
-                         ((instr2 & kOpcodeMask) == JAL ||
-                          ((instr2 & kOpcodeMask) == SPECIAL &&
-                           (instr2 & kFunctionFieldMask) == JALR)));
+  Instr instr3 = Assembler::instr_at(pc_ + 3 * Assembler::kInstrSize);
+  bool patched_return = (Assembler::IsMOVELI(instr0) && Assembler::IsSHL16INSLI(instr1)
+                         && Assembler::IsSHL16INSLI(instr2) && Assembler::IsJALR(instr3));
   return patched_return;
-#else
-  UNREACHABLE();
-  return true;;
-#endif
 }
 
 Address RelocInfo::target_address() {

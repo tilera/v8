@@ -118,6 +118,22 @@ bool Assembler::IsJAL(Instr instr) {
   return X1_OPC == JUMP_OPCODE_X1 && X1_SUB_OPC == JAL_JUMP_OPCODE_X1;
 }
 
+bool Assembler::IsJALR(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X1_OPC = -1, X1_SUB_OPC = -1, X1_SSUB_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X1_OPC = get_Opcode_X1(instr);
+  X1_SUB_OPC = get_RRROpcodeExtension_X1(instr);
+  X1_SSUB_OPC = get_UnaryOpcodeExtension_X1(instr);
+
+  // Checks if the instruction is a jal.
+  return X1_OPC == RRR_0_OPCODE_X1
+    && X1_SUB_OPC == UNARY_RRR_0_OPCODE_X1 && X1_SSUB_OPC == JALR_UNARY_OPCODE_X1;
+}
+
 bool Assembler::IsJR(Instr instr) {
   uint32_t mode   = get_Mode(instr);
   int32_t X1_OPC = -1, X1_SUB1_OPC = -1, X1_SUB2_OPC = -1;

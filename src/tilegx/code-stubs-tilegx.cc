@@ -6860,11 +6860,10 @@ void ICCompareStub::GenerateMiss(MacroAssembler* masm) {
 
 
 void DirectCEntryStub::Generate(MacroAssembler* masm) {
-#if 0
   // No need to pop or drop anything, LeaveExitFrame will restore the old
   // stack, thus dropping the allocated space for the return value.
   // The saved ra is after the reserved stack space for the 4 args.
-  __ ld(t9, MemOperand(sp, kCArgsSlotsSize));
+  __ ld(t9, MemOperand(sp, kStackLowReserve));
 
   if (FLAG_debug_code && FLAG_enable_slow_asserts) {
     // In case of an error the return address may point to a memory area
@@ -6872,51 +6871,40 @@ void DirectCEntryStub::Generate(MacroAssembler* masm) {
     // Dereference the address and check for this.
     __ ld(t0, MemOperand(t9));
     __ Assert(ne, "Received invalid return address.", t0,
-        Operand(reinterpret_cast<uint32_t>(kZapValue)));
+        Operand(reinterpret_cast<uint64_t>(kZapValue)));
   }
   __ Jump(t9);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void DirectCEntryStub::GenerateCall(MacroAssembler* masm,
                                     ExternalReference function) {
-#if 0
   __ li(t9, Operand(function));
   this->GenerateCall(masm, t9);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void DirectCEntryStub::GenerateCall(MacroAssembler* masm,
                                     Register target) {
-#if 0
   __ Move(t9, target);
   __ AssertStackIsAligned();
-  // Allocate space for arg slots.
-  __ Subu(sp, sp, kCArgsSlotsSize);
 
   // Block the trampoline pool through the whole function to make sure the
   // number of generated instructions is constant.
   Assembler::BlockTrampolinePoolScope block_trampoline_pool(masm);
 
   // We need to get the current 'pc' value, which is not available on MIPS.
-  Label find_ra;
-  masm->bal(&find_ra);  // ra = pc + 8.
-  masm->nop();  // Branch delay slot nop.
-  masm->bind(&find_ra);
+  masm->lnk(lr);  // ra = pc + 8.
 
-  const int kNumInstructionsToJump = 6;
+  Label find_ra;
+  masm->bind(&find_ra);
+  const int kNumInstructionsToJump = 7;
   masm->addli(ra, ra, kNumInstructionsToJump * kPointerSize);
   // Push return address (accessible to GC through exit frame pc).
   // This spot for ra was reserved in EnterExitFrame.
-  masm->st(ra, MemOperand(sp, kCArgsSlotsSize));
+  masm->st(ra, MemOperand(sp));
+  // Allocate space for TileGX private stack zone.
+  __ Subu(sp, sp, kStackLowReserve);
   intptr_t loc =
       reinterpret_cast<intptr_t>(GetCode(masm->isolate()).location());
   masm->li(ra, Operand(loc, RelocInfo::CODE_TARGET), CONSTANT_SIZE);
@@ -6924,10 +6912,6 @@ void DirectCEntryStub::GenerateCall(MacroAssembler* masm,
   masm->Jump(t9);
   // Make sure the stored 'ra' points to this position.
   ASSERT_EQ(kNumInstructionsToJump, masm->InstructionsGeneratedSince(&find_ra));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

@@ -787,15 +787,10 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
 void BaseStoreStubCompiler::GenerateRestoreName(MacroAssembler* masm,
                                                 Label* label,
                                                 Handle<Name> name) {
-#if 0
   if (!label->is_unused()) {
     __ bind(label);
     __ li(this->name(), Operand(name));
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -1454,7 +1449,6 @@ void BaseLoadStubCompiler::GenerateLoadConstant(Handle<JSFunction> value) {
 void BaseLoadStubCompiler::GenerateLoadCallback(
     Register reg,
     Handle<ExecutableAccessorInfo> callback) {
-#if 0
   // Build AccessorInfo::args_ list on the stack and push property name below
   // the exit frame to make GC aware of them and store pointers to them.
   __ push(receiver());
@@ -1513,10 +1507,6 @@ void BaseLoadStubCompiler::GenerateLoadCallback(
                               kStackUnwindSpace,
                               returns_handle,
                               4);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

@@ -786,6 +786,7 @@ class Assembler : public AssemblerBase {
   static bool IsJ(Instr instr);
   static bool IsJR(Instr instr);
   static bool IsJAL(Instr instr);
+  static bool IsJALR(Instr instr);
   static bool IsMOVELI(Instr instr);
   static bool IsANDI(Instr instr);
   static bool IsSHL16INSLI(Instr instr);
