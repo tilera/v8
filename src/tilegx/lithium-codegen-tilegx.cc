@@ -1084,7 +1084,106 @@ void LCodeGen::DoDivI(LDivI* instr) {  UNREACHABLE();  }
 void LCodeGen::DoMultiplyAddD(LMultiplyAddD* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoMulI(LMulI* instr) {  UNREACHABLE();  }
+void LCodeGen::DoMulI(LMulI* instr) {
+  Register scratch = scratch0();
+  Register result = ToRegister(instr->result());
+  // Note that result may alias left.
+  Register left = ToRegister(instr->left());
+  LOperand* right_op = instr->right();
+
+  bool can_overflow = instr->hydrogen()->CheckFlag(HValue::kCanOverflow);
+  bool bailout_on_minus_zero =
+    instr->hydrogen()->CheckFlag(HValue::kBailoutOnMinusZero);
+
+  if (right_op->IsConstantOperand() && !can_overflow) {
+    // Use optimized code for specific constants.
+    int32_t constant = ToInteger32(LConstantOperand::cast(right_op));
+
+    if (bailout_on_minus_zero && (constant < 0)) {
+      // The case of a null constant will be handled separately.
+      // If constant is negative and left is null, the result should be -0.
+      DeoptimizeIf(eq, instr->environment(), left, Operand(zero));
+    }
+
+    switch (constant) {
+      case -1:
+        __ Subu(result, zero, left);
+        break;
+      case 0:
+        if (bailout_on_minus_zero) {
+          // If left is strictly negative and the constant is null, the
+          // result is -0. Deoptimize if required, otherwise return 0.
+          DeoptimizeIf(lt, instr->environment(), left, Operand(zero));
+        }
+        __ move(result, zero);
+        break;
+      case 1:
+        // Nothing to do.
+        __ move(result, left);
+        break;
+      default:
+        // Multiplying by powers of two and powers of two plus or minus
+        // one can be done faster with shifted operands.
+        // For other constants we emit standard code.
+        int32_t mask = constant >> 31;
+        uint32_t constant_abs = (constant + mask) ^ mask;
+
+        if (IsPowerOf2(constant_abs) ||
+            IsPowerOf2(constant_abs - 1) ||
+            IsPowerOf2(constant_abs + 1)) {
+          if (IsPowerOf2(constant_abs)) {
+            int32_t shift = WhichPowerOf2(constant_abs);
+            __ sll(result, left, shift);
+          } else if (IsPowerOf2(constant_abs - 1)) {
+            int32_t shift = WhichPowerOf2(constant_abs - 1);
+            __ sll(scratch, left, shift);
+            __ Addu(result, scratch, left);
+          } else if (IsPowerOf2(constant_abs + 1)) {
+            int32_t shift = WhichPowerOf2(constant_abs + 1);
+            __ sll(scratch, left, shift);
+            __ Subu(result, scratch, left);
+          }
+
+          // Correct the sign of the result is the constant is negative.
+          if (constant < 0)  {
+            __ Subu(result, zero, result);
+          }
+
+        } else {
+          // Generate standard code.
+          __ li(at, constant);
+          __ Mul(result, left, at);
+        }
+    }
+
+  } else {
+    Register right = EmitLoadRegister(right_op, scratch);
+    if (bailout_on_minus_zero) {
+      __ Or(ToRegister(instr->temp()), left, right);
+    }
+
+    if (can_overflow) {
+      // hi:lo = left * right.
+      __ mul_ls_ls(result, left, right);
+      __ sra(scratch, result, 32);
+      __ sra(at, result, 31);
+      DeoptimizeIf(ne, instr->environment(), scratch, Operand(at));
+    } else {
+      __ Mul(result, left, right);
+    }
+
+    if (bailout_on_minus_zero) {
+      // Bail out if the result is supposed to be negative zero.
+      Label done;
+      __ Branch(&done, ne, result, Operand(zero));
+      DeoptimizeIf(lt,
+                   instr->environment(),
+                   ToRegister(instr->temp()),
+                   Operand(zero));
+      __ bind(&done);
+    }
+  }
+}
 
 
 void LCodeGen::DoBitI(LBitI* instr) {
@@ -2455,11 +2554,49 @@ MemOperand LCodeGen::PrepareKeyedOperand(Register key,
                                          int element_size,
                                          int shift_size,
                                          int additional_index,
-                                         int additional_offset) {  UNREACHABLE();  return MemOperand(r0);}
+                                         int additional_offset) {
+  if (additional_index != 0 && !key_is_constant) {
+    additional_index *= 1 << (element_size - shift_size);
+    __ Addu(scratch0(), key, Operand(additional_index));
+  }
 
+  if (key_is_constant) {
+    return MemOperand(base,
+                      (constant_key << element_size) + additional_offset);
+  }
 
-void LCodeGen::DoLoadKeyedGeneric(LLoadKeyedGeneric* instr) {  UNREACHABLE();  }
+  if (additional_index == 0) {
+    if (shift_size >= 0) {
+      __ sll(scratch0(), key, shift_size);
+      __ Addu(scratch0(), base, scratch0());
+      return MemOperand(scratch0());
+    } else {
+      ASSERT_EQ(-1, shift_size);
+      __ srl(scratch0(), key, 1);
+      __ Addu(scratch0(), base, scratch0());
+      return MemOperand(scratch0());
+    }
+  }
 
+  if (shift_size >= 0) {
+    __ sll(scratch0(), scratch0(), shift_size);
+    __ Addu(scratch0(), base, scratch0());
+    return MemOperand(scratch0());
+  } else {
+    ASSERT_EQ(-1, shift_size);
+    __ srl(scratch0(), scratch0(), 1);
+    __ Addu(scratch0(), base, scratch0());
+    return MemOperand(scratch0());
+  }
+}
+
+void LCodeGen::DoLoadKeyedGeneric(LLoadKeyedGeneric* instr) {
+  ASSERT(ToRegister(instr->object()).is(a1));
+  ASSERT(ToRegister(instr->key()).is(a0));
+
+  Handle<Code> ic = isolate()->builtins()->KeyedLoadIC_Initialize();
+  CallCode(ic, RelocInfo::CODE_TARGET, instr);
+}
 
 void LCodeGen::DoArgumentsElements(LArgumentsElements* instr) {  UNREACHABLE();  }
 
@@ -3040,8 +3177,19 @@ void LCodeGen::DoStringLength(LStringLength* instr) {  UNREACHABLE();  }
 void LCodeGen::DoInteger32ToDouble(LInteger32ToDouble* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoInteger32ToSmi(LInteger32ToSmi* instr) {  UNREACHABLE();  }
+void LCodeGen::DoInteger32ToSmi(LInteger32ToSmi* instr) {
+  LOperand* input = instr->value();
+  ASSERT(input->IsRegister());
+  LOperand* output = instr->result();
+  ASSERT(output->IsRegister());
+  Register scratch = scratch0();
 
+  __ SmiTagCheckOverflow(ToRegister(output), ToRegister(input), scratch);
+  if (!instr->hydrogen()->value()->HasRange() ||
+      !instr->hydrogen()->value()->range()->IsInSmiRange()) {
+    DeoptimizeIf(lt, instr->environment(), scratch, Operand(zero));
+  }
+}
 
 void LCodeGen::DoUint32ToDouble(LUint32ToDouble* instr) {  UNREACHABLE();  }
 
@@ -3063,11 +3211,25 @@ void LCodeGen::DoNumberTagD(LNumberTagD* instr) {  UNREACHABLE();  }
 void LCodeGen::DoDeferredNumberTagD(LNumberTagD* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoSmiTag(LSmiTag* instr) {  UNREACHABLE();  }
+void LCodeGen::DoSmiTag(LSmiTag* instr) {
+  ASSERT(!instr->hydrogen_value()->CheckFlag(HValue::kCanOverflow));
+  __ SmiTag(ToRegister(instr->result()), ToRegister(instr->value()));
+}
 
-
-void LCodeGen::DoSmiUntag(LSmiUntag* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoSmiUntag(LSmiUntag* instr) {
+  Register scratch = scratch0();
+  Register input = ToRegister(instr->value());
+  Register result = ToRegister(instr->result());
+  if (instr->needs_check()) {
+    STATIC_ASSERT(kHeapObjectTag == 1);
+    // If the input is a HeapObject, value of scratch won't be zero.
+    __ And(scratch, input, Operand(kHeapObjectTag));
+    __ SmiUntag(result, input);
+    DeoptimizeIf(ne, instr->environment(), scratch, Operand(zero));
+  } else {
+    __ SmiUntag(result, input);
+  }
+}
 
 void LCodeGen::EmitNumberUntagD(Register input_reg,
                                 DoubleRegister result_reg,
@@ -3083,8 +3245,34 @@ void LCodeGen::DoDeferredTaggedToI(LTaggedToI* instr) {  UNREACHABLE();  }
 void LCodeGen::DoTaggedToI(LTaggedToI* instr) {  UNREACHABLE();  }
 
 
-void LCodeGen::DoNumberUntagD(LNumberUntagD* instr) {  UNREACHABLE();  }
+void LCodeGen::DoNumberUntagD(LNumberUntagD* instr) {
+  LOperand* input = instr->value();
+  ASSERT(input->IsRegister());
+  LOperand* result = instr->result();
+  ASSERT(result->IsDoubleRegister());
 
+  Register input_reg = ToRegister(input);
+  DoubleRegister result_reg = ToDoubleRegister(result);
+
+  NumberUntagDMode mode = NUMBER_CANDIDATE_IS_ANY_TAGGED;
+  HValue* value = instr->hydrogen()->value();
+  if (value->type().IsSmi()) {
+    mode = NUMBER_CANDIDATE_IS_SMI;
+  } else if (value->IsLoadKeyed()) {
+    HLoadKeyed* load = HLoadKeyed::cast(value);
+    if (load->UsesMustHandleHole()) {
+      if (load->hole_mode() == ALLOW_RETURN_HOLE) {
+        mode = NUMBER_CANDIDATE_IS_ANY_TAGGED_CONVERT_HOLE;
+      }
+    }
+  }
+
+  EmitNumberUntagD(input_reg, result_reg,
+                   instr->hydrogen()->deoptimize_on_undefined(),
+                   instr->hydrogen()->deoptimize_on_minus_zero(),
+                   instr->environment(),
+                   mode);
+}
 
 void LCodeGen::DoDoubleToI(LDoubleToI* instr) {  UNREACHABLE();  }
 

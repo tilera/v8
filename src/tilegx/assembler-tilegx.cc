@@ -1017,6 +1017,12 @@ void Assembler::dd(uint32_t data) {
   pc_ += sizeof(uint32_t);
 }
 
+void Assembler::dq(uint64_t data) {
+  CheckBuffer();
+  *reinterpret_cast<uint64_t*>(pc_) = data;
+  pc_ += sizeof(uint64_t);
+}
+
 bool Assembler::IsNop(Instr instr, unsigned int type) {
   UNREACHABLE();
   return false;
@@ -1531,7 +1537,6 @@ void Assembler::stop(const char* msg, uint32_t code) {
 }
 
 void Assembler::JumpLabelToJumpRegister(Address pc) {
-  uint64_t* p = reinterpret_cast<uint64_t*>(pc);
   Instr instr4 = instr_at(pc + 3 * kInstrSize);
 
   if (IsJAL(instr4) || IsJ(instr4))

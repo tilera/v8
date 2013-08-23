@@ -607,7 +607,7 @@ void MathExpGenerator::EmitMathExp(MacroAssembler* masm,
 
 
 // nop(CODE_AGE_MARKER_NOP)
-static const uint32_t kCodeAgePatchFirstInstruction = 0x00010180;
+static const uint64_t kCodeAgePatchFirstInstruction = 0x3004339fd1483000L;
 
 static byte* GetNoCodeAgeSequence(uint32_t* length) {
   // The sequence of instructions that is patched out for aging code is the
@@ -663,6 +663,12 @@ void Code::PatchPlatformCodeAge(byte* sequence,
     CodePatcher patcher(sequence, young_length / Assembler::kInstrSize);
     // Mark this code sequence for FindPlatformCodeAgeSequence()
     patcher.masm()->nop(Assembler::CODE_AGE_MARKER_NOP);
+
+    patcher.masm()->nop();
+    patcher.masm()->nop();
+    patcher.masm()->nop();
+    patcher.masm()->nop();
+
     // Save the function's original return address
     // (it will be clobbered by Call(t9))
     patcher.masm()->move(at, ra);
@@ -671,7 +677,7 @@ void Code::PatchPlatformCodeAge(byte* sequence,
         Operand(reinterpret_cast<uint64_t>(stub->instruction_start())));
     patcher.masm()->Call(t9);
     // Record the stub address in the empty space for GetCodeAgeAndParity()
-    patcher.masm()->dd(reinterpret_cast<uint64_t>(stub->instruction_start()));
+    patcher.masm()->dq(reinterpret_cast<uint64_t>(stub->instruction_start()));
   }
 }
 

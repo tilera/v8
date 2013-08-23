@@ -748,6 +748,7 @@ class Assembler : public AssemblerBase {
   // inline tables, e.g., jump-tables.
   void db(uint8_t data);
   void dd(uint32_t data);
+  void dq(uint64_t data);
 
   // GetCode emits any pending (non-emitted) code and fills the descriptor
   // desc. GetCode() is idempotent; it returns the same result if no other
@@ -866,8 +867,10 @@ class Assembler : public AssemblerBase {
   // ---------------------------------------------------------------------------
   // Instruction Encoding
   
-  void nop(int line = 0) {
-    sll(zero, zero, zero, line);
+  void nop(unsigned int type = 0, int line = 0) {
+    ASSERT(type < 32);
+    Register nop_rt_reg = (type == 0) ? zero : at;
+    sll(zero, nop_rt_reg, type, line);
   }
 
   void j(int64_t target, int line = 0);

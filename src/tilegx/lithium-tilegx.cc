@@ -1429,7 +1429,6 @@ LInstruction* LChunkBuilder::DoMod(HMod* instr) {
 
 
 LInstruction* LChunkBuilder::DoMul(HMul* instr) {
-#if 0
   if (instr->representation().IsInteger32()) {
     ASSERT(instr->left()->representation().IsInteger32());
     ASSERT(instr->right()->representation().IsInteger32());
@@ -1452,6 +1451,7 @@ LInstruction* LChunkBuilder::DoMul(HMul* instr) {
     return DefineAsRegister(mul);
 
   } else if (instr->representation().IsDouble()) {
+#if 0
     if (kArchVariant == kMips32r2) {
       if (instr->UseCount() == 1 && instr->uses().value()->IsAdd()) {
         HAdd* add = HAdd::cast(instr->uses().value());
@@ -1467,14 +1467,11 @@ LInstruction* LChunkBuilder::DoMul(HMul* instr) {
         }
       }
     }
+#endif
     return DoArithmeticD(Token::MUL, instr);
   } else {
     return DoArithmeticT(Token::MUL, instr);
   }
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 
@@ -1508,7 +1505,6 @@ LInstruction* LChunkBuilder::DoMultiplyAdd(HMul* mul, HValue* addend) {
 
 
 LInstruction* LChunkBuilder::DoAdd(HAdd* instr) {
-#if 0
   if (instr->representation().IsInteger32()) {
     ASSERT(instr->left()->representation().IsInteger32());
     ASSERT(instr->right()->representation().IsInteger32());
@@ -1521,6 +1517,8 @@ LInstruction* LChunkBuilder::DoAdd(HAdd* instr) {
     }
     return result;
   } else if (instr->representation().IsDouble()) {
+    //FIXME: disable madd opt temperarily.
+#if 0
     if (kArchVariant == kMips32r2) {
       if (instr->left()->IsMul())
         return DoMultiplyAdd(HMul::cast(instr->left()), instr->right());
@@ -1530,15 +1528,12 @@ LInstruction* LChunkBuilder::DoAdd(HAdd* instr) {
         return DoMultiplyAdd(HMul::cast(instr->right()), instr->left());
       }
     }
+#endif
     return DoArithmeticD(Token::ADD, instr);
   } else {
     ASSERT(instr->representation().IsSmiOrTagged());
     return DoArithmeticT(Token::ADD, instr);
   }
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 
@@ -1745,15 +1740,10 @@ LInstruction* LChunkBuilder::DoValueOf(HValueOf* instr) {
 
 
 LInstruction* LChunkBuilder::DoDateField(HDateField* instr) {
-#if 0
   LOperand* object = UseFixed(instr->value(), r0);
   LDateField* result =
       new(zone()) LDateField(object, FixedTemp(a1), instr->index());
   return MarkAsCall(DefineFixed(result, r0), instr, CAN_DEOPTIMIZE_EAGERLY);
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 
