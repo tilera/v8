@@ -84,6 +84,15 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
       create_RRROpcodeExtension_X0(MUL_HS_HS_RRR_0_OPCODE_X0) | FNOP_X1
 
+#define FSINGLE_PACK1_X0                                                       \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(UNARY_RRR_0_OPCODE_X0) |                    \
+      create_UnaryOpcodeExtension_X0(FSINGLE_PACK1_UNARY_OPCODE_X0) | FNOP_X1
+
+#define FSINGLE_PACK2_X0                                                       \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(FSINGLE_PACK2_RRR_0_OPCODE_X0) | FNOP_X1
+
 #define FDOUBLE_PACK1_X0                                                       \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
       create_RRROpcodeExtension_X0(FDOUBLE_PACK1_RRR_0_OPCODE_X0) | FNOP_X1
@@ -99,6 +108,10 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 #define SUB_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(SUB_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define SUBX_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SUBX_RRR_0_OPCODE_X1) | FNOP_X0
 
 #define MULX_X0                                                                \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
@@ -932,6 +945,7 @@ class Assembler : public AssemblerBase {
   void ld4s(const Register& rd, const Register& rs, int line = 0);
   void add(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void sub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void subx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void mulx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void addi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
   void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
@@ -960,6 +974,8 @@ class Assembler : public AssemblerBase {
   void mul_hs_ls(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void mul_hs_hs(const Register& rd, const Register& rs, const Register& rt, int line = 0);
 
+  void fsingle_pack1(const Register& rd, const Register& rsa, int line = 0);
+  void fsingle_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 

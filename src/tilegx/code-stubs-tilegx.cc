@@ -969,7 +969,7 @@ static void EmitIdenticalObjectComparison(MacroAssembler* masm,
 
   __ Branch(&not_identical, ne, a0, Operand(a1));
 
-  __ li(exp_mask_reg, Operand(HeapNumber::kExponentMask));
+  __ li(exp_mask_reg, Operand(0x7FF0000000000000L));
 
   // Test for NaN. Sadly, we can't just compare to factory->nan_value(),
   // so we do the second best thing - test it ourselves.
@@ -1025,17 +1025,14 @@ static void EmitIdenticalObjectComparison(MacroAssembler* masm,
     // The representation of NaN values has all exponent bits (52..62) set,
     // and not all mantissa bits (0..51) clear.
     // Read top bits of double representation (second word of value).
-    __ ld(t2, FieldMemOperand(a0, HeapNumber::kExponentOffset));
+    __ ld(t2, FieldMemOperand(a0, HeapNumber::kValueOffset));
     // Test that exponent bits are all set.
     __ And(t3, t2, Operand(exp_mask_reg));
     // If all bits not set (ne cond), then not a NaN, objects are equal.
     __ Branch(&return_equal, ne, t3, Operand(exp_mask_reg));
 
     // Shift out flag and all exponent bits, retaining only mantissa.
-    __ sll(t2, t2, HeapNumber::kNonMantissaBitsInTopWord);
-    // Or with all low-bits of mantissa.
-    __ ld(t3, FieldMemOperand(a0, HeapNumber::kMantissaOffset));
-    __ Or(v0, t3, Operand(t2));
+    __ sll(v0, t2, HeapNumber::kNonMantissaBitsInTopWord);
     // For equal we already have the right value in v0:  Return zero (equal)
     // if all bits in mantissa are zero (it's an Infinity) and non-zero if
     // not (it's a NaN).  For <= and >= we need to load v0 with the failing

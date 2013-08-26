@@ -464,6 +464,19 @@ void Assembler::ld4s(const Register& rd, const Register& rs, int line) {
   emit(instr, line);
 }
 
+void Assembler::fsingle_pack1(const Register& rd, const Register& rsa, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid());
+  Instr instr = FSINGLE_PACK1_X0 | DEST_X0(rd.code()) | SRCA_X0(rsa.code());
+  emit(instr, line);
+}
+
+void Assembler::fsingle_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = FSINGLE_PACK2_X0 | DEST_X0(rd.code())
+	               | SRCA_X0(rsa.code()) | SRCB_X0(rsb.code());
+  emit(instr, line);
+}
+
 void Assembler::fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = FDOUBLE_PACK1_X0 | DEST_X0(rd.code())
@@ -488,6 +501,13 @@ void Assembler::add(const Register& rd, const Register& rsa, const Register& rsb
 void Assembler::sub(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = SUB_X1 | DEST_X1(rd.code())
+	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
+void Assembler::subx(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = SUBX_X1 | DEST_X1(rd.code())
 	               | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
   emit(instr, line);
 }

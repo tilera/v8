@@ -1206,7 +1206,6 @@ static void GenerateCheckPropertyCells(MacroAssembler* masm,
 }
 
 
-#if 0
 // Convert and store int passed in register ival to IEEE 754 single precision
 // floating point value at memory location (dst + 4 * wordoffset)
 // If FPU is available use it for conversion.
@@ -1214,15 +1213,27 @@ static void StoreIntAsFloat(MacroAssembler* masm,
                             Register dst,
                             Register wordoffset,
                             Register ival,
-                            Register scratch1) {
-  __ mtc1(ival, f0);
-  __ cvt_s_w(f0, f0);
-  __ sll(scratch1, wordoffset, 2);
-  __ addu(scratch1, dst, scratch1);
-  __ swc1(f0, MemOperand(scratch1, 0));
-}
-#endif
+                            Register fval,
+                            Register scratch1,
+                            Register scratch2) {
+  // {
+  __ cmpltsi(fval, ival, 0);
+  __ subx(scratch1, zero, ival);
+  // }
+  // {
+  __ moveli(scratch2, 158);
+  __ movn(ival, scratch1, fval);
+  // }
+  __ bfins(scratch2, fval, 10, 10);
+  __ bfins(scratch2, ival, 32, 63);
+  __ fsingle_pack1(ival, scratch2);
+  __ fsingle_pack2(ival, scratch2, ival);
 
+
+  __ sll(scratch1, wordoffset, 2);
+  __ add(scratch1, dst, scratch1);
+  __ st4(ival, MemOperand(scratch1));
+}
 
 void StubCompiler::GenerateTailCall(MacroAssembler* masm, Handle<Code> code) {
   __ Jump(code, RelocInfo::CODE_TARGET);
@@ -2738,7 +2749,6 @@ Handle<Code> CallStubCompiler::CompileCallConstant(
 Handle<Code> CallStubCompiler::CompileCallInterceptor(Handle<JSObject> object,
                                                       Handle<JSObject> holder,
                                                       Handle<Name> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2    : name
   //  -- ra    : return address
@@ -2773,10 +2783,6 @@ Handle<Code> CallStubCompiler::CompileCallInterceptor(Handle<JSObject> object,
 
   // Return the generated code.
   return GetCode(Code::INTERCEPTOR, name);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -3401,46 +3407,44 @@ void KeyedLoadStubCompiler::GenerateLoadDictionaryElement(
 }
 
 
-#if 0
 static void GenerateSmiKeyCheck(MacroAssembler* masm,
                                 Register key,
-                                Register scratch0,
-                                Register scratch1,
-                                FPURegister double_scratch0,
-                                FPURegister double_scratch1,
                                 Label* fail) {
-  Label key_ok;
-  // Check for smi or a smi inside a heap number.  We convert the heap
-  // number and check if the conversion is exact and fits into the smi
-  // range.
-  __ JumpIfSmi(key, &key_ok);
-  __ CheckMap(key,
-              scratch0,
-              Heap::kHeapNumberMapRootIndex,
-              fail,
-              DONT_DO_SMI_CHECK);
-  __ ldc1(double_scratch0, FieldMemOperand(key, HeapNumber::kValueOffset));
-  __ EmitFPUTruncate(kRoundToZero,
-                     scratch0,
-                     double_scratch0,
-                     at,
-                     double_scratch1,
-                     scratch1,
-                     kCheckForInexactConversion);
-
-  __ Branch(fail, ne, scratch1, Operand(zero));
-
-  __ SmiTagCheckOverflow(key, scratch0, scratch1);
-  __ BranchOnOverflow(fail, scratch1);
-  __ bind(&key_ok);
+  __ JumpIfNotSmi(key, fail);
 }
-#endif
 
+static bool IsElementTypeSigned(ElementsKind elements_kind) {
+  switch (elements_kind) {
+    case EXTERNAL_BYTE_ELEMENTS:
+    case EXTERNAL_SHORT_ELEMENTS:
+    case EXTERNAL_INT_ELEMENTS:
+      return true;
+
+    case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
+    case EXTERNAL_UNSIGNED_SHORT_ELEMENTS:
+    case EXTERNAL_UNSIGNED_INT_ELEMENTS:
+    case EXTERNAL_PIXEL_ELEMENTS:
+      return false;
+
+    case EXTERNAL_FLOAT_ELEMENTS:
+    case EXTERNAL_DOUBLE_ELEMENTS:
+    case FAST_SMI_ELEMENTS:
+    case FAST_ELEMENTS:
+    case FAST_DOUBLE_ELEMENTS:
+    case FAST_HOLEY_SMI_ELEMENTS:
+    case FAST_HOLEY_ELEMENTS:
+    case FAST_HOLEY_DOUBLE_ELEMENTS:
+    case DICTIONARY_ELEMENTS:
+    case NON_STRICT_ARGUMENTS_ELEMENTS:
+      UNREACHABLE();
+      return false;
+  }
+  return false;
+}
 
 void KeyedStoreStubCompiler::GenerateStoreExternalArray(
     MacroAssembler* masm,
     ElementsKind elements_kind) {
-#if 0
   // ---------- S t a t e --------------
   //  -- a0     : value
   //  -- a1     : key
@@ -3460,7 +3464,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
   // have been verified by the caller to not be a smi.
 
   // Check that the key is a smi or a heap number convertible to a smi.
-  GenerateSmiKeyCheck(masm, key, t0, t1, f2, f4, &miss_force_generic);
+  GenerateSmiKeyCheck(masm, key, &miss_force_generic);
 
   __ ld(a3, FieldMemOperand(receiver, JSObject::kElementsOffset));
 
@@ -3494,50 +3498,50 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       // Normal branch: nop in delay slot.
       __ Branch(&done, gt, t1, Operand(v0));
       // Use delay slot in this branch.
-      __ Branch(USE_DELAY_SLOT, &done, lt, t1, Operand(zero));
       __ move(v0, zero);  // In delay slot.
+      __ Branch(&done, lt, t1, Operand(zero));
       __ move(v0, t1);  // Value is in range 0..255.
       __ bind(&done);
       __ move(t1, v0);
 
-      __ srl(t8, key, 1);
-      __ addu(t8, a3, t8);
-      __ st1(t1, MemOperand(t8, 0));
+      __ srl(t8, key, 32); // Untag
+      __ add(t8, a3, t8);
+      __ st1(t1, MemOperand(t8));
       }
       break;
     case EXTERNAL_BYTE_ELEMENTS:
     case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
-      __ srl(t8, key, 1);
-      __ addu(t8, a3, t8);
-      __ st1(t1, MemOperand(t8, 0));
+      __ srl(t8, key, 32); // Untag
+      __ add(t8, a3, t8);
+      __ st1(t1, MemOperand(t8));
       break;
     case EXTERNAL_SHORT_ELEMENTS:
     case EXTERNAL_UNSIGNED_SHORT_ELEMENTS:
-      __ addu(t8, a3, key);
-      __ sh(t1, MemOperand(t8, 0));
+      __ srl(t8, key, 31); // Untag, then multiply 2
+      __ add(t8, a3, t8);
+      __ st2(t1, MemOperand(t8));
       break;
     case EXTERNAL_INT_ELEMENTS:
     case EXTERNAL_UNSIGNED_INT_ELEMENTS:
-      __ sll(t8, key, 1);
-      __ addu(t8, a3, t8);
-      __ st(t1, MemOperand(t8, 0));
+      __ srl(t8, key, 30); // Untag, then multiply 4
+      __ add(t8, a3, t8);
+      __ st(t1, MemOperand(t8));
       break;
     case EXTERNAL_FLOAT_ELEMENTS:
       // Perform int-to-float conversion and store to memory.
       __ SmiUntag(t0, key);
-      StoreIntAsFloat(masm, a3, t0, t1, t2);
+      StoreIntAsFloat(masm, a3, t0, t1, t2, t3, t4);
       break;
     case EXTERNAL_DOUBLE_ELEMENTS:
-      __ sll(t8, key, 2);
-      __ addu(a3, a3, t8);
+      __ srl(t8, key, 29); // Untag, then multiply 8
+      __ add(a3, a3, t8);
       // a3: effective address of the double element
       FloatingPointHelper::Destination destination;
-      destination = FloatingPointHelper::kFPURegisters;
+      destination = FloatingPointHelper::kCoreRegisters;
       FloatingPointHelper::ConvertIntToDouble(
           masm, t1, destination,
-          f0, t2, t3,  // These are: double_dst, dst_mantissa, dst_exponent.
-          t0, f2);  // These are: scratch2, single_scratch.
-      __ sdc1(f0, MemOperand(a3, 0));
+          t2, t3, t0);
+      __ st(t2, MemOperand(a3));
       break;
     case FAST_ELEMENTS:
     case FAST_SMI_ELEMENTS:
@@ -3570,37 +3574,146 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
     // reproducible behavior, convert these to zero.
 
 
-    __ ldc1(f0, FieldMemOperand(a0, HeapNumber::kValueOffset));
+    __ ld(t3, FieldMemOperand(value, HeapNumber::kValueOffset));
 
     if (elements_kind == EXTERNAL_FLOAT_ELEMENTS) {
-      __ cvt_s_d(f0, f0);
-      __ sll(t8, key, 1);
-      __ addu(t8, a3, t8);
-      __ swc1(f0, MemOperand(t8, 0));
-    } else if (elements_kind == EXTERNAL_DOUBLE_ELEMENTS) {
-      __ sll(t8, key, 2);
-      __ addu(t8, a3, t8);
-      __ sdc1(f0, MemOperand(t8, 0));
-    } else {
-      __ EmitECMATruncate(t3, f0, f2, t2, t1, t5);
+      Label done, nan_or_infinity_or_zero;
 
+      // Test for all special exponent values: zeros, subnormal numbers, NaNs
+      // and infinities. All these should be converted to 0.
+      __ li(t5, Operand(0x7FF0000000000000L));
+      __ and_(t6, t3, t5);
+      __ Branch(&nan_or_infinity_or_zero, eq, t6, Operand(zero));
+
+      __ xor_(t1, t6, t5);
+      __ li(t2, Operand(0x7F800000));
+      __ movz(t6, t2, t1);  // Only if t6 is equal to t5.
+      __ Branch(&nan_or_infinity_or_zero, eq, t1, Operand(zero));
+
+      // Rebias exponent.
+      __ srl(t6, t6, 52);
+      __ Addu(t6,
+              t6,
+              Operand(kBinary32ExponentBias - HeapNumber::kExponentBias));
+
+      __ li(t1, Operand(kBinary32MaxExponent));
+      __ cmplts(t1, t1, t6);
+      __ And(t2, t3, Operand(0x8000000000000000L));
+      __ srl(t2, t2, 32);
+      __ Or(t2, t2, Operand(kBinary32ExponentMask));
+      __ movn(t3, t2, t1);  // Only if t6 is gt kBinary32MaxExponent.
+      __ Branch(&done, gt, t6, Operand(kBinary32MaxExponent));
+
+      __ li(t1, Operand(kBinary32MinExponent));
+      __ cmplts(t1, t6, t1);
+      __ And(t2, t3, Operand(0x8000000000000000L));
+      __ srl(t2, t2, 32);
+      __ movn(t3, t2, t1);  // Only if t6 is lt kBinary32MinExponent.
+      __ Branch(&done, lt, t6, Operand(kBinary32MinExponent));
+
+      __ And(t7, t3, Operand(0x8000000000000000L));
+      __ srl(t7, t7, 32);
+      __ And(t3, t3, Operand(0xFFFFFFFFFFFFFL));
+      __ srl(t4, t3, 52 - 23);
+      __ or_(t7, t7, t4);
+
+      __ sll(t6, t6, kBinary32ExponentShift);
+      __ or_(t3, t7, t6);
+
+      __ bind(&done);
+      __ srl(t9, key, 30);
+      __ add(t9, a3, t9);
+      __ st(t3, MemOperand(t9));
+
+      // Entry registers are intact, a0 holds the value which is the return
+      // value.
+      __ move(v0, a0);
+      __ Ret();
+
+      __ bind(&nan_or_infinity_or_zero);
+      __ And(t7, t3, Operand(0x8000000000000000L));
+      __ srl(t7, t7, 32);
+      __ or_(t6, t6, t7);
+      
+      __ And(t3, t3, Operand(0xFFFFFFFFFFFFFL));
+      __ srl(t4, t3, 52 - 23);
+      __ or_(t3, t6, t4);
+      __ Branch(&done);
+    } else if (elements_kind == EXTERNAL_DOUBLE_ELEMENTS) {
+      __ srl(t8, key, 29); // Untag, then multiply by 8
+      __ add(t8, a3, t8);
+      __ st(t3, MemOperand(t8));
+      __ move(v0, a0);
+      __ Ret();
+    } else {
+      bool is_signed_type = IsElementTypeSigned(elements_kind);
+      int meaningfull_bits = is_signed_type ? (kBitsPerInt - 1) : kBitsPerInt;
+      int32_t min_value    = is_signed_type ? 0x80000000 : 0x00000000;
+
+      Label done, sign;
+
+      // Test for all special exponent values: zeros, subnormal numbers, NaNs
+      // and infinities. All these should be converted to 0.
+      __ li(t5, Operand(0x7FF0000000000000L));
+      __ and_(t6, t3, t5);
+      __ movz(t3, zero, t6);  // Only if t6 is equal to zero.
+      __ Branch(&done, eq, t6, Operand(zero));
+
+      __ xor_(t2, t6, t5);
+      __ movz(t3, zero, t2);  // Only if t6 is equal to t5.
+      __ Branch(&done, eq, t6, Operand(t5));
+
+      // Unbias exponent.
+      __ srl(t6, t6, 52);
+      __ Subu(t6, t6, Operand(HeapNumber::kExponentBias));
+      // If exponent is negative then result is 0.
+      __ cmplts(t2, t6, zero);
+      __ movn(t3, zero, t2);  // Only if exponent is negative.
+      __ Branch(&done, lt, t6, Operand(zero));
+
+      // If exponent is too big then result is minimal value.
+      __ li(t1, Operand(meaningfull_bits - 1));
+      __ cmplts(t1, t6, t1);
+      __ li(t2, min_value);
+      __ movz(t3, t2, t1);  // Only if t6 is ge meaningfull_bits - 1.
+      __ Branch(&done, ge, t6, Operand(meaningfull_bits - 1));
+
+      __ And(t5, t3, Operand(0x8000000000000000L));
+      __ srl(t5, t5, 32);
+
+      __ And(t3, t3, Operand(0xFFFFFFFFFFFFFL));
+      __ Or(t3, t3, Operand(1L << 52));
+
+      __ li(t9, meaningfull_bits);
+      __ sub(t4, t9, t6);
+      __ srl(t3, t3, t4);
+
+      __ bind(&sign);
+      __ sub(t2, t3, zero);
+      __ movz(t3, t2, t5);  // Only if t5 is zero.
+
+      __ bind(&done);
+
+      // Result is in t3.
+      // This switch block should be exactly the same as above (FPU mode).
       switch (elements_kind) {
         case EXTERNAL_BYTE_ELEMENTS:
         case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
-          __ srl(t8, key, 1);
-          __ addu(t8, a3, t8);
-          __ st1(t3, MemOperand(t8, 0));
+          __ srl(t8, key, 32);
+          __ add(t8, a3, t8);
+          __ st1(t3, MemOperand(t8));
           break;
         case EXTERNAL_SHORT_ELEMENTS:
         case EXTERNAL_UNSIGNED_SHORT_ELEMENTS:
-          __ addu(t8, a3, key);
-          __ sh(t3, MemOperand(t8, 0));
+          __ srl(t8, key, 31);
+          __ add(t8, a3, t8);
+          __ st2(t3, MemOperand(t8));
           break;
         case EXTERNAL_INT_ELEMENTS:
         case EXTERNAL_UNSIGNED_INT_ELEMENTS:
-          __ sll(t8, key, 1);
-          __ addu(t8, a3, t8);
-          __ st(t3, MemOperand(t8, 0));
+          __ srl(t8, key, 30);
+          __ add(t8, a3, t8);
+          __ st(t3, MemOperand(t8));
           break;
         case EXTERNAL_PIXEL_ELEMENTS:
         case EXTERNAL_FLOAT_ELEMENTS:
@@ -3617,11 +3730,6 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
           break;
       }
     }
-
-    // Entry registers are intact, a0 holds the value
-    // which is the return value.
-    __ move(v0, a0);
-    __ Ret();
   }
 
   // Slow case, key and receiver still in a0 and a1.
@@ -3646,10 +3754,6 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
   //  -- a1     : receiver
   // -----------------------------------
   TailCallBuiltin(masm, Builtins::kKeyedStoreIC_MissForceGeneric);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -3658,7 +3762,6 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
     bool is_js_array,
     ElementsKind elements_kind,
     KeyedAccessStoreMode store_mode) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a0    : value
   //  -- a1    : key
@@ -3682,7 +3785,7 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
   // have been verified by the caller to not be a smi.
 
   // Check that the key is a smi or a heap number convertible to a smi.
-  GenerateSmiKeyCheck(masm, key_reg, t0, t1, f2, f4, &miss_force_generic);
+  GenerateSmiKeyCheck(masm, key_reg, &miss_force_generic);
 
   if (IsFastSmiElementsKind(elements_kind)) {
     __ JumpIfNotSmi(value_reg, &transition_elements_kind);
@@ -3809,10 +3912,6 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
     __ bind(&slow);
     TailCallBuiltin(masm, Builtins::kKeyedStoreIC_Slow);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -3820,7 +3919,6 @@ void KeyedStoreStubCompiler::GenerateStoreFastDoubleElement(
     MacroAssembler* masm,
     bool is_js_array,
     KeyedAccessStoreMode store_mode) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a0    : value
   //  -- a1    : key
@@ -3851,7 +3949,7 @@ void KeyedStoreStubCompiler::GenerateStoreFastDoubleElement(
   // have been verified by the caller to not be a smi.
 
   // Check that the key is a smi or a heap number convertible to a smi.
-  GenerateSmiKeyCheck(masm, key_reg, t0, t1, f2, f4, &miss_force_generic);
+  GenerateSmiKeyCheck(masm, key_reg, &miss_force_generic);
 
   __ ld(elements_reg,
          FieldMemOperand(receiver_reg, JSObject::kElementsOffset));
@@ -3883,8 +3981,8 @@ void KeyedStoreStubCompiler::GenerateStoreFastDoubleElement(
                                  scratch4,
                                  &transition_elements_kind);
 
-  __ Ret(USE_DELAY_SLOT);
   __ move(v0, value_reg);  // In delay slot.
+  __ Ret();
 
   // Handle store cache miss, replacing the ic with the generic stub.
   __ bind(&miss_force_generic);
@@ -3975,10 +4073,6 @@ void KeyedStoreStubCompiler::GenerateStoreFastDoubleElement(
     __ bind(&slow);
     TailCallBuiltin(masm, Builtins::kKeyedStoreIC_Slow);
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
