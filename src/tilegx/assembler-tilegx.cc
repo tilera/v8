@@ -187,6 +187,25 @@ bool Assembler::IsMOVELI(Instr instr) {
   return X0_OPC == ADDLI_OPCODE_X0 || X1_OPC == ADDLI_OPCODE_X1;
 }
 
+bool Assembler::IsSHL(Instr instr) {
+  uint32_t mode   = get_Mode(instr);
+  int32_t X0_OPC = -1, X1_OPC = -1;
+  int32_t X0_SUB_OPC = -1, X1_SUB_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X0_OPC = get_Opcode_X0(instr);
+  X1_OPC = get_Opcode_X1(instr);
+  X0_SUB_OPC = get_RRROpcodeExtension_X0(instr);
+  X1_SUB_OPC = get_RRROpcodeExtension_X1(instr);
+
+  return (X0_OPC == RRR_0_OPCODE_X0
+          && X0_SUB_OPC == SHL_RRR_0_OPCODE_X0)
+         || (X1_OPC == RRR_0_OPCODE_X1
+             && X1_SUB_OPC == SHL_RRR_0_OPCODE_X1);
+}
+
 bool Assembler::IsANDI(Instr instr) {
   uint32_t mode   = get_Mode(instr);
   int32_t X0_OPC = -1, X1_OPC = -1;
@@ -1044,8 +1063,32 @@ void Assembler::dq(uint64_t data) {
 }
 
 bool Assembler::IsNop(Instr instr, unsigned int type) {
-  UNREACHABLE();
-  return false;
+  // See Assembler::nop(type).
+  ASSERT(type < 32);
+
+  uint32_t mode = get_Mode(instr);
+  int32_t X0_OPC = -1, X1_OPC = -1;
+  int32_t X0_SUB_OPC = -1, X1_SUB_OPC = -1;
+
+  if (mode != 0)
+    return false;
+
+  X0_OPC = get_Opcode_X0(instr);
+  X1_OPC = get_Opcode_X1(instr);
+  X0_SUB_OPC = get_RRROpcodeExtension_X0(instr);
+  X1_SUB_OPC = get_RRROpcodeExtension_X1(instr);
+
+  Register nop_rt_reg = (type == 0) ? zero : at;
+  bool ret = ((X0_OPC == RRR_0_OPCODE_X0
+              && X0_SUB_OPC == SHL_RRR_0_OPCODE_X0
+              && get_SrcA_X0(instr) == static_cast<uint32_t>(ToNumber(nop_rt_reg))
+              && get_SrcB_X0(instr) == type)
+             || (X1_OPC == RRR_0_OPCODE_X1
+                 && X1_SUB_OPC == SHL_RRR_0_OPCODE_X1
+                 && get_SrcA_X1(instr) == static_cast<uint32_t>(ToNumber(nop_rt_reg))
+                 && get_SrcB_X1(instr) == type));
+
+  return ret;
 }
 
 const int RelocInfo::kApplyMask = RelocInfo::kCodeTargetMask |

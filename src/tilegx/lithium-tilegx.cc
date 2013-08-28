@@ -1000,15 +1000,10 @@ LInstruction* LChunkBuilder::DoInstanceOf(HInstanceOf* instr) {
 
 LInstruction* LChunkBuilder::DoInstanceOfKnownGlobal(
     HInstanceOfKnownGlobal* instr) {
-#if 0
   LInstanceOfKnownGlobal* result =
       new(zone()) LInstanceOfKnownGlobal(UseFixed(instr->left(), r0),
                                          FixedTemp(t0));
   return MarkAsCall(DefineFixed(result, r0), instr);
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 
@@ -1027,7 +1022,6 @@ LInstruction* LChunkBuilder::DoWrapReceiver(HWrapReceiver* instr) {
 
 
 LInstruction* LChunkBuilder::DoApplyArguments(HApplyArguments* instr) {
-#if 0
   LOperand* function = UseFixed(instr->function(), r1);
   LOperand* receiver = UseFixed(instr->receiver(), r0);
   LOperand* length = UseFixed(instr->length(), r2);
@@ -1037,10 +1031,6 @@ LInstruction* LChunkBuilder::DoApplyArguments(HApplyArguments* instr) {
                                                         length,
                                                         elements);
   return MarkAsCall(DefineFixed(result, r0), instr, CAN_DEOPTIMIZE_EAGERLY);
-#else
-  UNREACHABLE();
-  return NULL;
-#endif
 }
 
 

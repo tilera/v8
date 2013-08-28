@@ -803,6 +803,7 @@ class Assembler : public AssemblerBase {
   static bool IsJALR(Instr instr);
   static bool IsMOVELI(Instr instr);
   static bool IsANDI(Instr instr);
+  static bool IsSHL(Instr instr);
   static bool IsSHL16INSLI(Instr instr);
   static bool IsBeqz(Instr instr);
   static bool IsBnez(Instr instr);

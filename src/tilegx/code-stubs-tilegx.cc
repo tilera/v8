@@ -1680,20 +1680,25 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
     __ ld1u(at, FieldMemOperand(map, Map::kInstanceTypeOffset));
     Label skip;
     __ Branch(&skip, ge, at, Operand(FIRST_NONSTRING_TYPE));
-    __ Ret();  // the string length is OK as the return value
     __ ld(tos_, FieldMemOperand(tos_, String::kLengthOffset));
+    __ Ret();  // the string length is OK as the return value
     __ bind(&skip);
   }
 
   if (types_.Contains(HEAP_NUMBER)) {
-#if 0
     // Heap number -> false iff +0, -0, or NaN.
     Label not_heap_number;
     __ LoadRoot(at, Heap::kHeapNumberMapRootIndex);
     __ Branch(&not_heap_number, ne, map, Operand(at));
     Label zero_or_nan, number;
-    __ ldc1(f2, FieldMemOperand(tos_, HeapNumber::kValueOffset));
-    __ BranchF(&number, &zero_or_nan, ne, f2, kDoubleRegZero);
+
+    __ ld(at, FieldMemOperand(tos_, HeapNumber::kValueOffset));
+    __ li(at2, Operand(0x7FF0000000000000L));
+    __ and_(t6, at, at2);
+    __ Branch(&zero_or_nan, eq, t6, Operand(zero));
+
+    __ xor_(at2, t6, t5);
+    __ Branch(&number, ne, at2, Operand(zero));
     // "tos_" is a register, and contains a non zero value by default.
     // Hence we only need to overwrite "tos_" with zero to return false for
     // FP_ZERO or FP_NAN cases. Otherwise, by default it returns true.
@@ -1702,9 +1707,6 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
     __ bind(&number);
     __ Ret();
     __ bind(&not_heap_number);
-#else
-    UNREACHABLE();
-#endif
   }
 
   __ bind(&patch);

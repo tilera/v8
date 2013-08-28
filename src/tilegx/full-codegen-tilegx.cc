@@ -482,7 +482,7 @@ void FullCodeGenerator::TestContext::Plug(Variable* var) const {
 }
 
 
-void FullCodeGenerator::EffectContext::Plug(Heap::RootListIndex index) const { UNREACHABLE(); }
+void FullCodeGenerator::EffectContext::Plug(Heap::RootListIndex index) const {}
 
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(
@@ -2294,25 +2294,33 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ BranchOnOverflow(&stub_call, scratch1);
       break;
     case Token::MUL: {
-      __ SmiUntag(scratch1, right);
-  //FIXME
 #if 0
+      __ SmiUntag(scratch1, right);
       __ Mult(left, scratch1);
       __ mflo(scratch1);
       __ mfhi(scratch2);
-#endif
       __ sra(scratch1, scratch1, 31);
       __ Branch(&stub_call, ne, scratch1, Operand(scratch2));
-  //FIXME
-#if 0
       __ mflo(v0);
-#endif
       __ Branch(&done, ne, v0, Operand(zero));
       __ Addu(scratch2, right, left);
       __ Branch(&stub_call, lt, scratch2, Operand(zero));
       ASSERT(Smi::FromInt(0) == 0);
       __ move(v0, zero);
       break;
+#else
+      __ mul_hs_hs(scratch1, left, right);
+      __ sra(scratch2, scratch1, 32);
+      __ sra(at2, scratch1, 30);
+      __ Branch(&stub_call, ne, scratch2, Operand(at2));
+      __ sll(scratch1, scratch1, 32); // Convert to Smi
+      __ move(v0, scratch1);
+      __ Branch(&done, ne, v0, Operand(zero));
+      __ Addu(scratch2, right, left);
+      __ Branch(&stub_call, lt, scratch2, Operand(zero));
+      ASSERT(Smi::FromInt(0) == 0);
+      __ move(v0, zero);
+#endif
     }
     case Token::BIT_OR:
       __ Or(v0, left, Operand(right));
@@ -4003,20 +4011,21 @@ void FullCodeGenerator::EmitFastAsciiArrayJoin(CallRuntime* expr) {
   // smi but the other values are, so the result is a smi.
   __ ld(scratch1, FieldMemOperand(separator, SeqOneByteString::kLengthOffset));
   __ Subu(string_length, string_length, Operand(scratch1));
+#if 0
   __ Mult(array_length, scratch1);
   // Check for smi overflow. No overflow if higher 33 bits of 64-bit result are
   // zero.
-  //FIXME
-#if 0
   __ mfhi(scratch2);
-#endif
   __ Branch(&bailout, ne, scratch2, Operand(zero));
-  //FIXME
-#if 0
   __ mflo(scratch2);
-#endif
   __ And(scratch3, scratch2, Operand(0x80000000));
   __ Branch(&bailout, ne, scratch3, Operand(zero));
+#else
+  __ mul_hs_ls(scratch2, scratch1, array_length);
+  __ sra(scratch3, scratch2, 30);
+  __ Branch(&bailout, ne, scratch3, Operand(zero));
+  __ sll(scratch2, scratch2, 32);
+#endif
   __ AdduAndCheckForOverflow(string_length, string_length, scratch2, scratch3);
   __ BranchOnOverflow(&bailout, scratch3);
   __ SmiUntag(string_length);

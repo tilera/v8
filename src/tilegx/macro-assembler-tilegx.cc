@@ -607,11 +607,24 @@ void MacroAssembler::Xor(Register rd, Register rs, const Operand& rt) {
 }
 
 
-void MacroAssembler::Nor(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
+void MacroAssembler::Nor(Register rd, Register rs, const Operand& rt) {
+  if (rt.is_reg()) {
+    nor(rd, rs, rt.rm());
+  } else {
+    // li handles the relocation.
+    ASSERT(!rs.is(at));
+    li(at, rt);
+    nor(rd, rs, at);
+  }
+}
 
-
-void MacroAssembler::Neg(Register rs, const Operand& rt) { UNREACHABLE(); }
-
+void MacroAssembler::Neg(Register rs, const Operand& rt) {
+  ASSERT(rt.is_reg());
+  ASSERT(!at.is(rs));
+  ASSERT(!at.is(rt.rm()));
+  li(at, -1);
+  xor_(rs, rt.rm(), at);
+}
 
 void MacroAssembler::Slt(Register rd, Register rs, const Operand& rt) { UNREACHABLE(); }
 
