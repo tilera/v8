@@ -2141,16 +2141,16 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
     case Token::MOD:
       break;
     case Token::BIT_OR:
-      __ Ret();
       __ or_(v0, left, right);
+      __ Ret();
       break;
     case Token::BIT_AND:
-      __ Ret();
       __ and_(v0, left, right);
+      __ Ret();
       break;
     case Token::BIT_XOR:
-      __ Ret();
       __ xor_(v0, left, right);
+      __ Ret();
       break;
     case Token::SAR:
       // Remove tags from right operand.
@@ -2161,7 +2161,6 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ Ret();
       break;
     case Token::SHR:
-      // FIXME:
       // Remove tags from operands. We can't do this on a 31 bit number
       // because then the 0s get shifted into bit 30 instead of bit 31.
       __ SmiUntag(scratch1, left);
