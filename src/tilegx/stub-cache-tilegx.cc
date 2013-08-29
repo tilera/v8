@@ -690,8 +690,6 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
   } else if (FLAG_track_heap_object_fields && representation.IsHeapObject()) {
     __ JumpIfSmi(value_reg, miss_label);
   } else if (FLAG_track_double_fields && representation.IsDouble()) {
-    UNREACHABLE();
-#if 0
     // Load the double storage.
     if (index < 0) {
       int offset = object->map()->instance_size() + (index * kPointerSize);
@@ -707,23 +705,24 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
     Label do_store, heap_number;
     __ JumpIfNotSmi(value_reg, &heap_number);
     __ SmiUntag(scratch2, value_reg);
-    __ mtc1(scratch2, f6);
-    __ cvt_d_w(f4, f6);
+
+    FloatingPointHelper::ConvertIntToDouble(
+          masm, scratch2, FloatingPointHelper::kCoreRegisters,
+          at2, t2, t3);
     __ jmp(&do_store);
 
     __ bind(&heap_number);
     __ CheckMap(value_reg, scratch2, Heap::kHeapNumberMapRootIndex,
                 miss_label, DONT_DO_SMI_CHECK);
-    __ ldc1(f4, FieldMemOperand(value_reg, HeapNumber::kValueOffset));
+    __ ld(at2, FieldMemOperand(value_reg, HeapNumber::kValueOffset));
 
     __ bind(&do_store);
-    __ sdc1(f4, FieldMemOperand(scratch1, HeapNumber::kValueOffset));
+    __ st(at2, FieldMemOperand(scratch1, HeapNumber::kValueOffset));
     // Return the value (register v0).
     ASSERT(value_reg.is(a0));
     __ move(v0, a0);
     __ Ret();
     return;
-#endif
   }
 
   // TODO(verwaest): Share this code as a code stub.
