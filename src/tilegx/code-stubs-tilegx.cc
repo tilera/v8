@@ -304,13 +304,15 @@ void FastNewClosureStub::Generate(MacroAssembler* masm) {
             Operand(Smi::FromInt(SharedFunctionInfo::kSecondEntryIndex)));
   __ Subu(t0, t0, Operand(Smi::FromInt(SharedFunctionInfo::kEntryLength)));
   __ Addu(t1, a1, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ sll(at, t0, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(at, t0, 32);
+  __ sll(at, at, kPointerSizeLog2);
   __ Addu(t1, t1, Operand(at));
   __ ld(t1, MemOperand(t1));
   __ Branch(&loop, ne, a2, Operand(t1));
   // Hit: fetch the optimized code.
   __ Addu(t1, a1, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ sll(at, t0, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(at, t0, 32);
+  __ sll(at, at, kPointerSizeLog2);
   __ Addu(t1, t1, Operand(at));
   __ Addu(t1, t1, Operand(kPointerSize));
   __ ld(t0, MemOperand(t1));
@@ -2159,6 +2161,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ Ret();
       break;
     case Token::SHR:
+      // FIXME:
       // Remove tags from operands. We can't do this on a 31 bit number
       // because then the 0s get shifted into bit 30 instead of bit 31.
       __ SmiUntag(scratch1, left);
@@ -4092,7 +4095,8 @@ void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
 
   // Read the argument from the stack and return it.
   __ sub(a3, a0, a1);
-  __ sll(t3, a3, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t3, a3, 32);
+  __ sll(t3, t3, kPointerSizeLog2);
   __ Addu(a3, fp, Operand(t3));
   __ ld(v0, MemOperand(a3, kDisplacement));
   __ Ret();
@@ -4106,7 +4110,8 @@ void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
 
   // Read the argument from the adaptor frame and return it.
   __ sub(a3, a0, a1);
-  __ sll(t3, a3, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t3, a3, 32);
+  __ sll(t3, t3, kPointerSizeLog2);
   __ Addu(a3, a2, Operand(t3));
   __ ld(v0, MemOperand(a3, kDisplacement));
   __ Ret();
@@ -4385,7 +4390,8 @@ void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
   __ bind(&adaptor_frame);
   __ ld(a1, MemOperand(a2, ArgumentsAdaptorFrameConstants::kLengthOffset));
   __ st(a1, MemOperand(sp, 0));
-  __ sll(at, a1, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(at, a1, 32);
+  __ sll(at, at, kPointerSizeLog2);
   __ Addu(a3, a2, Operand(at));
 
   __ Addu(a3, a3, Operand(StandardFrameConstants::kCallerSPOffset));
@@ -4396,7 +4402,7 @@ void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
   Label add_arguments_object;
   __ bind(&try_allocate);
   __ Branch(&add_arguments_object, eq, a1, Operand(zero));
-  __ srl(a1, a1, kSmiTagSize);
+  __ srl(a1, a1, 32);
 
   __ Addu(a1, a1, Operand(FixedArray::kHeaderSize / kPointerSize));
   __ bind(&add_arguments_object);
@@ -5367,14 +5373,14 @@ void StringCharFromCodeGenerator::GenerateFast(MacroAssembler* masm) {
   ASSERT(IsPowerOf2(String::kMaxOneByteCharCode + 1));
   __ And(t0,
          code_,
-         Operand(kSmiTagMask |
-                 ((~String::kMaxOneByteCharCode) << kSmiTagSize)));
+         Operand(1L | (static_cast<int64_t>(~String::kMaxOneByteCharCode) << 32)));
   __ Branch(&slow_case_, ne, t0, Operand(zero));
 
   __ LoadRoot(result_, Heap::kSingleCharacterStringCacheRootIndex);
   // At this point code register contains smi tagged ASCII char code.
   STATIC_ASSERT(kSmiTag == 0);
-  __ sll(t0, code_, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t0, code_, 32);
+  __ sll(t0, t0, kPointerSizeLog2);
   __ Addu(result_, result_, t0);
   __ ld(result_, FieldMemOperand(result_, FixedArray::kHeaderSize));
   __ LoadRoot(t0, Heap::kUndefinedValueRootIndex);
@@ -7497,7 +7503,8 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
   // Array literal has ElementsKind of FAST_*_ELEMENTS and value is an object.
   __ bind(&fast_elements);
   __ ld(t1, FieldMemOperand(a1, JSObject::kElementsOffset));
-  __ sll(t2, a3, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t2, a3, 32);
+  __ sll(t2, t2, kPointerSizeLog2);
   __ Addu(t2, t1, t2);
   __ Addu(t2, t2, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
   __ st(a0, MemOperand(t2, 0));
@@ -7511,7 +7518,8 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
   // and value is Smi.
   __ bind(&smi_element);
   __ ld(t1, FieldMemOperand(a1, JSObject::kElementsOffset));
-  __ sll(t2, a3, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t2, a3, 32);
+  __ sll(t2, t2, kPointerSizeLog2);
   __ Addu(t2, t1, t2);
   __ st(a0, FieldMemOperand(t2, FixedArray::kHeaderSize));
   __ Ret();

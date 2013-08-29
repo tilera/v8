@@ -1782,7 +1782,8 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
       // Store the value.
       // We may need a register containing the address end_elements below,
       // so write back the value in end_elements.
-      __ sll(end_elements, v0, kPointerSizeLog2 - kSmiTagSize);
+      __ srl(end_elements, v0, 32);
+      __ sll(end_elements, end_elements, kPointerSizeLog2);
       __ Addu(end_elements, elements, end_elements);
       const int kEndElementsOffset =
           FixedArray::kHeaderSize - kHeapObjectTag - argc * kPointerSize;
@@ -1878,7 +1879,8 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
       // Store the value.
       // We may need a register containing the address end_elements below,
       // so write back the value in end_elements.
-      __ sll(end_elements, v0, kPointerSizeLog2 - kSmiTagSize);
+      __ srl(end_elements, v0, 32);
+      __ sll(end_elements, end_elements, kPointerSizeLog2);
       __ Addu(end_elements, elements, end_elements);
       __ Addu(end_elements, end_elements, kEndElementsOffset);
       __ st(t0, MemOperand(end_elements));
@@ -1917,7 +1919,8 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
 
       const int kAllocationDelta = 4;
       // Load top and check if it is the end of elements.
-      __ sll(end_elements, v0, kPointerSizeLog2 - kSmiTagSize);
+      __ srl(end_elements, v0, 32);
+      __ sll(end_elements, end_elements, kPointerSizeLog2);
       __ Addu(end_elements, elements, end_elements);
       __ Addu(end_elements, end_elements, Operand(kEndElementsOffset));
       __ li(t3, Operand(new_space_allocation_top));
@@ -2016,7 +2019,8 @@ Handle<Code> CallStubCompiler::CompileArrayPopCall(
   STATIC_ASSERT(kSmiTag == 0);
   // We can't address the last element in one operation. Compute the more
   // expensive shift first, and use an offset later on.
-  __ sll(t1, t0, kPointerSizeLog2 - kSmiTagSize);
+  __ srl(t1, t0, 32);
+  __ sll(t1, t1, kPointerSizeLog2);
   __ Addu(elements, elements, t1);
   __ ld(v0, FieldMemOperand(elements, FixedArray::kHeaderSize));
   __ Branch(&call_builtin, eq, v0, Operand(t2));
@@ -3819,7 +3823,8 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
             elements_reg,
             Operand(FixedArray::kHeaderSize - kHeapObjectTag));
     STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-    __ sll(scratch2, key_reg, kPointerSizeLog2 - kSmiTagSize);
+    __ srl(scratch2, key_reg, 32);
+    __ sll(scratch2, scratch2, kPointerSizeLog2);
     __ Addu(scratch, scratch, scratch2);
     __ st(value_reg, MemOperand(scratch));
   } else {
@@ -3828,7 +3833,8 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
             elements_reg,
             Operand(FixedArray::kHeaderSize - kHeapObjectTag));
     STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-    __ sll(scratch2, key_reg, kPointerSizeLog2 - kSmiTagSize);
+    __ srl(scratch2, key_reg, 32);
+    __ sll(scratch2, scratch2, kPointerSizeLog2);
     __ Addu(scratch, scratch, scratch2);
     __ st(value_reg, MemOperand(scratch));
     __ move(receiver_reg, value_reg);
