@@ -78,43 +78,27 @@ void BreakLocationIterator::SetDebugBreakAtReturn() {
 
 // Restore the JS frame exit code.
 void BreakLocationIterator::ClearDebugBreakAtReturn() {
-#if 0
   rinfo()->PatchCode(original_rinfo()->pc(),
                      Assembler::kJSReturnSequenceInstructions);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 // A debug break in the exit code is identified by the JS frame exit code
 // having been patched with li/call psuedo-instrunction (liu/ori/jalr).
 bool Debug::IsDebugBreakAtReturn(RelocInfo* rinfo) {
-#if 0
   ASSERT(RelocInfo::IsJSReturn(rinfo->rmode()));
   return rinfo->IsPatchedReturnSequence();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 bool BreakLocationIterator::IsDebugBreakAtSlot() {
-#if 0
   ASSERT(IsDebugBreakSlot());
   // Check whether the debug break slot instructions have been patched.
   return rinfo()->IsPatchedDebugBreakSlotSequence();
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BreakLocationIterator::SetDebugBreakAtSlot() {
-#if 0
   ASSERT(IsDebugBreakSlot());
   // Patch the code changing the debug break slot code from:
   //   nop(DEBUG_BREAK_NOP) - nop(1) is sll(zero, zero, 1)
@@ -125,25 +109,16 @@ void BreakLocationIterator::SetDebugBreakAtSlot() {
   //   li t9, address   (lui t9 / ori t9 instruction pair)
   //   call t9          (jalr t9 / nop instruction pair)
   CodePatcher patcher(rinfo()->pc(), Assembler::kDebugBreakSlotInstructions);
-  patcher.masm()->li(v8::internal::t9, Operand(reinterpret_cast<int32_t>(
+  patcher.masm()->li(v8::internal::t9, Operand(reinterpret_cast<int64_t>(
       Isolate::Current()->debug()->debug_break_slot()->entry())));
   patcher.masm()->Call(v8::internal::t9);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void BreakLocationIterator::ClearDebugBreakAtSlot() {
-#if 0
   ASSERT(IsDebugBreakSlot());
   rinfo()->PatchCode(original_rinfo()->pc(),
                      Assembler::kDebugBreakSlotInstructions);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 const bool Debug::FramePaddingLayout::kIsSupported = false;

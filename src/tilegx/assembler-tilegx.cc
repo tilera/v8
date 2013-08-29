@@ -1075,18 +1075,18 @@ bool Assembler::IsNop(Instr instr, unsigned int type) {
 
   X0_OPC = get_Opcode_X0(instr);
   X1_OPC = get_Opcode_X1(instr);
-  X0_SUB_OPC = get_RRROpcodeExtension_X0(instr);
-  X1_SUB_OPC = get_RRROpcodeExtension_X1(instr);
+  X0_SUB_OPC = get_ShiftOpcodeExtension_X0(instr);
+  X1_SUB_OPC = get_ShiftOpcodeExtension_X1(instr);
 
   Register nop_rt_reg = (type == 0) ? zero : at;
-  bool ret = ((X0_OPC == RRR_0_OPCODE_X0
-              && X0_SUB_OPC == SHL_RRR_0_OPCODE_X0
+  bool ret = ((X0_OPC == SHIFT_OPCODE_X0
+              && X0_SUB_OPC == SHLI_SHIFT_OPCODE_X0
               && get_SrcA_X0(instr) == static_cast<uint32_t>(ToNumber(nop_rt_reg))
-              && get_SrcB_X0(instr) == type)
-             || (X1_OPC == RRR_0_OPCODE_X1
-                 && X1_SUB_OPC == SHL_RRR_0_OPCODE_X1
+              && get_ShAmt_X0(instr) == type)
+             || (X1_OPC == SHIFT_OPCODE_X1
+                 && X1_SUB_OPC == SHLI_SHIFT_OPCODE_X1
                  && get_SrcA_X1(instr) == static_cast<uint32_t>(ToNumber(nop_rt_reg))
-                 && get_SrcB_X1(instr) == type));
+                 && get_ShAmt_X1(instr) == type));
 
   return ret;
 }
@@ -1190,6 +1190,18 @@ bool RelocInfo::IsCodedSpecially() {
   // specially coded on MIPS means that it is a lui/ori instruction, and that is
   // always the case inside code objects.
   return true;
+}
+
+// Patch the code at the current address with the supplied instructions.
+void RelocInfo::PatchCode(byte* instructions, int instruction_count) {
+  Instr* pc = reinterpret_cast<Instr*>(pc_);
+  Instr* instr = reinterpret_cast<Instr*>(instructions);
+  for (int i = 0; i < instruction_count; i++) {
+    *(pc + i) = *(instr + i);
+  }
+
+  // Indicate that code has changed.
+  CPU::FlushICache(pc_, instruction_count * Assembler::kInstrSize);
 }
 
 void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {

@@ -4622,7 +4622,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ JumpIfNotSmi(a1, &runtime);
   __ ld(a3, FieldMemOperand(a3, String::kLengthOffset));
   __ Branch(&runtime, ls, a3, Operand(a1));
-  __ sra(a1, a1, kSmiTagSize);  // Untag the Smi.
+  __ sra(a1, a1, 32);  // Untag the Smi.
 
   STATIC_ASSERT(kStringEncodingMask == 4);
   STATIC_ASSERT(kOneByteStringTag == 4);
@@ -4714,7 +4714,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ add(a2, t0, t1);
 
   __ ld(t2, FieldMemOperand(subject, String::kLengthOffset));
-  __ sra(t2, t2, kSmiTagSize);
+  __ sra(t2, t2, 32);
   __ sll(t1, t2, a3);
   __ add(a3, t0, t1);
   // Argument 2 (a1): Previous index.
@@ -4795,7 +4795,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ ld(a0,
         FieldMemOperand(last_match_info_elements, FixedArray::kLengthOffset));
   __ Addu(a2, a1, Operand(RegExpImpl::kLastMatchOverhead));
-  __ sra(at, a0, kSmiTagSize);
+  __ sra(at, a0, 32);
   __ Branch(&runtime, gt, a2, Operand(at));
 
   // a1: number of capture registers
@@ -4898,7 +4898,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // (9) Sliced string.  Replace subject with parent.  Go to (4).
   // Load offset into t0 and replace subject string with parent.
   __ ld(t0, FieldMemOperand(subject, SlicedString::kOffsetOffset));
-  __ sra(t0, t0, kSmiTagSize);
+  __ sra(t0, t0, 32);
   __ ld(subject, FieldMemOperand(subject, SlicedString::kParentOffset));
   __ jmp(&check_underlying);  // Go to (4).
 #endif  // V8_INTERPRETED_REGEXP
@@ -5284,7 +5284,7 @@ void StringCharCodeAtGenerator::GenerateFast(MacroAssembler* masm) {
   __ ld(t0, FieldMemOperand(object_, String::kLengthOffset));
   __ Branch(index_out_of_range_, ls, t0, Operand(index_));
 
-  __ sra(index_, index_, kSmiTagSize);
+  __ sra(index_, index_, 32);
 
   StringCharLoadGenerator::Generate(masm,
                                     object_,
@@ -6184,8 +6184,8 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   }
 
   // Untag both string-lengths.
-  __ sra(a2, a2, kSmiTagSize);
-  __ sra(a3, a3, kSmiTagSize);
+  __ sra(a2, a2, 1);
+  __ sra(a3, a3, 1);
 
   // Both strings are non-empty.
   // a0: first string
@@ -6542,7 +6542,6 @@ void ICCompareStub::GenerateNumbers(MacroAssembler* masm) {
     __ JumpIfNotSmi(a0, &miss);
   }
 
-  __ bpt();
   //FIXME:
 #if 0
   // Inlining the double comparison and falling back to the general compare
@@ -6596,9 +6595,10 @@ void ICCompareStub::GenerateNumbers(MacroAssembler* masm) {
   __ li(v0, Operand(LESS));
   __ Ret();
 
+#endif
+
   __ bind(&unordered);
   __ bind(&generic_stub);
-#endif
   ICCompareStub stub(op_, CompareIC::GENERIC, CompareIC::GENERIC,
                      CompareIC::GENERIC);
   __ Jump(stub.GetCode(masm->isolate()), RelocInfo::CODE_TARGET);
@@ -7020,7 +7020,7 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
 
   // Compute the capacity mask.
   __ ld(scratch1, FieldMemOperand(elements, kCapacityOffset));
-  __ sra(scratch1, scratch1, kSmiTagSize);  // convert smi to int
+  __ sra(scratch1, scratch1, 32);  // convert smi to int
   __ Subu(scratch1, scratch1, Operand(1));
 
   // Generate an unrolled loop that performs a few probes before
@@ -7104,7 +7104,7 @@ void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
   Label in_dictionary, maybe_in_dictionary, not_in_dictionary;
 
   __ ld(mask, FieldMemOperand(dictionary, kCapacityOffset));
-  __ sra(mask, mask, kSmiTagSize);
+  __ sra(mask, mask, 32);
   __ Subu(mask, mask, Operand(1));
 
   __ ld(hash, FieldMemOperand(key, Name::kHashFieldOffset));

@@ -455,7 +455,7 @@ void StringCharLoadGenerator::Generate(MacroAssembler* masm,
   Label indirect_string_loaded;
   __ ld(result, FieldMemOperand(string, SlicedString::kOffsetOffset));
   __ ld(string, FieldMemOperand(string, SlicedString::kParentOffset));
-  __ sra(at, result, kSmiTagSize);
+  __ sra(at, result, 32);
   __ Addu(index, index, at);
   __ jmp(&indirect_string_loaded);
 

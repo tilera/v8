@@ -4300,8 +4300,7 @@ void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
   Movz(result, input_high, scratch);
   bind(&done);
 #else
-  info(__LINE__);
-  bpt();
+  UNREACHABLE();
 #endif
 }
 
