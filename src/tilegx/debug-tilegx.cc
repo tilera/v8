@@ -45,7 +45,6 @@ bool BreakLocationIterator::IsDebugBreakAtReturn() {
 
 
 void BreakLocationIterator::SetDebugBreakAtReturn() {
-#if 0
   // Mips return sequence:
   // mov sp, fp
   // lw fp, sp(0)
@@ -60,7 +59,7 @@ void BreakLocationIterator::SetDebugBreakAtReturn() {
   CodePatcher patcher(rinfo()->pc(), Assembler::kJSReturnSequenceInstructions);
   // li and Call pseudo-instructions emit two instructions each.
   patcher.masm()->li(v8::internal::t9,
-      Operand(reinterpret_cast<int32_t>(
+      Operand(reinterpret_cast<int64_t>(
           Isolate::Current()->debug()->debug_break_return()->entry())));
   patcher.masm()->Call(v8::internal::t9);
   patcher.masm()->nop();
@@ -69,10 +68,6 @@ void BreakLocationIterator::SetDebugBreakAtReturn() {
 
   // TODO(mips): Open issue about using breakpoint instruction instead of nops.
   // patcher.masm()->bkpt(0);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
