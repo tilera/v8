@@ -825,7 +825,7 @@ void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
   BRANCH_ARGS_CHECK(cond, rs, rt);
   ASSERT(!rs.is(zero));
   Register r2 = no_reg;
-  Register scratch = tt;
+  Register scratch = tt2;
 
   if (rt.is_reg()) {
     // NOTE: 'at' can be clobbered by Branch but it is legal to use it as rs or

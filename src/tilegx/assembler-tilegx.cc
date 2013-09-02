@@ -754,7 +754,7 @@ void Assembler::print(Label* L) {
   }
 }
 
-const int kEndOfChain = -8;
+const int kEndOfChain = 0;
 
 int Assembler::target_at(int32_t pos) {
   Instr instr = instr_at(pos);
