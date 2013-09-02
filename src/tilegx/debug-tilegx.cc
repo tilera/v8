@@ -145,7 +145,7 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
             __ Assert(
                 eq, "Unable to encode value as smi", at, Operand(zero));
           }
-          __ sll(reg, reg, kSmiTagSize);
+          __ sll(reg, reg, 32);
         }
       }
       __ MultiPush(object_regs | non_object_regs);
@@ -167,7 +167,7 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
         int r = JSCallerSavedCode(i);
         Register reg = { r };
         if ((non_object_regs & (1L << r)) != 0) {
-          __ srl(reg, reg, kSmiTagSize);
+          __ srl(reg, reg, 32);
         }
         if (FLAG_debug_code &&
             (((object_regs |non_object_regs) & (1L << r)) == 0)) {

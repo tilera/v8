@@ -861,7 +861,6 @@ static void CompileCallLoadPropertyWithInterceptor(
 
 static const int kFastApiCallArguments = FunctionCallbackArguments::kArgsLength;
 
-#if 0
 // Reserves space for the extra arguments to API function in the
 // caller's frame.
 //
@@ -970,7 +969,6 @@ static void GenerateFastApiDirectCall(MacroAssembler* masm,
                               returns_handle,
                               kFastApiCallArguments + 1);
 }
-#endif
 
 class CallInterceptorCompiler BASE_EMBEDDED {
  public:
@@ -1020,7 +1018,6 @@ class CallInterceptorCompiler BASE_EMBEDDED {
                         Handle<Name> name,
                         const CallOptimization& optimization,
                         Label* miss_label) {
-#if 0
     ASSERT(optimization.is_constant_call());
     ASSERT(!lookup->holder()->IsGlobalObject());
     Counters* counters = masm->isolate()->counters();
@@ -1106,10 +1103,6 @@ class CallInterceptorCompiler BASE_EMBEDDED {
     if (can_do_fast_api_call) {
       FreeSpaceForFastApiCall(masm);
     }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
   }
 
   void CompileRegular(MacroAssembler* masm,
@@ -1121,7 +1114,6 @@ class CallInterceptorCompiler BASE_EMBEDDED {
                       Handle<Name> name,
                       Handle<JSObject> interceptor_holder,
                       Label* miss_label) {
-#if 0
     Register holder =
         stub_compiler_->CheckPrototypes(object, receiver, interceptor_holder,
                                         scratch1, scratch2, scratch3,
@@ -1142,10 +1134,6 @@ class CallInterceptorCompiler BASE_EMBEDDED {
     // Restore the name_ register.
     __ pop(name_);
     // Leave the internal frame.
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
   }
 
   void LoadWithInterceptor(MacroAssembler* masm,
@@ -1154,7 +1142,6 @@ class CallInterceptorCompiler BASE_EMBEDDED {
                            Handle<JSObject> holder_obj,
                            Register scratch,
                            Label* interceptor_succeeded) {
-#if 0
     {
       FrameScope scope(masm, StackFrame::INTERNAL);
 
@@ -1170,10 +1157,6 @@ class CallInterceptorCompiler BASE_EMBEDDED {
     // If interceptor returns no-result sentinel, call the constant function.
     __ LoadRoot(scratch, Heap::kNoInterceptorResultSentinelRootIndex);
     __ Branch(interceptor_succeeded, ne, v0, Operand(scratch));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
   }
 
   StubCompiler* stub_compiler_;
@@ -2557,7 +2540,6 @@ Handle<Code> CallStubCompiler::CompileFastApiCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
 
   Counters* counters = isolate()->counters();
 
@@ -2601,10 +2583,6 @@ Handle<Code> CallStubCompiler::CompileFastApiCall(
 
   // Return the generated code.
   return GetCode(function);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

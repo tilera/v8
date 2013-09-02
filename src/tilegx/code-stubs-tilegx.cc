@@ -3113,221 +3113,12 @@ void InterruptStub::Generate(MacroAssembler* masm) {
 
 
 void MathPowStub::Generate(MacroAssembler* masm) {
-#if 0
-  const Register base = a1;
-  const Register exponent = a2;
-  const Register heapnumbermap = t1;
-  const Register heapnumber = v0;
-  const DoubleRegister double_base = f2;
-  const DoubleRegister double_exponent = f4;
-  const DoubleRegister double_result = f0;
-  const DoubleRegister double_scratch = f6;
-  const FPURegister single_scratch = f8;
-  const Register scratch = t5;
-  const Register scratch2 = t3;
 
-  Label call_runtime, done, int_exponent;
-  if (exponent_type_ == ON_STACK) {
-    Label base_is_smi, unpack_exponent;
-    // The exponent and base are supplied as arguments on the stack.
-    // This can only happen if the stub is called from non-optimized code.
-    // Load input parameters from stack to double registers.
-    __ ld(base, MemOperand(sp, 1 * kPointerSize));
-    __ ld(exponent, MemOperand(sp, 0 * kPointerSize));
+  ASSERT(exponent_type_ == ON_STACK);
+  __ TailCallRuntime(Runtime::kMath_pow_cfunction, 2, 1);
 
-    __ LoadRoot(heapnumbermap, Heap::kHeapNumberMapRootIndex);
-
-    __ UntagAndJumpIfSmi(scratch, base, &base_is_smi);
-    __ ld(scratch, FieldMemOperand(base, JSObject::kMapOffset));
-    __ Branch(&call_runtime, ne, scratch, Operand(heapnumbermap));
-
-    __ ldc1(double_base, FieldMemOperand(base, HeapNumber::kValueOffset));
-    __ jmp(&unpack_exponent);
-
-    __ bind(&base_is_smi);
-    __ mtc1(scratch, single_scratch);
-    __ cvt_d_w(double_base, single_scratch);
-    __ bind(&unpack_exponent);
-
-    __ UntagAndJumpIfSmi(scratch, exponent, &int_exponent);
-
-    __ ld(scratch, FieldMemOperand(exponent, JSObject::kMapOffset));
-    __ Branch(&call_runtime, ne, scratch, Operand(heapnumbermap));
-    __ ldc1(double_exponent,
-            FieldMemOperand(exponent, HeapNumber::kValueOffset));
-  } else if (exponent_type_ == TAGGED) {
-    // Base is already in double_base.
-    __ UntagAndJumpIfSmi(scratch, exponent, &int_exponent);
-
-    __ ldc1(double_exponent,
-            FieldMemOperand(exponent, HeapNumber::kValueOffset));
-  }
-
-  if (exponent_type_ != INTEGER) {
-    Label int_exponent_convert;
-    // Detect integer exponents stored as double.
-    __ EmitFPUTruncate(kRoundToMinusInf,
-                       scratch,
-                       double_exponent,
-                       at,
-                       double_scratch,
-                       scratch2,
-                       kCheckForInexactConversion);
-    // scratch2 == 0 means there was no conversion error.
-    __ Branch(&int_exponent_convert, eq, scratch2, Operand(zero));
-
-    if (exponent_type_ == ON_STACK) {
-      // Detect square root case.  Crankshaft detects constant +/-0.5 at
-      // compile time and uses DoMathPowHalf instead.  We then skip this check
-      // for non-constant cases of +/-0.5 as these hardly occur.
-      Label not_plus_half;
-
-      // Test for 0.5.
-      __ Move(double_scratch, 0.5);
-      __ BranchF(&not_plus_half,
-                 NULL,
-                 ne,
-                 double_exponent,
-                 double_scratch);
-      // double_scratch can be overwritten in the delay slot.
-      // Calculates square root of base.  Check for the special case of
-      // Math.pow(-Infinity, 0.5) == Infinity (ECMA spec, 15.8.2.13).
-      __ Move(double_scratch, -V8_INFINITY);
-      __ BranchF(&done, NULL, eq, double_base, double_scratch);
-      __ neg_d(double_result, double_scratch);
-
-      // Add +0 to convert -0 to +0.
-      __ add_d(double_scratch, double_base, kDoubleRegZero);
-      __ sqrt_d(double_result, double_scratch);
-      __ jmp(&done);
-
-      __ bind(&not_plus_half);
-      __ Move(double_scratch, -0.5);
-      __ BranchF(&call_runtime,
-                 NULL,
-                 ne,
-                 double_exponent,
-                 double_scratch);
-      // double_scratch can be overwritten in the delay slot.
-      // Calculates square root of base.  Check for the special case of
-      // Math.pow(-Infinity, -0.5) == 0 (ECMA spec, 15.8.2.13).
-      __ Move(double_scratch, -V8_INFINITY);
-      __ BranchF(&done, NULL, eq, double_base, double_scratch);
-      __ Move(double_result, kDoubleRegZero);
-
-      // Add +0 to convert -0 to +0.
-      __ add_d(double_scratch, double_base, kDoubleRegZero);
-      __ Move(double_result, 1);
-      __ sqrt_d(double_scratch, double_scratch);
-      __ div_d(double_result, double_result, double_scratch);
-      __ jmp(&done);
-    }
-
-    __ push(ra);
-    {
-      AllowExternalCallThatCantCauseGC scope(masm);
-      __ PrepareCallCFunction(0, 2, scratch2);
-      __ SetCallCDoubleArguments(double_base, double_exponent);
-      __ CallCFunction(
-          ExternalReference::power_double_double_function(masm->isolate()),
-          0, 2);
-    }
-    __ pop(ra);
-    __ GetCFunctionDoubleResult(double_result);
-    __ jmp(&done);
-
-    __ bind(&int_exponent_convert);
-  }
-
-  // Calculate power with integer exponent.
-  __ bind(&int_exponent);
-
-  // Get two copies of exponent in the registers scratch and exponent.
-  if (exponent_type_ == INTEGER) {
-    __ move(scratch, exponent);
-  } else {
-    // Exponent has previously been stored into scratch as untagged integer.
-    __ move(exponent, scratch);
-  }
-
-  __ mov_d(double_scratch, double_base);  // Back up base.
-  __ Move(double_result, 1.0);
-
-  // Get absolute value of exponent.
-  Label positive_exponent;
-  __ Branch(&positive_exponent, ge, scratch, Operand(zero));
-  __ Subu(scratch, zero, scratch);
-  __ bind(&positive_exponent);
-
-  Label while_true, no_carry, loop_end;
-  __ bind(&while_true);
-
-  __ And(scratch2, scratch, 1);
-
-  __ Branch(&no_carry, eq, scratch2, Operand(zero));
-  __ mul_d(double_result, double_result, double_scratch);
-  __ bind(&no_carry);
-
-  __ sra(scratch, scratch, 1);
-
-  __ Branch(&loop_end, eq, scratch, Operand(zero));
-  __ mul_d(double_scratch, double_scratch, double_scratch);
-
-  __ Branch(&while_true);
-
-  __ bind(&loop_end);
-
-  __ Branch(&done, ge, exponent, Operand(zero));
-  __ Move(double_scratch, 1.0);
-  __ div_d(double_result, double_scratch, double_result);
-  // Test whether result is zero.  Bail out to check for subnormal result.
-  // Due to subnormals, x^-y == (1/x)^y does not hold in all cases.
-  __ BranchF(&done, NULL, ne, double_result, kDoubleRegZero);
-
-  // double_exponent may not contain the exponent value if the input was a
-  // smi.  We set it with exponent value before bailing out.
-  __ mtc1(exponent, single_scratch);
-  __ cvt_d_w(double_exponent, single_scratch);
-
-  // Returning or bailing out.
-  Counters* counters = masm->isolate()->counters();
-  if (exponent_type_ == ON_STACK) {
-    // The arguments are still on the stack.
-    __ bind(&call_runtime);
-    __ TailCallRuntime(Runtime::kMath_pow_cfunction, 2, 1);
-
-    // The stub is called from non-optimized code, which expects the result
-    // as heap number in exponent.
-    __ bind(&done);
-    __ AllocateHeapNumber(
-        heapnumber, scratch, scratch2, heapnumbermap, &call_runtime);
-    __ sdc1(double_result,
-            FieldMemOperand(heapnumber, HeapNumber::kValueOffset));
-    ASSERT(heapnumber.is(v0));
-    __ IncrementCounter(counters->math_pow(), 1, scratch, scratch2);
-    __ DropAndRet(2);
-  } else {
-    __ push(ra);
-    {
-      AllowExternalCallThatCantCauseGC scope(masm);
-      __ PrepareCallCFunction(0, 2, scratch);
-      __ SetCallCDoubleArguments(double_base, double_exponent);
-      __ CallCFunction(
-          ExternalReference::power_double_double_function(masm->isolate()),
-          0, 2);
-    }
-    __ pop(ra);
-    __ GetCFunctionDoubleResult(double_result);
-
-    __ bind(&done);
-    __ IncrementCounter(counters->math_pow(), 1, scratch, scratch2);
-    __ Ret();
-  }
-#else
-
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
+  // Shouldn't be executed.
+  __ bpt();
 }
 
 
@@ -3825,6 +3616,7 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
     __ LoadFromSafepointRegisterSlot(scratch, t0);
     __ Subu(inline_site, ra, scratch);
     // Get the map location in scratch and patch it.
+    UNREACHABLE();
     __ GetRelocatedValue(inline_site, scratch, v1);  // v1 used as scratch.
     __ st(map, FieldMemOperand(scratch, JSGlobalPropertyCell::kValueOffset));
   }
@@ -3856,6 +3648,7 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
     __ LoadRoot(v0, Heap::kTrueValueRootIndex);
     __ Addu(inline_site, inline_site, Operand(kDeltaToLoadBoolResult));
     // Get the boolean result location in scratch and patch it.
+    UNREACHABLE();
     __ PatchRelocatedValue(inline_site, scratch, v0);
 
     if (!ReturnTrueFalseObject()) {
@@ -3874,6 +3667,7 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
     __ LoadRoot(v0, Heap::kFalseValueRootIndex);
     __ Addu(inline_site, inline_site, Operand(kDeltaToLoadBoolResult));
     // Get the boolean result location in scratch and patch it.
+    UNREACHABLE();
     __ PatchRelocatedValue(inline_site, scratch, v0);
 
     if (!ReturnTrueFalseObject()) {
@@ -4440,7 +4234,7 @@ void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
   __ st(a3, FieldMemOperand(t0, FixedArray::kMapOffset));
   __ st(a1, FieldMemOperand(t0, FixedArray::kLengthOffset));
   // Untag the length for the loop.
-  __ srl(a1, a1, kSmiTagSize);
+  __ srl(a1, a1, 32);
 
   // Copy the fixed array slots.
   Label loop;
@@ -4851,7 +4645,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ ld(a3, MemOperand(a2, 0));
   __ addli(a2, a2, kPointerSize);
   // Store the smi value in the last match info.
-  __ sll(a3, a3, kSmiTagSize);  // Convert to Smi.
+  __ sll(a3, a3, 32);  // Convert to Smi.
   __ st(a3, MemOperand(a0, 0));
   __ addli(a0, a0, kPointerSize);  // In branch delay slot.
   __ Branch(&next_capture);
@@ -4970,7 +4764,7 @@ void RegExpConstructResultStub::Generate(MacroAssembler* masm) {
   __ li(a2, Operand(masm->isolate()->factory()->fixed_array_map()));
   __ st(a2, FieldMemOperand(a3, HeapObject::kMapOffset));
   // Set FixedArray length.
-  __ sll(t2, t1, kSmiTagSize);
+  __ sll(t2, t1, 32);
   __ st(t2, FieldMemOperand(a3, FixedArray::kLengthOffset));
   // Fill contents of fixed-array with undefined.
   __ LoadRoot(a2, Heap::kUndefinedValueRootIndex);
@@ -5297,7 +5091,7 @@ void StringCharCodeAtGenerator::GenerateFast(MacroAssembler* masm) {
                                     result_,
                                     &call_runtime_);
 
-  __ sll(result_, result_, kSmiTagSize);
+  __ sll(result_, result_, 32);
   __ bind(&exit_);
 }
 
@@ -5345,7 +5139,7 @@ void StringCharCodeAtGenerator::GenerateSlow(
   // is too complex (e.g., when the string needs to be flattened).
   __ bind(&call_runtime_);
   call_helper.BeforeCall(masm);
-  __ sll(index_, index_, kSmiTagSize);
+  __ sll(index_, index_, 32);
   __ Push(object_, index_);
   __ CallRuntime(Runtime::kStringCharCodeAt, 2);
 

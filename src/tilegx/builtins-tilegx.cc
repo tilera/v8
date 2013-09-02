@@ -937,13 +937,13 @@ void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
 
     // Do not transform the receiver for strict mode functions.
     __ ld(a2, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
-    __ ld4s(a3, FieldMemOperand(a2, SharedFunctionInfo::kCompilerHintsOffset));
-    __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kStrictModeFunction +
-                                 kSmiTagSize)));
+    __ ld1u(a3, FieldMemOperand(a2, SharedFunctionInfo::kStrictModeByteOffset));
+    __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kStrictModeBitWithinByte)));
     __ Branch(&shift_arguments, ne, t3, Operand(zero));
 
     // Do not transform the receiver for native (Compilerhints already in a3).
-    __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kNative + kSmiTagSize)));
+    __ ld1u(a3, FieldMemOperand(a2, SharedFunctionInfo::kNativeByteOffset));
+    __ And(t3, a3, Operand(1 << (SharedFunctionInfo::kNativeBitWithinByte)));
     __ Branch(&shift_arguments, ne, t3, Operand(zero));
 
     // Compute the receiver in non-strict mode.
