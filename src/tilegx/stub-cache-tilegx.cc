@@ -2040,7 +2040,6 @@ Handle<Code> CallStubCompiler::CompileStringCharCodeAtCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2                     : function name
   //  -- ra                     : return address
@@ -2116,10 +2115,6 @@ Handle<Code> CallStubCompiler::CompileStringCharCodeAtCall(
 
   // Return the generated code.
   return GetCode(function);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2129,7 +2124,6 @@ Handle<Code> CallStubCompiler::CompileStringCharAtCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2                     : function name
   //  -- ra                     : return address
@@ -2204,10 +2198,6 @@ Handle<Code> CallStubCompiler::CompileStringCharAtCall(
 
   // Return the generated code.
   return GetCode(function);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2217,7 +2207,6 @@ Handle<Code> CallStubCompiler::CompileStringFromCharCodeCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2                     : function name
   //  -- ra                     : return address
@@ -2283,10 +2272,6 @@ Handle<Code> CallStubCompiler::CompileStringFromCharCodeCall(
 
   // Return the generated code.
   return cell.is_null() ? GetCode(function) : GetCode(Code::NORMAL, name);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
@@ -2420,8 +2405,8 @@ Handle<Code> CallStubCompiler::CompileMathFloorCall(
   // Return the generated code.
   return cell.is_null() ? GetCode(function) : GetCode(Code::NORMAL, name);
 #else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
+  UNREACHABLE();
+  return Handle<Code>::null();
 #endif
 }
 
@@ -2432,7 +2417,6 @@ Handle<Code> CallStubCompiler::CompileMathAbsCall(
     Handle<JSGlobalPropertyCell> cell,
     Handle<JSFunction> function,
     Handle<String> name) {
-#if 0
   // ----------- S t a t e -------------
   //  -- a2                     : function name
   //  -- ra                     : return address
@@ -2469,6 +2453,7 @@ Handle<Code> CallStubCompiler::CompileMathAbsCall(
   Label not_smi;
   STATIC_ASSERT(kSmiTag == 0);
   __ JumpIfNotSmi(v0, &not_smi);
+  __ SmiUntag(v0, v0);
 
   // Do bitwise not or do nothing depending on the sign of the
   // argument.
@@ -2491,12 +2476,12 @@ Handle<Code> CallStubCompiler::CompileMathAbsCall(
   // sign.
   __ bind(&not_smi);
   __ CheckMap(v0, a1, Heap::kHeapNumberMapRootIndex, &slow, DONT_DO_SMI_CHECK);
-  __ ld(a1, FieldMemOperand(v0, HeapNumber::kExponentOffset));
+  __ ld(a1, FieldMemOperand(v0, HeapNumber::kValueOffset));
 
   // Check the sign of the argument. If the argument is positive,
   // just return it.
   Label negative_sign;
-  __ And(t0, a1, Operand(HeapNumber::kSignMask));
+  __ And(t0, a1, Operand(0x8000000000000000L));
   __ Branch(&negative_sign, ne, t0, Operand(zero));
   __ Drop(argc + 1);
   __ Ret();
@@ -2504,12 +2489,10 @@ Handle<Code> CallStubCompiler::CompileMathAbsCall(
   // If the argument is negative, clear the sign, and return a new
   // number.
   __ bind(&negative_sign);
-  __ Xor(a1, a1, Operand(HeapNumber::kSignMask));
-  __ ld(a3, FieldMemOperand(v0, HeapNumber::kMantissaOffset));
+  __ Xor(a1, a1, Operand(0x8000000000000000L));
   __ LoadRoot(t2, Heap::kHeapNumberMapRootIndex);
   __ AllocateHeapNumber(v0, t0, t1, t2, &slow);
-  __ st(a1, FieldMemOperand(v0, HeapNumber::kExponentOffset));
-  __ st(a3, FieldMemOperand(v0, HeapNumber::kMantissaOffset));
+  __ st(a1, FieldMemOperand(v0, HeapNumber::kValueOffset));
   __ Drop(argc + 1);
   __ Ret();
 
@@ -2526,10 +2509,6 @@ Handle<Code> CallStubCompiler::CompileMathAbsCall(
 
   // Return the generated code.
   return cell.is_null() ? GetCode(function) : GetCode(Code::NORMAL, name);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 

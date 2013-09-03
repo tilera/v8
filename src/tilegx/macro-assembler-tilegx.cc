@@ -2294,7 +2294,15 @@ void MacroAssembler::CopyBytes(Register src,
   st1(scratch, MemOperand(dst, 2));
   srl(scratch, scratch, 8);
   st1(scratch, MemOperand(dst, 3));
-  Addu(dst, dst, 4);
+  srl(scratch, scratch, 8);
+  st1(scratch, MemOperand(dst, 4));
+  srl(scratch, scratch, 8);
+  st1(scratch, MemOperand(dst, 5));
+  srl(scratch, scratch, 8);
+  st1(scratch, MemOperand(dst, 6));
+  srl(scratch, scratch, 8);
+  st1(scratch, MemOperand(dst, 7));
+  Addu(dst, dst, 8);
 
   Subu(length, length, Operand(kPointerSize));
   Branch(&word_loop);

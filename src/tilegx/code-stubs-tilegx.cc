@@ -915,32 +915,28 @@ void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
   // We test for the special value that has a different exponent.
   STATIC_ASSERT(HeapNumber::kSignMask == 0x80000000u);
   // Test sign, and save for later conditionals.
-  __ And(sign_, the_int_, Operand(0x80000000u));
+  __ And(sign_, the_int_, Operand(0x80000000L));
   __ Branch(&max_negative_int, eq, the_int_, Operand(0x80000000u));
 
   // Set up the correct exponent in scratch_.  All non-Smi int32s have the same.
   // A non-Smi integer is 1.xxx * 2^30 so the exponent is 30 (biased).
-  uint32_t non_smi_exponent =
-      (HeapNumber::kExponentBias + 30) << HeapNumber::kExponentShift;
+  uint64_t non_smi_exponent = 1053L << 52;
   __ li(scratch_, Operand(non_smi_exponent));
   // Set the sign bit in scratch_ if the value was negative.
+  __ sll(sign_, sign_, 32);
   __ or_(scratch_, scratch_, sign_);
   // Subtract from 0 if the value was negative.
-  __ sub(tt, zero, the_int_);
-  __ movn(the_int_, tt, sign_);
+  __ sub(at, zero, the_int_);
+  __ movn(the_int_, at, sign_);
   // We should be masking the implict first digit of the mantissa away here,
   // but it just ends up combining harmlessly with the last digit of the
   // exponent that happens to be 1.  The sign bit is 0 so we shift 10 to get
   // the most significant 1 to hit the last bit of the 12 bit sign and exponent.
-  ASSERT(((1 << HeapNumber::kExponentShift) & non_smi_exponent) != 0);
-  const int shift_distance = HeapNumber::kNonMantissaBitsInTopWord - 2;
-  __ srl(tt, the_int_, shift_distance);
-  __ or_(scratch_, scratch_, tt);
+  ASSERT(((1L << 52) & non_smi_exponent) != 0);
+  __ sll(at, at, 22);
+  __ or_(scratch_, scratch_, at);
   __ st(scratch_, FieldMemOperand(the_heap_number_,
-                                   HeapNumber::kExponentOffset));
-  __ sll(scratch_, the_int_, 32 - shift_distance);
-  __ st(scratch_, FieldMemOperand(the_heap_number_,
-                                   HeapNumber::kMantissaOffset));
+                                   HeapNumber::kValueOffset));
   __ Ret();
 
   __ bind(&max_negative_int);
@@ -949,12 +945,9 @@ void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
   // The actual mantissa bits stored are all 0 because the implicit most
   // significant 1 bit is not stored.
   non_smi_exponent += 1 << HeapNumber::kExponentShift;
-  __ li(scratch_, Operand(HeapNumber::kSignMask | non_smi_exponent));
+  __ li(scratch_, Operand(0x8000000000000000L | non_smi_exponent));
   __ st(scratch_,
-        FieldMemOperand(the_heap_number_, HeapNumber::kExponentOffset));
-  __ move(scratch_, zero);
-  __ st(scratch_,
-        FieldMemOperand(the_heap_number_, HeapNumber::kMantissaOffset));
+        FieldMemOperand(the_heap_number_, HeapNumber::kValueOffset));
   __ Ret();
 }
 
@@ -1941,26 +1934,21 @@ void UnaryOpStub::GenerateHeapNumberCodeSub(MacroAssembler* masm,
 }
 
 
-void UnaryOpStub::GenerateHeapNumberCodeBitNot(
-    MacroAssembler* masm,
+void UnaryOpStub::GenerateHeapNumberCodeBitNot( MacroAssembler* masm,
     Label* slow) {
-#if 0
   Label impossible;
 
   EmitCheckForHeapNumber(masm, a0, a1, t2, slow);
   // Convert the heap number in a0 to an untagged integer in a1.
-  __ ConvertToInt32(a0, a1, a2, a3, f0, slow);
+  __ ConvertToInt32(a0, a1, a2, a3, slow);
 
-  // Do the bitwise operation and check if the result fits in a smi.
-  Label try_float;
   __ Neg(a1, a1);
-  __ Addu(a2, a1, Operand(0x40000000));
-  __ Branch(&try_float, lt, a2, Operand(zero));
 
   // Tag the result as a smi and we're done.
   __ SmiTag(v0, a1);
   __ Ret();
 
+#if 0
   // Try to store the result in a heap number.
   __ bind(&try_float);
   if (mode_ == UNARY_NO_OVERWRITE) {
@@ -1990,19 +1978,13 @@ void UnaryOpStub::GenerateHeapNumberCodeBitNot(
     __ move(v0, a2);  // Move newly allocated heap number to v0.
   }
 
-  // Convert the int32 in a1 to the heap number in v0. a2 is corrupted.
-  __ mtc1(a1, f0);
-  __ cvt_d_w(f0, f0);
-  __ sdc1(f0, FieldMemOperand(v0, HeapNumber::kValueOffset));
-  __ Ret();
+  WriteInt32ToHeapNumberStub stub(a1, v0, a2, a3);
+  __ Jump(stub.GetCode(masm->isolate()), RelocInfo::CODE_TARGET);
 
   __ bind(&impossible);
   if (FLAG_debug_code) {
     __ stop("Incorrect assumption in bit-not stub");
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
 #endif
 }
 
@@ -6720,7 +6702,6 @@ void NameDictionaryLookupStub::GenerateNegativeLookup(MacroAssembler* masm,
                                                       Register properties,
                                                       Handle<Name> name,
                                                       Register scratch0) {
-#if 0
   ASSERT(name->IsUniqueName());
   // If names of slots in range from 1 to kProbes - 1 for the hash value are
   // not equal to the name and kProbes-th slot is not used (its name is the
@@ -6733,9 +6714,9 @@ void NameDictionaryLookupStub::GenerateNegativeLookup(MacroAssembler* masm,
     Register index = scratch0;
     // Capacity is smi 2^n.
     __ ld(index, FieldMemOperand(properties, kCapacityOffset));
+    __ SmiUntag(index, index);
     __ Subu(index, index, Operand(1));
-    __ And(index, index, Operand(
-        Smi::FromInt(name->Hash() + NameDictionary::GetProbeOffset(i))));
+    __ And(index, index, Operand(name->Hash() + NameDictionary::GetProbeOffset(i)));
 
     // Scale the index by multiplying by the entry size.
     ASSERT(NameDictionary::kEntrySize == 3);
@@ -6746,7 +6727,7 @@ void NameDictionaryLookupStub::GenerateNegativeLookup(MacroAssembler* masm,
     // Having undefined at this place means the name is not contained.
     ASSERT_EQ(kSmiTagSize, 1);
     Register tmp = properties;
-    __ sll(scratch0, index, 1);
+    __ sll(scratch0, index, 3);
     __ Addu(tmp, properties, scratch0);
     __ ld(entity_name, FieldMemOperand(tmp, kElementsStartOffset));
 
@@ -6792,10 +6773,6 @@ void NameDictionaryLookupStub::GenerateNegativeLookup(MacroAssembler* masm,
 
   __ Branch(done, eq, at, Operand(zero));
   __ Branch(miss, ne, at, Operand(zero));
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
