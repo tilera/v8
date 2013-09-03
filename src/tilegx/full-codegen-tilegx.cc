@@ -640,7 +640,7 @@ void FullCodeGenerator::TestContext::Plug(Label* materialize_true,
 }
 
 
-void FullCodeGenerator::EffectContext::Plug(bool flag) const { UNREACHABLE(); }
+void FullCodeGenerator::EffectContext::Plug(bool flag) const {}
 
 
 void FullCodeGenerator::AccumulatorValueContext::Plug(bool flag) const {
