@@ -4226,14 +4226,13 @@ void MacroAssembler::ConvertToInt32(Register source,
 void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
                                                  Register input,
                                                  Register scratch) {
-#if 0
   Label done, normal_exponent, restore_sign;
   // Extract the biased exponent in result.
-  bfextu(result, input_high, 52, 62);
+  bfextu(result, input, 52, 62);
 
   // Check for Infinity and NaNs, which should return 0.
   Subu(scratch, result, 0x7FF);
-  movz(result, zero_reg, scratch);
+  movz(result, zero, scratch);
   Branch(&done, eq, scratch, Operand(zero));
 
   // Express exponent as delta to (number of mantissa bits + 31).
@@ -4243,8 +4242,8 @@ void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
 
   // If the delta is strictly positive, all bits would be shifted away,
   // which means that we can return 0.
-  Branch(&normal_exponent, le, result, Operand(zero_reg));
-  mov(result, zero_reg);
+  Branch(&normal_exponent, le, result, Operand(zero));
+  move(result, zero);
   Branch(&done);
 
   bind(&normal_exponent);
@@ -4255,53 +4254,21 @@ void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
   // Save the sign.
   Register sign = result;
   result = no_reg;
-  And(sign, input_high, Operand(HeapNumber::kSignMask));
+  And(sign, input, Operand(0x8000000000000000L));
 
-  // On ARM shifts > 31 bits are valid and will result in zero. On MIPS we need
-  // to check for this specific case.
-  Label high_shift_needed, high_shift_done;
-  Branch(&high_shift_needed, lt, scratch, Operand(32));
-  mov(input_high, zero_reg);
-  Branch(&high_shift_done);
-  bind(&high_shift_needed);
+  // Set the implicit 1 before the mantissa part in input.
+  Or(input, input, Operand(1L << 52));
 
-  // Set the implicit 1 before the mantissa part in input_high.
-  Or(input_high,
-     input_high,
-     Operand(1 << HeapNumber::kMantissaBitsInTopWord));
-  // Shift the mantissa bits to the correct position.
-  // We don't need to clear non-mantissa bits as they will be shifted away.
-  // If they weren't, it would mean that the answer is in the 32bit range.
-  sllv(input_high, input_high, scratch);
+  sll(scratch, input, scratch);
+  srl(input, scratch, 33);
 
-  bind(&high_shift_done);
-
-  // Replace the shifted bits with bits from the lower mantissa word.
-  Label pos_shift, shift_done;
-  li(at, 32);
-  subu(scratch, at, scratch);
-  Branch(&pos_shift, ge, scratch, Operand(zero_reg));
-
-  // Negate scratch.
-  Subu(scratch, zero_reg, scratch);
-  sllv(input_low, input_low, scratch);
-  Branch(&shift_done);
-
-  bind(&pos_shift);
-  srlv(input_low, input_low, scratch);
-
-  bind(&shift_done);
-  Or(input_high, input_high, Operand(input_low));
   // Restore sign if necessary.
-  mov(scratch, sign);
+  move(scratch, sign);
   result = sign;
   sign = no_reg;
-  Subu(result, zero_reg, input_high);
-  Movz(result, input_high, scratch);
+  Subu(result, zero, input);
+  movz(result, input, scratch);
   bind(&done);
-#else
-  UNREACHABLE();
-#endif
 }
 
 bool AreAliased(Register r1, Register r2, Register r3, Register r4) {
