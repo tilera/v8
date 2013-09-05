@@ -642,7 +642,7 @@ void StubCompiler::GenerateStoreTransition(MacroAssembler* masm,
   // Return the value (register v0).
   ASSERT(value_reg.is(a0));
   __ bind(&exit);
-  __ move(v0, a0);
+  //__ move(v0, a0);
   __ Ret();
 }
 
@@ -720,7 +720,7 @@ void StubCompiler::GenerateStoreField(MacroAssembler* masm,
     __ st(at2, FieldMemOperand(scratch1, HeapNumber::kValueOffset));
     // Return the value (register v0).
     ASSERT(value_reg.is(a0));
-    __ move(v0, a0);
+    //__ move(v0, a0);
     __ Ret();
     return;
   }
@@ -3516,7 +3516,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
   }
 
   // Entry registers are intact, a0 holds the value which is the return value.
-  __ move(v0, a0);
+  //__ move(v0, a0);
   __ Ret();
 
   if (elements_kind != EXTERNAL_PIXEL_ELEMENTS) {
@@ -3587,7 +3587,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
 
       // Entry registers are intact, a0 holds the value which is the return
       // value.
-      __ move(v0, a0);
+      //__ move(v0, a0);
       __ Ret();
 
       __ bind(&nan_or_infinity_or_zero);
@@ -3603,7 +3603,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       __ srl(t8, key, 29); // Untag, then multiply by 8
       __ add(t8, a3, t8);
       __ st(t3, MemOperand(t8));
-      __ move(v0, a0);
+      //__ move(v0, a0);
       __ Ret();
     } else {
       bool is_signed_type = IsElementTypeSigned(elements_kind);

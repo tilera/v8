@@ -1121,9 +1121,11 @@ void FullCodeGenerator::VisitForInStatement(ForInStatement* stmt) {
   // The enum cache is valid.  Load the map of the object being
   // iterated over and use the cache for the iteration.
   Label use_cache;
+  __ move(at2, a0);
   __ ld(v0, FieldMemOperand(a0, HeapObject::kMapOffset));
   __ Branch(&use_cache);
 
+  __ move(a0, at2);
   // Get the set of properties to enumerate.
   __ bind(&call_runtime);
   __ push(a0);  // Duplicate the enumerable object on the stack.

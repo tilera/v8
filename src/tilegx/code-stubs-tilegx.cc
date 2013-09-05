@@ -3700,9 +3700,9 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
       __ Push(a0, a1);
       __ InvokeBuiltin(Builtins::INSTANCE_OF, CALL_FUNCTION);
     }
-    __ move(a0, v0);
+    __ move(at2, v0);
     __ LoadRoot(v0, Heap::kTrueValueRootIndex);
-    __ DropAndRet(HasArgsInRegisters() ? 0 : 2, eq, a0, Operand(zero));
+    __ DropAndRet(HasArgsInRegisters() ? 0 : 2, eq, at2, Operand(zero));
     __ LoadRoot(v0, Heap::kFalseValueRootIndex);
     __ DropAndRet(HasArgsInRegisters() ? 0 : 2);
   }
@@ -5951,6 +5951,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
     ASSERT(Smi::FromInt(0) == 0);
     __ ld(a2, FieldMemOperand(a0, String::kLengthOffset));
     __ ld(a3, FieldMemOperand(a1, String::kLengthOffset));
+    __ move(at2, a0);
     __ move(v0, a0);       // Assume we'll return first string (from a0).
     __ movz(v0, a1, a2);  // If first is empty, return second (from a1).
     __ cmplts(t4, zero, a2);   // if (a2 > 0) t4 = 1.
@@ -5962,6 +5963,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
     __ DropAndRet(2);
 
     __ bind(&strings_not_empty);
+    __ move(a0, at2);
   }
 
   // Untag both string-lengths.
@@ -6072,8 +6074,10 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   __ jmp(&after_writing);
 
   __ bind(&skip_write_barrier);
-  __ st(a0, FieldMemOperand(v0, ConsString::kFirstOffset));
-  __ st(a1, FieldMemOperand(v0, ConsString::kSecondOffset));
+  __ move(at2, v0);
+  __ st(a0, FieldMemOperand(at2, ConsString::kFirstOffset));
+  __ st(a1, FieldMemOperand(at2, ConsString::kSecondOffset));
+  __ move(v0, at2);
 
   __ bind(&after_writing);
 
@@ -6477,7 +6481,7 @@ void ICCompareStub::GenerateUniqueNames(MacroAssembler* masm) {
   __ bind(&succeed2);
 
   // Use a0 as result
-  __ move(v0, a0);
+  //__ move(v0, a0);
 
   // Unique names are compared by identity.
   Label done;
@@ -6530,8 +6534,8 @@ void ICCompareStub::GenerateStrings(MacroAssembler* masm) {
   STATIC_ASSERT(EQUAL == 0);
   STATIC_ASSERT(kSmiTag == 0);
   __ Branch(&left_ne_right, ne, left, Operand(right));
-  __ Ret();
   __ move(v0, zero);  // In the delay slot.
+  __ Ret();
   __ bind(&left_ne_right);
 
   // Handle not identical strings.
@@ -6548,8 +6552,8 @@ void ICCompareStub::GenerateStrings(MacroAssembler* masm) {
     // Make sure a0 is non-zero. At this point input operands are
     // guaranteed to be non-zero.
     ASSERT(right.is(a0));
+    //__ move(v0, a0);  // In the delay slot.
     __ Ret();
-    __ move(v0, a0);  // In the delay slot.
     __ bind(&is_symbol);
   }
 
@@ -6593,8 +6597,8 @@ void ICCompareStub::GenerateObjects(MacroAssembler* masm) {
   __ Branch(&miss, ne, a2, Operand(JS_OBJECT_TYPE));
 
   ASSERT(GetCondition() == eq);
-  __ Ret();
   __ sub(v0, a0, a1);
+  __ Ret();
 
   __ bind(&miss);
   GenerateMiss(masm);
@@ -7281,8 +7285,8 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
   // Update the write barrier for the array store.
   __ RecordWrite(t1, t2, a0, kRAHasNotBeenSaved, kDontSaveFPRegs,
                  EMIT_REMEMBERED_SET, OMIT_SMI_CHECK);
+  //__ move(v0, a0);
   __ Ret();
-  __ move(v0, a0);
 
   // Array literal has ElementsKind of FAST_*_SMI_ELEMENTS or FAST_*_ELEMENTS,
   // and value is Smi.
@@ -7292,8 +7296,8 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
   __ sll(t2, t2, kPointerSizeLog2);
   __ Addu(t2, t1, t2);
   __ st(a0, FieldMemOperand(t2, FixedArray::kHeaderSize));
+  //__ move(v0, a0);
   __ Ret();
-  __ move(v0, a0);
 
   // Array literal has ElementsKind of FAST_*_DOUBLE_ELEMENTS.
   __ bind(&double_elements);
@@ -7302,8 +7306,8 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
                                  // Overwrites all regs after this.
                                  t1, t2, t3, t5, a2,
                                  &slow_elements);
+  //__ move(v0, a0);
   __ Ret();
-  __ move(v0, a0);
 }
 
 
