@@ -1654,7 +1654,7 @@ void PatchInlinedSmiCode(Address address, InlinedSmiCheck check) {
   // The delta to the start of the map check instruction and the
   // condition code uses at the patched jump.
   int delta = get_Imm8_X1(instr);
-  delta += get_SrcA_X1(instr) * kImm16Mask;
+  delta += get_SrcA_X1(instr) * kImm8Mask;
   // If the delta is 0 the instruction is andi at, zero, #0 which also
   // signals that nothing was inlined.
   if (delta == 0) {

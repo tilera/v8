@@ -101,8 +101,8 @@ class JumpPatchSite BASE_EMBEDDED {
   void EmitPatchInfo() {
     if (patch_site_.is_bound()) {
       int delta_to_patch_site = masm_->InstructionsGeneratedSince(&patch_site_);
-      Register reg = Register::from_code(delta_to_patch_site / kImm16Mask);
-      __ andi(zero, reg, delta_to_patch_site % kImm16Mask);
+      Register reg = Register::from_code(delta_to_patch_site / kImm8Mask);
+      __ andi(zero, reg, delta_to_patch_site % kImm8Mask);
 #ifdef DEBUG
       info_emitted_ = true;
 #endif
@@ -4418,6 +4418,14 @@ void FullCodeGenerator::VisitCountOperation(CountOperation* expr) {
   JumpPatchSite patch_site(masm_);
 
   int count_value = expr->op() == Token::INC ? 1 : -1;
+
+  // the following if-true case may clobber a0, while
+  // a0 is needed later.
+  //
+  // MIPS don't have this problem because MIPS's return
+  // value reg and arg reg don't overlap.
+  __ move(at2, a0);
+
   if (ShouldInlineSmiCase(expr->op())) {
     __ li(a1, Operand(Smi::FromInt(count_value)));
     __ AdduAndCheckForOverflow(v0, a0, a1, t0);
@@ -4428,6 +4436,9 @@ void FullCodeGenerator::VisitCountOperation(CountOperation* expr) {
     patch_site.EmitJumpIfSmi(v0, &done);
     __ bind(&stub_call);
   }
+
+  __ move(a0, at2);
+
   __ move(a1, a0);
   __ li(a0, Operand(Smi::FromInt(count_value)));
 
