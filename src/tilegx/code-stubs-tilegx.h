@@ -64,13 +64,13 @@ class RecordWriteStub: public PlatformCodeStub {
   virtual bool SometimesSetsUpAFrame() { return false; }
 
   static void PatchBranchIntoNop(MacroAssembler* masm, int pos) {
-    ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
+    //ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
     masm->instr_at_put(pos, (masm->instr_at(pos) & (~create_BrType_X1(-1))) | create_BrType_X1(BNEZ_BRANCH_OPCODE_X1));
     ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
   }
 
   static void PatchNopIntoBranch(MacroAssembler* masm, int pos) {
-    ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
+    //ASSERT(Assembler::IsBnez(masm->instr_at(pos)));
     masm->instr_at_put(pos, (masm->instr_at(pos) & (~create_BrType_X1(-1))) | create_BrType_X1(BEQZ_BRANCH_OPCODE_X1));
     ASSERT(Assembler::IsBeqz(masm->instr_at(pos)));
   }
