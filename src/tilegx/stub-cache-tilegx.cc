@@ -935,9 +935,8 @@ static void GenerateFastApiDirectCall(MacroAssembler* masm,
   Address function_address = v8::ToCData<Address>(api_call_info->callback());
   bool returns_handle =
       !CallbackTable::ReturnsVoid(masm->isolate(), function_address);
-  returns_handle = false;
 
-  Register first_arg = returns_handle ? a1 : a0;
+  Register first_arg = a0;
 
   // first_arg = v8::Arguments&
   // Arguments is built at sp + 1 (sp is a reserved spot for ra).
@@ -1467,10 +1466,9 @@ void BaseLoadStubCompiler::GenerateLoadCallback(
   Address getter_address = v8::ToCData<Address>(callback->getter());
   bool returns_handle =
       !CallbackTable::ReturnsVoid(isolate(), getter_address);
-  returns_handle = false;
 
-  Register first_arg = returns_handle ? a1 : a0;
-  Register second_arg = returns_handle ? a2 : a1;
+  Register first_arg = a0;
+  Register second_arg = a1;
 
   __ move(a2, scratch2());  // Saved in case scratch2 == a1.
   __ move(first_arg, sp);  // (first argument - see note below) = Handle<Name>
