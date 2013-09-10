@@ -508,7 +508,7 @@ void MacroAssembler::Addu(Register rd, Register rs, const Operand& rt) {
   if (rt.is_reg()) {
     add(rd, rs, rt.rm());
   } else {
-    if (is_int16(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+    if (is_lintn(rt.imm64_, 16) && !MustUseReg(rt.rmode_)) {
       addli(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
@@ -524,7 +524,7 @@ void MacroAssembler::Subu(Register rd, Register rs, const Operand& rt)
   if (rt.is_reg()) {
     sub(rd, rs, rt.rm());
   } else {
-    if (is_int16(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+    if (is_lintn(rt.imm64_, 16) && !MustUseReg(rt.rmode_)) {
       addli(rd, rs, -rt.imm64_);
     } else {
       // li handles the relocation.
@@ -563,7 +563,7 @@ void MacroAssembler::And(Register rd, Register rs, const Operand& rt) {
   if (rt.is_reg()) {
     and_(rd, rs, rt.rm());
   } else {
-    if (is_int8(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+    if (is_lintn(rt.imm64_, 8) && !MustUseReg(rt.rmode_)) {
       andi(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
@@ -969,7 +969,7 @@ void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
       case greater_equal:
         if (rt.imm64_ == 0) {
           bgez(rs, offset);
-        } else if (is_int16(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltsi(scratch, rs, rt.imm64_);
           beqz(scratch, offset);
         } else {
@@ -982,7 +982,7 @@ void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
       case less:
         if (rt.imm64_ == 0) {
           bltz(rs, offset);
-        } else if (is_int16(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltsi(scratch, rs, rt.imm64_);
           bnez(scratch, offset);
         } else {
@@ -1016,7 +1016,7 @@ void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
       case Ugreater_equal:
         if (rt.imm64_ == 0) {
           bgez(rs, offset);
-        } else if (is_int16(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltui(scratch, rs, rt.imm64_);
           beqz(scratch, offset);
         } else {
@@ -1030,7 +1030,7 @@ void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
         if (rt.imm64_ == 0) {
           // No code needs to be emitted.
           return;
-        } else if (is_int16(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltui(scratch, rs, rt.imm64_);
           bnez(scratch, offset);
         } else {
@@ -1231,7 +1231,7 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
         if (rt.imm64_ == 0) {
           offset = shifted_branch_offset(L, false);
           bgez(rs, offset);
-        } else if (is_int8(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltsi(scratch, rs, rt.imm64_);
           offset = shifted_branch_offset(L, false);
           beqz(scratch, offset);
@@ -1248,7 +1248,7 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
         if (rt.imm64_ == 0) {
           offset = shifted_branch_offset(L, false);
           bltz(rs, offset);
-        } else if (is_int8(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltsi(scratch, rs, rt.imm64_);
           offset = shifted_branch_offset(L, false);
           bnez(scratch, offset);
@@ -1292,7 +1292,7 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
         if (rt.imm64_ == 0) {
           offset = shifted_branch_offset(L, false);
           bgez(rs, offset);
-        } else if (is_int8(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltui(scratch, rs, rt.imm64_);
           offset = shifted_branch_offset(L, false);
           beqz(scratch, offset);
@@ -1309,7 +1309,7 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
         if (rt.imm64_ == 0) {
           // No code needs to be emitted.
           return;
-        } else if (is_int8(rt.imm64_)) {
+        } else if (is_lintn(rt.imm64_, 8)) {
           cmpltui(scratch, rs, rt.imm64_);
           offset = shifted_branch_offset(L, false);
           bnez(scratch, offset);
