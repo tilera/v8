@@ -1798,8 +1798,9 @@ void UnaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
   // Argument is in a0 and v0 at this point, so we can overwrite a0.
   __ li(a2, Operand(Smi::FromInt(op_)));
   __ li(a1, Operand(Smi::FromInt(mode_)));
+  __ push(v0);
   __ li(a0, Operand(Smi::FromInt(operand_type_)));
-  __ Push(v0, a2, a1, a0);
+  __ Push(a2, a1, a0);
 
   __ TailCallExternalReference(
       ExternalReference(IC_Utility(IC::kUnaryOp_Patch), masm->isolate()), 4, 1);
@@ -1844,12 +1845,12 @@ void UnaryOpStub::GenerateSmiCodeSub(MacroAssembler* masm,
   __ JumpIfNotSmi(a0, non_smi);
 
   // The result of negating zero or the smallest negative smi is not a smi.
-  __ And(t0, a0, ~0x80000000);
+  __ And(t0, a0, Operand(~0x8000000000000000L));
   __ Branch(slow, eq, t0, Operand(zero));
 
   // Return '0 - value'.
-  __ Ret();
   __ sub(v0, zero, a0);
+  __ Ret();
 }
 
 
