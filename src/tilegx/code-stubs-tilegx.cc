@@ -3955,7 +3955,8 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
   // We have an adaptor frame. Patch the parameters pointer.
   __ bind(&adaptor_frame);
   __ ld(a2, MemOperand(a3, ArgumentsAdaptorFrameConstants::kLengthOffset));
-  __ sll(t6, a2, 1);
+  __ sra(t6, a2, 32);
+  __ sll(t6, t6, 3);
   __ Addu(a3, a3, Operand(t6));
   __ Addu(a3, a3, Operand(StandardFrameConstants::kCallerSPOffset));
   __ st(a3, MemOperand(sp, 1 * kPointerSize));
@@ -3979,12 +3980,14 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
   ASSERT_EQ(0, Smi::FromInt(0));
   __ move(t5, zero);  // In delay slot: param map size = 0 when a1 == 0.
   __ Branch(&param_map_size, eq, a1, Operand(zero));
-  __ sll(t5, a1, 1);
+  __ sra(t5, a1, 32);
+  __ sll(t5, t5, 3);
   __ addli(t5, t5, kParameterMapHeaderSize);
   __ bind(&param_map_size);
 
   // 2. Backing store.
-  __ sll(t6, a2, 1);
+  __ sra(t6, a2, 32);
+  __ sll(t6, t6, 3);
   __ Addu(t5, t5, Operand(t6));
   __ Addu(t5, t5, Operand(FixedArray::kHeaderSize));
 
@@ -4062,7 +4065,8 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
   __ Addu(t2, a1, Operand(Smi::FromInt(2)));
   __ st(t2, FieldMemOperand(t0, FixedArray::kLengthOffset));
   __ st(cp, FieldMemOperand(t0, FixedArray::kHeaderSize + 0 * kPointerSize));
-  __ sll(t6, a1, 1);
+  __ sra(t6, a1, 32);
+  __ sll(t6, t6, 3);
   __ Addu(t2, t0, Operand(t6));
   __ Addu(t2, t2, Operand(kParameterMapHeaderSize));
   __ st(t2, FieldMemOperand(t0, FixedArray::kHeaderSize + 1 * kPointerSize));
@@ -4081,7 +4085,8 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
   __ Addu(t5, t5, Operand(Smi::FromInt(Context::MIN_CONTEXT_SLOTS)));
   __ Subu(t5, t5, Operand(a1));
   __ LoadRoot(t3, Heap::kTheHoleValueRootIndex);
-  __ sll(t6, t2, 1);
+  __ sra(t6, t2, 32);
+  __ sll(t6, t6, 3);
   __ Addu(a3, t0, Operand(t6));
   __ Addu(a3, a3, Operand(kParameterMapHeaderSize));
 
@@ -4095,7 +4100,8 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
 
   __ bind(&parameters_loop);
   __ Subu(t2, t2, Operand(Smi::FromInt(1)));
-  __ sll(t1, t2, 1);
+  __ sra(t1, t2, 32);
+  __ sll(t1, t1, 3);
   __ Addu(t1, t1, Operand(kParameterMapHeaderSize - kHeapObjectTag));
   __ Addu(t6, t0, t1);
   __ st(t5, MemOperand(t6));
@@ -4118,14 +4124,16 @@ void ArgumentsAccessStub::GenerateNewNonStrictFast(MacroAssembler* masm) {
   Label arguments_loop, arguments_test;
   __ move(t5, a1);
   __ ld(t0, MemOperand(sp, 1 * kPointerSize));
-  __ sll(t6, t5, 1);
+  __ sra(t6, t5, 32);
+  __ sll(t6, t6, 3);
   __ Subu(t0, t0, Operand(t6));
   __ jmp(&arguments_test);
 
   __ bind(&arguments_loop);
   __ Subu(t0, t0, Operand(kPointerSize));
   __ ld(t2, MemOperand(t0, 0));
-  __ sll(t6, t5, 1);
+  __ sra(t6, t5, 32);
+  __ sll(t6, t6, 3);
   __ Addu(t1, a3, Operand(t6));
   __ st(t2, FieldMemOperand(t1, FixedArray::kHeaderSize));
   __ Addu(t5, t5, Operand(Smi::FromInt(1)));
@@ -4559,7 +4567,8 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // Multiplying by 2 comes for free since r1 is smi-tagged.
   STATIC_ASSERT(kSmiTag == 0);
   STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 32);
-  __ Addu(a1, a1, Operand(2));  // a1 was a smi.
+  __ Addu(a1, a1, Operand(Smi::FromInt(2)));  // a1 was a smi.
+  __ sra(a1, a1, 31);
 
   __ ld(a0, MemOperand(sp, kLastMatchInfoOffset));
   __ JumpIfSmi(a0, &runtime);
