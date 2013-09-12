@@ -1765,7 +1765,7 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
       // Store the value.
       // We may need a register containing the address end_elements below,
       // so write back the value in end_elements.
-      __ srl(end_elements, v0, 32);
+      __ sra(end_elements, v0, 32);
       __ sll(end_elements, end_elements, kPointerSizeLog2);
       __ Addu(end_elements, elements, end_elements);
       const int kEndElementsOffset =
@@ -1862,7 +1862,7 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
       // Store the value.
       // We may need a register containing the address end_elements below,
       // so write back the value in end_elements.
-      __ srl(end_elements, v0, 32);
+      __ sra(end_elements, v0, 32);
       __ sll(end_elements, end_elements, kPointerSizeLog2);
       __ Addu(end_elements, elements, end_elements);
       __ Addu(end_elements, end_elements, kEndElementsOffset);
@@ -1902,7 +1902,7 @@ Handle<Code> CallStubCompiler::CompileArrayPushCall(
 
       const int kAllocationDelta = 4;
       // Load top and check if it is the end of elements.
-      __ srl(end_elements, v0, 32);
+      __ sra(end_elements, v0, 32);
       __ sll(end_elements, end_elements, kPointerSizeLog2);
       __ Addu(end_elements, elements, end_elements);
       __ Addu(end_elements, end_elements, Operand(kEndElementsOffset));
@@ -2002,7 +2002,7 @@ Handle<Code> CallStubCompiler::CompileArrayPopCall(
   STATIC_ASSERT(kSmiTag == 0);
   // We can't address the last element in one operation. Compute the more
   // expensive shift first, and use an offset later on.
-  __ srl(t1, t0, 32);
+  __ sra(t1, t0, 32);
   __ sll(t1, t1, kPointerSizeLog2);
   __ Addu(elements, elements, t1);
   __ ld(v0, FieldMemOperand(elements, FixedArray::kHeaderSize));
@@ -3464,26 +3464,26 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       __ bind(&done);
       __ move(t1, v0);
 
-      __ srl(t8, key, 32); // Untag
+      __ sra(t8, key, 32); // Untag
       __ add(t8, a3, t8);
       __ st1(t1, MemOperand(t8));
       }
       break;
     case EXTERNAL_BYTE_ELEMENTS:
     case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
-      __ srl(t8, key, 32); // Untag
+      __ sra(t8, key, 32); // Untag
       __ add(t8, a3, t8);
       __ st1(t1, MemOperand(t8));
       break;
     case EXTERNAL_SHORT_ELEMENTS:
     case EXTERNAL_UNSIGNED_SHORT_ELEMENTS:
-      __ srl(t8, key, 31); // Untag, then multiply 2
+      __ sra(t8, key, 31); // Untag, then multiply 2
       __ add(t8, a3, t8);
       __ st2(t1, MemOperand(t8));
       break;
     case EXTERNAL_INT_ELEMENTS:
     case EXTERNAL_UNSIGNED_INT_ELEMENTS:
-      __ srl(t8, key, 30); // Untag, then multiply 4
+      __ sra(t8, key, 30); // Untag, then multiply 4
       __ add(t8, a3, t8);
       __ st(t1, MemOperand(t8));
       break;
@@ -3493,7 +3493,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       StoreIntAsFloat(masm, a3, t0, t1, t2, t3, t4);
       break;
     case EXTERNAL_DOUBLE_ELEMENTS:
-      __ srl(t8, key, 29); // Untag, then multiply 8
+      __ sra(t8, key, 29); // Untag, then multiply 8
       __ add(a3, a3, t8);
       // a3: effective address of the double element
       FloatingPointHelper::Destination destination;
@@ -3780,7 +3780,7 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
             elements_reg,
             Operand(FixedArray::kHeaderSize - kHeapObjectTag));
     STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-    __ srl(scratch2, key_reg, 32);
+    __ sra(scratch2, key_reg, 32);
     __ sll(scratch2, scratch2, kPointerSizeLog2);
     __ Addu(scratch, scratch, scratch2);
     __ st(value_reg, MemOperand(scratch));
@@ -3790,7 +3790,7 @@ void KeyedStoreStubCompiler::GenerateStoreFastElement(
             elements_reg,
             Operand(FixedArray::kHeaderSize - kHeapObjectTag));
     STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-    __ srl(scratch2, key_reg, 32);
+    __ sra(scratch2, key_reg, 32);
     __ sll(scratch2, scratch2, kPointerSizeLog2);
     __ Addu(scratch, scratch, scratch2);
     __ st(value_reg, MemOperand(scratch));

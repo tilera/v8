@@ -294,7 +294,7 @@ static void GenerateFastArrayLoad(MacroAssembler* masm,
           Operand(FixedArray::kHeaderSize - kHeapObjectTag));
   // The key is a smi.
   STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-  __ srl(at, key, kSmiTagSize + kSmiShiftSize);
+  __ sra(at, key, kSmiTagSize + kSmiShiftSize);
   __ sll(at, at, kPointerSizeLog2);
   __ add(at, at, scratch1);
   __ ld(scratch2, MemOperand(at));
@@ -1186,7 +1186,7 @@ static void KeyedStoreGenerateGenericHelper(
   }
   // It's irrelevant whether array is smi-only or not when writing a smi.
   __ Addu(address, elements, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ srl(scratch_value, key, kSmiTagSize + kSmiShiftSize);
+  __ sra(scratch_value, key, kSmiTagSize + kSmiShiftSize);
   __ sll(scratch_value, scratch_value, kPointerSizeLog2);
   __ Addu(address, address, scratch_value);
   __ st(value, MemOperand(address));
@@ -1205,7 +1205,7 @@ static void KeyedStoreGenerateGenericHelper(
     __ st(scratch_value, FieldMemOperand(receiver, JSArray::kLengthOffset));
   }
   __ Addu(address, elements, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ srl(scratch_value, key, kSmiTagSize + kSmiShiftSize);
+  __ sra(scratch_value, key, kSmiTagSize + kSmiShiftSize);
   __ sll(scratch_value, scratch_value, kPointerSizeLog2);
   __ Addu(address, address, scratch_value);
   __ st(value, MemOperand(address));

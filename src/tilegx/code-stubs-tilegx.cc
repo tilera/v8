@@ -304,14 +304,14 @@ void FastNewClosureStub::Generate(MacroAssembler* masm) {
             Operand(Smi::FromInt(SharedFunctionInfo::kSecondEntryIndex)));
   __ Subu(t0, t0, Operand(Smi::FromInt(SharedFunctionInfo::kEntryLength)));
   __ Addu(t1, a1, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ srl(at, t0, 32);
+  __ sra(at, t0, 32);
   __ sll(at, at, kPointerSizeLog2);
   __ Addu(t1, t1, Operand(at));
   __ ld(t1, MemOperand(t1));
   __ Branch(&loop, ne, a2, Operand(t1));
   // Hit: fetch the optimized code.
   __ Addu(t1, a1, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ srl(at, t0, 32);
+  __ sra(at, t0, 32);
   __ sll(at, at, kPointerSizeLog2);
   __ Addu(t1, t1, Operand(at));
   __ Addu(t1, t1, Operand(kPointerSize));
@@ -1796,11 +1796,11 @@ void UnaryOpStub::Generate(MacroAssembler* masm) {
 
 void UnaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
   // Argument is in a0 and v0 at this point, so we can overwrite a0.
+  __ move(a3, a0);
   __ li(a2, Operand(Smi::FromInt(op_)));
   __ li(a1, Operand(Smi::FromInt(mode_)));
-  __ push(v0);
   __ li(a0, Operand(Smi::FromInt(operand_type_)));
-  __ Push(a2, a1, a0);
+  __ Push(a3, a2, a1, a0);
 
   __ TailCallExternalReference(
       ExternalReference(IC_Utility(IC::kUnaryOp_Patch), masm->isolate()), 4, 1);
@@ -1860,7 +1860,7 @@ void UnaryOpStub::GenerateSmiCodeBitNot(MacroAssembler* masm,
 
   // Flip bits and revert inverted smi-tag.
   __ Neg(v0, a0);
-  __ And(v0, v0, ~kSmiTagMask);
+  __ And(v0, v0, Operand(0xFFFFFFFF00000000L));
   __ Ret();
 }
 
@@ -2140,7 +2140,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ GetLeastBitsFromSmi(scratch1, right, 5);
       __ sra(scratch1, left, scratch1);
       // Smi tag result.
-      __ And(v0, scratch1, ~kSmiTagMask);
+      __ And(v0, scratch1, Operand(0xFFFFFFFF00000000L));
       __ Ret();
       break;
     case Token::SHR:
@@ -2151,7 +2151,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ srl(v0, scratch1, scratch2);
       // Unsigned shift is not allowed to produce a negative number, so
       // check the sign bit and the sign bit after Smi tagging.
-      __ And(scratch1, v0, Operand(0xc0000000));
+      __ And(scratch1, v0, Operand(0xC0000000));
       __ Branch(&not_smi_result, ne, scratch1, Operand(zero));
       // Smi tag result.
       __ SmiTag(v0);
@@ -3871,7 +3871,7 @@ void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
 
   // Read the argument from the stack and return it.
   __ sub(a3, a0, a1);
-  __ srl(t3, a3, 32);
+  __ sra(t3, a3, 32);
   __ sll(t3, t3, kPointerSizeLog2);
   __ Addu(a3, fp, Operand(t3));
   __ ld(v0, MemOperand(a3, kDisplacement));
@@ -3886,7 +3886,7 @@ void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
 
   // Read the argument from the adaptor frame and return it.
   __ sub(a3, a0, a1);
-  __ srl(t3, a3, 32);
+  __ sra(t3, a3, 32);
   __ sll(t3, t3, kPointerSizeLog2);
   __ Addu(a3, a2, Operand(t3));
   __ ld(v0, MemOperand(a3, kDisplacement));
@@ -4174,7 +4174,7 @@ void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
   __ bind(&adaptor_frame);
   __ ld(a1, MemOperand(a2, ArgumentsAdaptorFrameConstants::kLengthOffset));
   __ st(a1, MemOperand(sp, 0));
-  __ srl(at, a1, 32);
+  __ sra(at, a1, 32);
   __ sll(at, at, kPointerSizeLog2);
   __ Addu(a3, a2, Operand(at));
 
@@ -4186,7 +4186,7 @@ void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
   Label add_arguments_object;
   __ bind(&try_allocate);
   __ Branch(&add_arguments_object, eq, a1, Operand(zero));
-  __ srl(a1, a1, 32);
+  __ sra(a1, a1, 32);
 
   __ Addu(a1, a1, Operand(FixedArray::kHeaderSize / kPointerSize));
   __ bind(&add_arguments_object);
@@ -4225,7 +4225,7 @@ void ArgumentsAccessStub::GenerateNewStrict(MacroAssembler* masm) {
   __ st(a3, FieldMemOperand(t0, FixedArray::kMapOffset));
   __ st(a1, FieldMemOperand(t0, FixedArray::kLengthOffset));
   // Untag the length for the loop.
-  __ srl(a1, a1, 32);
+  __ sra(a1, a1, 32);
 
   // Copy the fixed array slots.
   Label loop;
@@ -4713,7 +4713,7 @@ void RegExpConstructResultStub::Generate(MacroAssembler* masm) {
   // FixedArray.
   int objects_size =
       (JSRegExpResult::kSize + FixedArray::kHeaderSize) / kPointerSize;
-  __ srl(t1, a1, kSmiTagSize + kSmiShiftSize);
+  __ sra(t1, a1, kSmiTagSize + kSmiShiftSize);
   __ Addu(a2, t1, Operand(objects_size));
   __ Allocate(
       a2,  // In: Size, in words.
@@ -5164,7 +5164,7 @@ void StringCharFromCodeGenerator::GenerateFast(MacroAssembler* masm) {
   __ LoadRoot(result_, Heap::kSingleCharacterStringCacheRootIndex);
   // At this point code register contains smi tagged ASCII char code.
   STATIC_ASSERT(kSmiTag == 0);
-  __ srl(t0, code_, 32);
+  __ sra(t0, code_, 32);
   __ sll(t0, t0, kPointerSizeLog2);
   __ Addu(result_, result_, t0);
   __ ld(result_, FieldMemOperand(result_, FixedArray::kHeaderSize));
@@ -7287,7 +7287,7 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
   // Array literal has ElementsKind of FAST_*_ELEMENTS and value is an object.
   __ bind(&fast_elements);
   __ ld(t1, FieldMemOperand(a1, JSObject::kElementsOffset));
-  __ srl(t2, a3, 32);
+  __ sra(t2, a3, 32);
   __ sll(t2, t2, kPointerSizeLog2);
   __ Addu(t2, t1, t2);
   __ Addu(t2, t2, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
@@ -7302,7 +7302,7 @@ void StoreArrayLiteralElementStub::Generate(MacroAssembler* masm) {
   // and value is Smi.
   __ bind(&smi_element);
   __ ld(t1, FieldMemOperand(a1, JSObject::kElementsOffset));
-  __ srl(t2, a3, 32);
+  __ sra(t2, a3, 32);
   __ sll(t2, t2, kPointerSizeLog2);
   __ Addu(t2, t1, t2);
   __ st(a0, FieldMemOperand(t2, FixedArray::kHeaderSize));

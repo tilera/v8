@@ -374,7 +374,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     __ Addu(a2, fp, Operand(StandardFrameConstants::kCallerSPOffset));
 
     // Set up number of arguments for function call below.
-    __ srl(a0, a3, kSmiTagSize + kSmiShiftSize);
+    __ sra(a0, a3, kSmiTagSize + kSmiShiftSize);
 
     // Copy arguments and receiver to the expression stack.
     // a0: number of arguments
@@ -386,7 +386,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     // sp[2]: constructor function
     // sp[3]: number of arguments (smi-tagged)
     Label loop, entry;
-    __ srl(a3, a3, kSmiTagSize + kSmiShiftSize);
+    __ sra(a3, a3, kSmiTagSize + kSmiShiftSize);
     __ jmp(&entry);
     __ bind(&loop);
     __ sll(t0, a3, kPointerSizeLog2);
@@ -455,7 +455,7 @@ static void Generate_JSConstructStubHelper(MacroAssembler* masm,
     // Leave construct frame.
   }
 
-  __ srl(t0, a1, kSmiTagSize + kSmiShiftSize);
+  __ sra(t0, a1, kSmiTagSize + kSmiShiftSize);
   __ sll(t0, t0, kPointerSizeLog2);
   __ Addu(sp, sp, t0);
   __ Addu(sp, sp, kPointerSize);
@@ -532,7 +532,7 @@ static void LeaveArgumentsAdaptorFrame(MacroAssembler* masm) {
   __ ld(a1, MemOperand(fp, -3 * kPointerSize));
   __ move(sp, fp);
   __ MultiPop(fp.bit() | lr.bit());
-  __ srl(t0, a1, kSmiTagSize + kSmiShiftSize);
+  __ sra(t0, a1, kSmiTagSize + kSmiShiftSize);
   __ sll(t0, t0, kPointerSizeLog2);
   __ Addu(sp, sp, t0);
   // Adjust for the receiver.
@@ -566,7 +566,7 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     EnterArgumentsAdaptorFrame(masm);
 
     // Calculate copy start address into a0 and copy end address into a2.
-    __ srl(a0, a0, kSmiTagSize + kSmiShiftSize);
+    __ sra(a0, a0, kSmiTagSize + kSmiShiftSize);
     __ sll(a0, a0, kPointerSizeLog2);
     __ Addu(a0, fp, a0);
     // Adjust for return address and receiver.
@@ -607,7 +607,7 @@ void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
     // a1: function
     // a2: expected number of arguments
     // a3: code entry to call
-    __ srl(a0, a0, kSmiTagSize + kSmiShiftSize);
+    __ sra(a0, a0, kSmiTagSize + kSmiShiftSize);
     __ sll(a0, a0, kPointerSizeLog2);
     __ Addu(a0, fp, a0);
     // Adjust for return address and receiver.
@@ -1118,7 +1118,7 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
     // here which will cause a2 to become negative.
     __ sub(a2, sp, a2);
     // Check if the arguments will overflow the stack.
-    __ srl(t3, r0, kSmiTagSize + kSmiShiftSize);
+    __ sra(t3, r0, kSmiTagSize + kSmiShiftSize);
     __ sll(t3, t3, kPointerSizeLog2);
     __ Branch(&okay, gt, a2, Operand(t3));  // Signed comparison.
 
@@ -1459,7 +1459,7 @@ static void AllocateJSArray(MacroAssembler* masm,
   // elements_array_storage: elements array element storage
   // array_size: smi-tagged size of elements array
   STATIC_ASSERT(kSmiTag == 0 && kSmiTagSize < kPointerSizeLog2);
-  __ srl(elements_array_end, array_size, kSmiTagSize + kSmiShiftSize);
+  __ sra(elements_array_end, array_size, kSmiTagSize + kSmiShiftSize);
   __ sll(elements_array_end, elements_array_end, kPointerSizeLog2);
   __ Addu(elements_array_end, elements_array_storage, elements_array_end);
 

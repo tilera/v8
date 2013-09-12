@@ -1198,7 +1198,7 @@ void FullCodeGenerator::VisitForInStatement(ForInStatement* stmt) {
   // Get the current entry of the array into register a3.
   __ ld(a2, MemOperand(sp, 2 * kPointerSize));
   __ Addu(a2, a2, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
-  __ srl(t0, a0, kSmiTagSize + kSmiShiftSize);
+  __ sra(t0, a0, kSmiTagSize + kSmiShiftSize);
   __ sll(t0, t0, kPointerSizeLog2);
   __ add(t0, a2, t0);  // Array base + scaled (smi) index.
   __ ld(a3, MemOperand(t0));  // Current entry.
@@ -2265,7 +2265,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ Branch(&stub_call);
       __ GetLeastBitsFromSmi(scratch1, right, 5);
       __ sra(right, left, scratch1);
-      __ And(v0, right, Operand(~kSmiTagMask));
+      __ And(v0, right, Operand(0xFFFFFFFF00000000L));
       break;
     case Token::SHL: {
       __ Branch(&stub_call);
@@ -2282,7 +2282,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ SmiUntag(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ srl(scratch1, scratch1, scratch2);
-      __ And(scratch2, scratch1, 0xc0000000);
+      __ And(scratch2, scratch1, 0xC0000000);
       __ Branch(&stub_call, ne, scratch2, Operand(zero));
       __ SmiTag(v0, scratch1);
       break;
@@ -2885,7 +2885,7 @@ void FullCodeGenerator::EmitIsNonNegativeSmi(CallRuntime* expr) {
                          &if_true, &if_false, &fall_through);
 
   PrepareForBailoutBeforeSplit(expr, true, if_true, if_false);
-  __ And(at, v0, Operand(kSmiTagMask | 0x80000000));
+  __ And(at, v0, Operand(kSmiTagMask | 0x8000000000000000L));
   Split(eq, at, Operand(zero), if_true, if_false, fall_through);
 
   context()->Plug(if_true, if_false);
@@ -3014,7 +3014,7 @@ void FullCodeGenerator::EmitIsStringWrapperSafeForDefaultValueOf(
   __ Addu(t0, t0, Operand(DescriptorArray::kFirstOffset - kHeapObjectTag));
   // Calculate the end of the descriptor array.
   __ move(a2, t0);
-  __ srl(t1, a3, kSmiTagSize + kSmiShiftSize);
+  __ sra(t1, a3, kSmiTagSize + kSmiShiftSize);
   __ sll(t1, t1, kPointerSizeLog2);
   __ Addu(a2, a2, t1);
 
@@ -3820,7 +3820,7 @@ void FullCodeGenerator::EmitGetFromCache(CallRuntime* expr) {
   // a2 now holds finger offset as a smi.
   __ Addu(a3, cache, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
   // a3 now points to the start of fixed array elements.
-  __ srl(at, a2, kSmiTagSize + kSmiShiftSize);
+  __ sra(at, a2, kSmiTagSize + kSmiShiftSize);
   __ sll(at, at, kPointerSizeLog2);
   __ add(a3, a3, at);
   // a3 now points to key of indexed element of cache.
