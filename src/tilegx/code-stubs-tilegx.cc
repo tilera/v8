@@ -7054,7 +7054,7 @@ void RecordWriteStub::GenerateFixedRegStubsAheadOfTime(Isolate* isolate) {
 
 
 bool CodeStub::CanUseFPRegisters() {
-  return true;  // FPU is a base requirement for V8.
+  return false;  // FPU is a base requirement for V8.
 }
 
 
@@ -7372,19 +7372,8 @@ void ProfileEntryHookStub::Generate(MacroAssembler* masm) {
     __ And(sp, sp, Operand(-frame_alignment));
   }
 
-#if defined(V8_HOST_ARCH_MIPS)
-  __ li(at, Operand(reinterpret_cast<int32_t>(&entry_hook_)));
+  __ li(at, Operand(reinterpret_cast<int64_t>(&entry_hook_)));
   __ ld(at, MemOperand(at));
-#else
-  // Under the simulator we need to indirect the entry hook through a
-  // trampoline function at a known address.
-  Address trampoline_address = reinterpret_cast<Address>(
-      reinterpret_cast<intptr_t>(EntryHookTrampoline));
-  ApiFunction dispatcher(trampoline_address);
-  __ li(at, Operand(ExternalReference(&dispatcher,
-                                      ExternalReference::BUILTIN_CALL,
-                                      masm->isolate())));
-#endif
   __ Call(at);
 
   // Restore the stack pointer if needed.

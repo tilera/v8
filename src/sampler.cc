@@ -298,8 +298,8 @@ void SignalHandler::HandleProfilerSignal(int signal, siginfo_t* info,
   sample->fp = reinterpret_cast<Address>(mcontext.gregs[30]);
 #elif V8_HOST_ARCH_TILEGX
   sample->pc = reinterpret_cast<Address>(mcontext.pc);
-  sample->sp = reinterpret_cast<Address>(mcontext.gregs[29]);
-  sample->fp = reinterpret_cast<Address>(mcontext.gregs[30]);
+  sample->sp = reinterpret_cast<Address>(mcontext.sp);
+  sample->fp = reinterpret_cast<Address>(mcontext.gregs[52]);
 #endif  // V8_HOST_ARCH_*
 #elif defined(__FreeBSD__)
 #if V8_HOST_ARCH_IA32

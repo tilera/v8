@@ -277,7 +277,7 @@ void RegExpMacroAssemblerTILEGX::IfRegisterEqPos(int reg,
 
 
 RegExpMacroAssembler::IrregexpImplementation
-    RegExpMacroAssemblerTILEGX::Implementation() { UNIMPLEMENTED(); return kTILEGXImplementation; }
+    RegExpMacroAssemblerTILEGX::Implementation() { return kTILEGXImplementation; }
 
 
 void RegExpMacroAssemblerTILEGX::LoadCurrentCharacter(int cp_offset,

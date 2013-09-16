@@ -1230,7 +1230,7 @@ int Serializer::RootIndex(HeapObject* heap_object, HowToCode from) {
   for (int i = 0; i < root_index_wave_front_; i++) {
     Object* root = heap->roots_array_start()[i];
     if (!root->IsSmi() && root == heap_object) {
-#if V8_TARGET_ARCH_MIPS
+#if V8_TARGET_ARCH_MIPS || V8_TARGET_ARCH_TILEGX
       if (from == kFromCode) {
         // In order to avoid code bloat in the deserializer we don't have
         // support for the encoding that specifies a particular root should
