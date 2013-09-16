@@ -1906,9 +1906,9 @@ void UnaryOpStub::GenerateHeapNumberCodeSub(MacroAssembler* masm,
   EmitCheckForHeapNumber(masm, a0, a1, t2, slow);
   // a0 is a heap number.  Get a new heap number in a1.
   if (mode_ == UNARY_OVERWRITE) {
-    __ ld(a2, FieldMemOperand(a0, HeapNumber::kExponentOffset));
-    __ Xor(a2, a2, Operand(HeapNumber::kSignMask));  // Flip sign.
-    __ st(a2, FieldMemOperand(a0, HeapNumber::kExponentOffset));
+    __ ld(a2, FieldMemOperand(a0, HeapNumber::kValueOffset));
+    __ Xor(a2, a2, Operand(0x8000000000000000L));  // Flip sign.
+    __ st(a2, FieldMemOperand(a0, HeapNumber::kValueOffset));
   } else {
     Label slow_allocate_heapnumber, heapnumber_allocated;
     __ AllocateHeapNumber(a1, a2, a3, t2, &slow_allocate_heapnumber);
@@ -1924,11 +1924,9 @@ void UnaryOpStub::GenerateHeapNumberCodeSub(MacroAssembler* masm,
     }
 
     __ bind(&heapnumber_allocated);
-    __ ld(a3, FieldMemOperand(a0, HeapNumber::kMantissaOffset));
-    __ ld(a2, FieldMemOperand(a0, HeapNumber::kExponentOffset));
-    __ st(a3, FieldMemOperand(a1, HeapNumber::kMantissaOffset));
-    __ Xor(a2, a2, Operand(HeapNumber::kSignMask));  // Flip sign.
-    __ st(a2, FieldMemOperand(a1, HeapNumber::kExponentOffset));
+    __ ld(a2, FieldMemOperand(a0, HeapNumber::kValueOffset));
+    __ Xor(a2, a2, Operand(0x8000000000000000L));  // Flip sign.
+    __ st(a2, FieldMemOperand(a1, HeapNumber::kValueOffset));
     __ move(v0, a1);
   }
   __ Ret();
@@ -5248,7 +5246,7 @@ void StringHelper::GenerateCopyCharactersLong(MacroAssembler* masm,
              Operand(zero));
   }
 
-  const int kReadAlignment = 4;
+  const int kReadAlignment = 8;
   const int kReadAlignmentMask = kReadAlignment - 1;
   // Ensure that reading an entire aligned word containing the last character
   // of a string will not read outside the allocated area (because we pad up
@@ -5264,8 +5262,8 @@ void StringHelper::GenerateCopyCharactersLong(MacroAssembler* masm,
   __ Branch(&done, eq, count, Operand(zero));
 
   Label byte_loop;
-  // Must copy at least eight bytes, otherwise just do it one byte at a time.
-  __ Subu(scratch1, count, Operand(8));
+  // Must copy at least sixteen bytes, otherwise just do it one byte at a time.
+  __ Subu(scratch1, count, Operand(16));
   __ Addu(count, dest, Operand(count));
   Register limit = count;  // Read until src equals this.
   __ Branch(&byte_loop, lt, scratch1, Operand(zero));
@@ -5291,7 +5289,6 @@ void StringHelper::GenerateCopyCharactersLong(MacroAssembler* masm,
   __ And(scratch4, src, Operand(kReadAlignmentMask));
   __ Branch(&simple_loop, eq, scratch4, Operand(zero));
 
-// FIXME
 #if 0 
   // Loop for src/dst that are not aligned the same way.
   // This loop uses lwl and lwr instructions. These instructions
@@ -5312,7 +5309,7 @@ void StringHelper::GenerateCopyCharactersLong(MacroAssembler* masm,
   __ Branch(&byte_loop);
 
   // Simple loop.
-  // Copy words from src to dest, until less than four bytes left.
+  // Copy words from src to dest, until less than eight bytes left.
   // Both src and dest are word aligned.
   __ bind(&simple_loop);
   {
@@ -5399,7 +5396,7 @@ void StringHelper::GenerateTwoCharacterStringTableProbe(MacroAssembler* masm,
   // Calculate capacity mask from the string table capacity.
   Register mask = scratch2;
   __ ld(mask, FieldMemOperand(string_table, StringTable::kCapacityOffset));
-  __ sra(mask, mask, 1);
+  __ sra(mask, mask, 32);
   __ Addu(mask, mask, -1);
 
   // Calculate untagged address of the first element of the string table.
@@ -5583,7 +5580,7 @@ void SubStringStub::Generate(MacroAssembler* masm) {
   // v0: original string
   // a2: result string length
   __ ld(t0, FieldMemOperand(v0, String::kLengthOffset));
-  __ sra(t0, t0, 1);
+  __ sra(t0, t0, 32);
   // Return original string.
   __ Branch(&return_v0, eq, a2, Operand(t0));
   // Longer than original string's length or negative: unsafe arguments.
@@ -5619,7 +5616,7 @@ void SubStringStub::Generate(MacroAssembler* masm) {
   // Sliced string.  Fetch parent and correct start index by offset.
   __ ld(t1, FieldMemOperand(v0, SlicedString::kParentOffset));
   __ ld(t0, FieldMemOperand(v0, SlicedString::kOffsetOffset));
-  __ sra(t0, t0, 1);  // Add offset to index.
+  __ sra(t0, t0, 32);  // Add offset to index.
   __ Addu(a3, a3, t0);
   // Update instance type.
   __ ld(a1, FieldMemOperand(t1, HeapObject::kMapOffset));
@@ -5977,8 +5974,8 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   }
 
   // Untag both string-lengths.
-  __ sra(a2, a2, 1);
-  __ sra(a3, a3, 1);
+  __ sra(a2, a2, 32);
+  __ sra(a3, a3, 32);
 
   // Both strings are non-empty.
   // a0: first string
@@ -6056,6 +6053,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
 
   // Allocate an ASCII cons string.
   __ bind(&ascii_data);
+  __ move(t6, v0);
   __ AllocateAsciiConsString(v0, t2, t0, t1, &call_runtime);
   __ bind(&allocated);
   // Fill the fields of the cons string.
@@ -6067,7 +6065,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   __ Branch(&skip_write_barrier, eq, t0, Operand(zero));
 
   __ move(t3, v0);
-  __ st(a0, FieldMemOperand(t3, ConsString::kFirstOffset));
+  __ st(t6, FieldMemOperand(t3, ConsString::kFirstOffset));
   __ RecordWriteField(t3,
                       ConsString::kFirstOffset,
                       a0,
@@ -6084,10 +6082,8 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   __ jmp(&after_writing);
 
   __ bind(&skip_write_barrier);
-  __ move(at2, v0);
-  __ st(a0, FieldMemOperand(at2, ConsString::kFirstOffset));
-  __ st(a1, FieldMemOperand(at2, ConsString::kSecondOffset));
-  __ move(v0, at2);
+  __ st(t6, FieldMemOperand(v0, ConsString::kFirstOffset));
+  __ st(a1, FieldMemOperand(v0, ConsString::kSecondOffset));
 
   __ bind(&after_writing);
 
@@ -6336,61 +6332,6 @@ void ICCompareStub::GenerateNumbers(MacroAssembler* masm) {
   if (right_ == CompareIC::SMI) {
     __ JumpIfNotSmi(a0, &miss);
   }
-
-  //FIXME:
-#if 0
-  // Inlining the double comparison and falling back to the general compare
-  // stub if NaN is involved.
-  // Load left and right operand.
-  Label done, left, left_smi, right_smi;
-  __ JumpIfSmi(a0, &right_smi);
-  __ CheckMap(a0, a2, Heap::kHeapNumberMapRootIndex, &maybe_undefined1,
-              DONT_DO_SMI_CHECK);
-  __ Subu(a2, a0, Operand(kHeapObjectTag));
-  __ ldc1(f2, MemOperand(a2, HeapNumber::kValueOffset));
-  __ Branch(&left);
-  __ bind(&right_smi);
-  __ SmiUntag(a2, a0);  // Can't clobber a0 yet.
-  FPURegister single_scratch = f6;
-  __ mtc1(a2, single_scratch);
-  __ cvt_d_w(f2, single_scratch);
-
-  __ bind(&left);
-  __ JumpIfSmi(a1, &left_smi);
-  __ CheckMap(a1, a2, Heap::kHeapNumberMapRootIndex, &maybe_undefined2,
-              DONT_DO_SMI_CHECK);
-  __ Subu(a2, a1, Operand(kHeapObjectTag));
-  __ ldc1(f0, MemOperand(a2, HeapNumber::kValueOffset));
-  __ Branch(&done);
-  __ bind(&left_smi);
-  __ SmiUntag(a2, a1);  // Can't clobber a1 yet.
-  single_scratch = f8;
-  __ mtc1(a2, single_scratch);
-  __ cvt_d_w(f0, single_scratch);
-
-  __ bind(&done);
-
-  // Return a result of -1, 0, or 1, or use CompareStub for NaNs.
-  Label fpu_eq, fpu_lt;
-  // Test if equal, and also handle the unordered/NaN case.
-  __ BranchF(&fpu_eq, &unordered, eq, f0, f2);
-
-  // Test if less (unordered case is already handled).
-  __ BranchF(&fpu_lt, NULL, lt, f0, f2);
-
-  // Otherwise it's greater, so just fall thru, and return.
-  __ li(v0, Operand(GREATER));
-  __ Ret();
-
-  __ bind(&fpu_eq);
-  __ li(v0, Operand(EQUAL));
-  __ Ret();
-
-  __ bind(&fpu_lt);
-  __ li(v0, Operand(LESS));
-  __ Ret();
-
-#endif
 
   __ bind(&unordered);
   __ bind(&generic_stub);

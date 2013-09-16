@@ -1152,13 +1152,13 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
     // Compute the receiver.
     // Do not transform the receiver for strict mode functions.
     Label call_to_object, use_global_receiver;
-    __ ld(a2, FieldMemOperand(a2, SharedFunctionInfo::kCompilerHintsOffset));
-    __ And(t3, a2, Operand(1 << (SharedFunctionInfo::kStrictModeFunction +
-                                 kSmiTagSize)));
+    __ ld1u(at2, FieldMemOperand(a2, SharedFunctionInfo::kStrictModeByteOffset));
+    __ And(t3, at2, Operand(1 << (SharedFunctionInfo::kStrictModeBitWithinByte)));
     __ Branch(&push_receiver, ne, t3, Operand(zero));
 
     // Do not transform the receiver for native (Compilerhints already in a2).
-    __ And(t3, a2, Operand(1 << (SharedFunctionInfo::kNative + kSmiTagSize)));
+    __ ld1u(at2, FieldMemOperand(a2, SharedFunctionInfo::kNativeByteOffset));
+    __ And(t3, at2, Operand(1 << (SharedFunctionInfo::kNativeBitWithinByte)));
     __ Branch(&push_receiver, ne, t3, Operand(zero));
 
     // Compute the receiver in non-strict mode.
@@ -1215,7 +1215,7 @@ void Builtins::Generate_FunctionApply(MacroAssembler* masm) {
 
     // Use inline caching to access the arguments.
     __ ld(a0, MemOperand(fp, kIndexOffset));
-    __ Addu(a0, a0, Operand(1 << kSmiTagSize));
+    __ Addu(a0, a0, Operand(1L << 32));
     __ st(a0, MemOperand(fp, kIndexOffset));
 
     // Test if the copy loop has finished copying all the elements from the
@@ -1536,7 +1536,7 @@ void ArrayNativeCode(MacroAssembler* masm, Label* call_generic_code) {
   // is too large to actually allocate an elements array.
   STATIC_ASSERT(kSmiTag == 0);
   __ Branch(call_generic_code, Ugreater_equal, a2,
-            Operand(JSObject::kInitialMaxFastElementArray << kSmiTagSize));
+            Operand(static_cast<uint64_t>(JSObject::kInitialMaxFastElementArray) << 32));
 
   // a0: argc
   // a1: constructor

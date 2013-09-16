@@ -3303,27 +3303,13 @@ void FullCodeGenerator::EmitRandomHeapNumber(CallRuntime* expr) {
 
   __ bind(&heapnumber_allocated);
 
-  // Convert 32 random bits in v0 to 0.(32 random bits) in a double
-  // by computing:
-  // ( 1.(20 0s)(32 random bits) x 2^20 ) - (1.0 x 2^20)).
-  __ PrepareCallCFunction(1, a0);
-  __ ld(a0, ContextOperand(cp, Context::GLOBAL_OBJECT_INDEX));
-  __ ld(a0, FieldMemOperand(a0, GlobalObject::kNativeContextOffset));
-  __ CallCFunction(ExternalReference::random_uint32_function(isolate()), 1);
 
-  // 0x41300000 is the top half of 1.0 x 2^20 as a double.
-  __ li(a1, Operand(0x41300000));
-  // Move 0x41300000xxxxxxxx (x = random bits in v0) to FPU.
-  //FIXME
-#if 0
-  __ Move(f12, v0, a1);
-  // Move 0x4130000000000000 to FPU.
-  __ Move(f14, zero, a1);
-  // Subtract and store the result in the heap number.
-  __ sub_d(f0, f12, f14);
-  __ sdc1(f0, FieldMemOperand(s0, HeapNumber::kValueOffset));
-#endif
-  __ move(v0, s0);
+  __ PrepareCallCFunction(2, a0);
+  __ move(a0, s0);
+  __ ld(a1, ContextOperand(cp, Context::GLOBAL_OBJECT_INDEX));
+  __ ld(a1, FieldMemOperand(a1, GlobalObject::kNativeContextOffset));
+  __ CallCFunction(
+       ExternalReference::fill_heap_number_with_random_function(isolate()), 2);
 
   context()->Plug(v0);
 }
@@ -4838,7 +4824,7 @@ void FullCodeGenerator::ExitFinallyBlock() {
   // Uncook return address and return.
   __ pop(result_register());
   ASSERT_EQ(32, kSmiTagSize + kSmiShiftSize);
-  __ sra(a1, a1, 1);  // Un-smi-tag value.
+  __ sra(a1, a1, 32);  // Un-smi-tag value.
   __ Addu(at, a1, Operand(masm_->CodeObject()));
   __ Jump(at);
 }

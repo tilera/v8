@@ -2369,7 +2369,7 @@ Handle<Code> CallStubCompiler::CompileMathFloorCall(
   __ Branch(&wont_fit_smi, lt, a1, Operand(zero));
   // Tag the result.
   STATIC_ASSERT(kSmiTag == 0);
-  __ sll(v0, v0, kSmiTagSize);
+  __ sll(v0, v0, 32);
 
   // Check for -0.
   __ Branch(&restore_fcsr_and_return, ne, v0, Operand(zero));

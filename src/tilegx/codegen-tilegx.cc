@@ -62,6 +62,8 @@ double fast_exp_simulator(double x) {
 
 
 UnaryMathFunction CreateExpFunction() {
+  return &exp;
+#if 0
   if (!FLAG_fast_math) return &exp;
   size_t actual_size;
   byte* buffer = static_cast<byte*>(OS::Allocate(1 * KB, &actual_size, true));
@@ -112,6 +114,7 @@ UnaryMathFunction CreateExpFunction() {
 #else
   fast_exp_mips_machine_code = buffer;
   return &fast_exp_simulator;
+#endif
 #endif
 }
 
@@ -539,6 +542,8 @@ void MathExpGenerator::EmitMathExp(MacroAssembler* masm,
                                    Register temp1,
                                    Register temp2,
                                    Register temp3) {
+  UNREACHABLE();
+#if 0
   ASSERT(!input.is(result));
   ASSERT(!input.is(double_scratch1));
   ASSERT(!input.is(double_scratch2));
@@ -603,6 +608,7 @@ void MathExpGenerator::EmitMathExp(MacroAssembler* masm,
   __ mul_d(result, result, input);
 #endif
   __ bind(&done);
+#endif
 }
 
 

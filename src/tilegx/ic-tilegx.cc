@@ -727,7 +727,7 @@ static MemOperand GenerateMappedArgumentsLookup(MacroAssembler* masm,
   __ Branch(slow_case, lt, scratch2, Operand(FIRST_JS_RECEIVER_TYPE));
 
   // Check that the key is a positive smi.
-  __ And(scratch1, key, Operand(0x80000001));
+  __ And(scratch1, key, Operand(0x8000000000000001L));
   __ Branch(slow_case, ne, scratch1, Operand(zero));
 
   // Load the elements into scratch1 and check its map.
@@ -747,8 +747,11 @@ static MemOperand GenerateMappedArgumentsLookup(MacroAssembler* masm,
   const int kOffset =
       FixedArray::kHeaderSize + 2 * kPointerSize - kHeapObjectTag;
 
-  __ li(scratch3, Operand(kPointerSize >> 1));
-  __ Mul(scratch3, key, scratch3);
+  __ SmiUntag(scratch3, key);
+
+  __ li(scratch2, Operand(kPointerSize));
+  __ Mul(scratch3, scratch3, scratch2);
+
   __ Addu(scratch3, scratch3, Operand(kOffset));
 
   __ Addu(scratch2, scratch1, scratch3);
@@ -760,8 +763,11 @@ static MemOperand GenerateMappedArgumentsLookup(MacroAssembler* masm,
   // we do not jump to the unmapped lookup (which requires the parameter
   // map in scratch1).
   __ ld(scratch1, FieldMemOperand(scratch1, FixedArray::kHeaderSize));
-  __ li(scratch3, Operand(kPointerSize >> 1));
+  __ li(scratch3, Operand(kPointerSize));
+
+  __ SmiUntag(scratch2, scratch2);
   __ Mul(scratch3, scratch2, scratch3);
+
   __ Addu(scratch3, scratch3, Operand(Context::kHeaderSize - kHeapObjectTag));
   __ Addu(scratch2, scratch1, scratch3);
   return MemOperand(scratch2);
@@ -787,8 +793,9 @@ static MemOperand GenerateUnmappedArgumentsLookup(MacroAssembler* masm,
               DONT_DO_SMI_CHECK);
   __ ld(scratch, FieldMemOperand(backing_store, FixedArray::kLengthOffset));
   __ Branch(slow_case, Ugreater_equal, key, Operand(scratch));
-  __ li(scratch, Operand(kPointerSize >> 1));
-  __ Mul(scratch, key, scratch);
+  __ li(at2, Operand(kPointerSize));
+  __ SmiUntag(scratch, key);
+  __ Mul(scratch, scratch, at2);
   __ Addu(scratch,
           scratch,
           Operand(FixedArray::kHeaderSize - kHeapObjectTag));

@@ -1958,7 +1958,7 @@ void MacroAssembler::InitializeNewString(Register string,
                                          Heap::RootListIndex map_index,
                                          Register scratch1,
                                          Register scratch2) {
-  sll(scratch1, length, kSmiTagSize + kSmiShiftSize);
+  sll(scratch1, length, 32);
   LoadRoot(scratch2, map_index);
   st(scratch1, FieldMemOperand(string, String::kLengthOffset));
   li(scratch1, Operand(String::kEmptyHashField));
@@ -3606,7 +3606,8 @@ void MacroAssembler::JumpIfBothInstanceTypesAreNotSequentialAscii(
   int kFlatAsciiStringMask =
       kIsNotStringMask | kStringEncodingMask | kStringRepresentationMask;
   int kFlatAsciiStringTag = ASCII_STRING_TYPE;
-  ASSERT(kFlatAsciiStringTag <= 0xffff);  // Ensure this fits 16-bit immed.
+  ASSERT(kFlatAsciiStringMask <= 0xff);  // Ensure this fits 16-bit immed.
+  ASSERT(kFlatAsciiStringTag <= 0xff);  // Ensure this fits 16-bit immed.
   andi(scratch1, first, kFlatAsciiStringMask);
   Branch(failure, ne, scratch1, Operand(kFlatAsciiStringTag));
   andi(scratch2, second, kFlatAsciiStringMask);
