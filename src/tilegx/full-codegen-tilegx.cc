@@ -2313,8 +2313,8 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
 #else
       __ mul_hs_hs(scratch1, left, right);
       __ sra(scratch2, scratch1, 32);
-      __ sra(at2, scratch1, 30);
-      __ Branch(&stub_call, ne, scratch2, Operand(at2));
+      __ sra(at, scratch1, 30);
+      __ Branch(&stub_call, ne, scratch2, Operand(at));
       __ sll(scratch1, scratch1, 32); // Convert to Smi
       __ move(v0, scratch1);
       __ Branch(&done, ne, v0, Operand(zero));

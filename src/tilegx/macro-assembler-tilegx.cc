@@ -682,7 +682,7 @@ void MacroAssembler::MultiPushReversed(RegList regs) {
 
   Subu(sp, sp, Operand(stack_offset));
   for (int16_t i = 0; i < kNumRegisters; i++) {
-    if ((regs & (1 << i)) != 0) {
+    if ((regs & (1L << i)) != 0) {
       stack_offset -= kPointerSize;
       st(ToRegister(i), MemOperand(sp, stack_offset));
     }
@@ -2242,7 +2242,7 @@ void MacroAssembler::CopyFields(Register dst,
   Register tmp = no_reg;
   // Find a temp register in temps list.
   for (int i = 0; i < kNumRegisters; i++) {
-    if ((temps & (1 << i)) != 0) {
+    if ((temps & (1L << i)) != 0) {
       tmp.code_ = i;
       break;
     }
