@@ -286,13 +286,22 @@ void Assembler::lnk(const Register& rd, int line) {
 }
 
 void Assembler::st(const Register& rd, const MemOperand& rs, int line) {
-  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  ASSERT(rd.is_valid() && rs.rm().is_valid());
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
-                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
-    emit(instr, line);
-    instr = ST_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
-    emit(instr, line);
+    if (is_int16(rs.offset_)) {
+      Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+                             | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+      emit(instr, line);
+      instr = ST_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+      emit(instr, line);
+    } else {
+      moveli(tt, (rs.offset_ >> 48) & 0xFFFF, line);
+      shl16insli(tt, tt, (rs.offset_ >> 32) & 0xFFFF, line);
+      shl16insli(tt, tt, (rs.offset_ >> 16) & 0xFFFF, line);
+      shl16insli(tt, tt, rs.offset_ & 0xFFFF, line);
+      add(tt, rs.rm(), tt, line);
+      st(rd, tt, line);
+    }
   } else
     st(rd, rs.rm(), line);
 }
@@ -1385,8 +1394,8 @@ void Assembler::GrowBuffer() {
   desc.reloc_size = (buffer_ + buffer_size_) - reloc_info_writer.pos();
 
   // Copy the data.
-  int pc_delta = desc.buffer - buffer_;
-  int rc_delta = (desc.buffer + desc.buffer_size) - (buffer_ + buffer_size_);
+  intptr_t pc_delta = desc.buffer - buffer_;
+  intptr_t rc_delta = (desc.buffer + desc.buffer_size) - (buffer_ + buffer_size_);
   OS::MemMove(desc.buffer, buffer_, desc.instr_size);
   OS::MemMove(reloc_info_writer.pos() + rc_delta,
               reloc_info_writer.pos(), desc.reloc_size);
@@ -1418,7 +1427,7 @@ bool Assembler::is_near(Label* L) {
   return false;
 }
 
-uint32_t Assembler::jump_address(Label* L) {
+uint64_t Assembler::jump_address(Label* L) {
   int64_t target_pos;
 
   if (L->is_bound()) {

@@ -783,7 +783,7 @@ class Assembler : public AssemblerBase {
     return o >> 3;
   }
 
-  uint32_t jump_address(Label* L);
+  uint64_t jump_address(Label* L);
 
   static const int kInstrSize = sizeof(Instr);
 
