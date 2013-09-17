@@ -6714,7 +6714,7 @@ void NameDictionaryLookupStub::GenerateNegativeLookup(MacroAssembler* masm,
           FieldMemOperand(receiver, JSObject::kPropertiesOffset));
   }
 
-  const int spill_mask =
+  const long spill_mask =
       (ra.bit() | t2.bit() | t1.bit() | t0.bit() | a3.bit() |
        a2.bit() | a1.bit() | a0.bit() | v0.bit());
 
@@ -6723,11 +6723,11 @@ void NameDictionaryLookupStub::GenerateNegativeLookup(MacroAssembler* masm,
   __ li(a1, Operand(Handle<Name>(name)));
   NameDictionaryLookupStub stub(NEGATIVE_LOOKUP);
   __ CallStub(&stub);
-  __ move(at, v0);
+  __ move(at2, v0);
   __ MultiPop(spill_mask);
 
-  __ Branch(done, eq, at, Operand(zero));
-  __ Branch(miss, ne, at, Operand(zero));
+  __ Branch(done, eq, at2, Operand(zero));
+  __ Branch(miss, ne, at2, Operand(zero));
 }
 
 
@@ -6786,7 +6786,7 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
     __ Branch(done, eq, name, Operand(at));
   }
 
-  const int spill_mask =
+  const long spill_mask =
       (ra.bit() | t2.bit() | t1.bit() | t0.bit() |
        a3.bit() | a2.bit() | a1.bit() | a0.bit() | v0.bit()) &
       ~(scratch1.bit() | scratch2.bit());
@@ -6803,11 +6803,11 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
   NameDictionaryLookupStub stub(POSITIVE_LOOKUP);
   __ CallStub(&stub);
   __ move(scratch2, a2);
-  __ move(at, v0);
+  __ move(at2, v0);
   __ MultiPop(spill_mask);
 
-  __ Branch(done, ne, at, Operand(zero));
-  __ Branch(miss, eq, at, Operand(zero));
+  __ Branch(done, ne, at2, Operand(zero));
+  __ Branch(miss, eq, at2, Operand(zero));
 }
 
 
