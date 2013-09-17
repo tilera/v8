@@ -3366,8 +3366,8 @@ void MacroAssembler::EnterExitFrame(bool save_doubles,
 
   // Set the exit frame sp value to point just before the return address
   // location.
-  addi(tt, sp, kPointerSize);
-  st(tt, MemOperand(fp, ExitFrameConstants::kSPOffset));
+  addi(tt2, sp, kPointerSize);
+  st(tt2, MemOperand(fp, ExitFrameConstants::kSPOffset));
 }
 
 void MacroAssembler::LeaveExitFrame(bool save_doubles,
