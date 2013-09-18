@@ -2383,8 +2383,7 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
     key = ToRegister(instr->key());
   }
   int element_size_shift = ElementsKindToShiftSize(elements_kind);
-  int shift_size = (instr->hydrogen()->key()->representation().IsSmi())
-      ? (element_size_shift - kSmiTagSize) : element_size_shift;
+  int is_smi = instr->hydrogen()->key()->representation().IsSmi();
   int additional_offset = instr->additional_index() << element_size_shift;
 
   if (elements_kind == EXTERNAL_FLOAT_ELEMENTS ||
@@ -2415,7 +2414,7 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
     Register result = ToRegister(instr->result());
     MemOperand mem_operand = PrepareKeyedOperand(
         key, external_pointer, key_is_constant, constant_key,
-        element_size_shift, shift_size,
+        element_size_shift, is_smi,
         instr->additional_index(), additional_offset);
     switch (elements_kind) {
       case EXTERNAL_BYTE_ELEMENTS:
@@ -2423,7 +2422,6 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
         break;
       case EXTERNAL_PIXEL_ELEMENTS:
       case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
-        __ info(__LINE__);
         __ ld1u(result, mem_operand);
         break;
       case EXTERNAL_SHORT_ELEMENTS:
@@ -2433,10 +2431,10 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
         __ ld2u(result, mem_operand);
         break;
       case EXTERNAL_INT_ELEMENTS:
-        __ ld(result, mem_operand);
+        __ ld4s(result, mem_operand);
         break;
       case EXTERNAL_UNSIGNED_INT_ELEMENTS:
-        __ ld(result, mem_operand);
+        __ ld4u(result, mem_operand);
         if (!instr->hydrogen()->CheckFlag(HInstruction::kUint32)) {
           DeoptimizeIf(Ugreater_equal, instr->environment(),
               result, Operand(0x80000000));
@@ -2467,8 +2465,6 @@ void LCodeGen::DoLoadKeyedFixedDoubleArray(LLoadKeyed* instr) {
   Register scratch = scratch0();
 
   int element_size_shift = ElementsKindToShiftSize(FAST_DOUBLE_ELEMENTS);
-  int shift_size = (instr->hydrogen()->key()->representation().IsSmi())
-      ? (element_size_shift - kSmiTagSize) : element_size_shift;
   int constant_key = 0;
   if (key_is_constant) {
     constant_key = ToInteger32(LConstantOperand::cast(instr->key()));
@@ -2482,7 +2478,8 @@ void LCodeGen::DoLoadKeyedFixedDoubleArray(LLoadKeyed* instr) {
   int base_offset = (FixedDoubleArray::kHeaderSize - kHeapObjectTag) +
       ((constant_key + instr->additional_index()) << element_size_shift);
   if (!key_is_constant) {
-    __ sll(scratch, key, shift_size);
+    __ sra(scratch, key, 32);
+    __ sll(scratch, key, element_size_shift);
     __ Addu(elements, elements, scratch);
   }
   __ Addu(elements, elements, Operand(base_offset));
@@ -2512,7 +2509,7 @@ void LCodeGen::DoLoadKeyedFixedArray(LLoadKeyed* instr) {
     // during bound check elimination with the index argument to the bounds
     // check, which can be tagged, so that case must be handled here, too.
     if (instr->hydrogen()->key()->representation().IsSmi()) {
-      __ srl(scratch, key, kSmiTagSize + kSmiShiftSize);
+      __ sra(scratch, key, kSmiTagSize + kSmiShiftSize);
       __ sll(scratch, scratch, kPointerSizeLog2);
       __ add(scratch, elements, scratch);
     } else {
@@ -2552,12 +2549,15 @@ MemOperand LCodeGen::PrepareKeyedOperand(Register key,
                                          bool key_is_constant,
                                          int constant_key,
                                          int element_size,
-                                         int shift_size,
+                                         int is_smi,
                                          int additional_index,
                                          int additional_offset) {
+  uint64_t tmp64 = additional_index;
+
   if (additional_index != 0 && !key_is_constant) {
-    additional_index *= 1 << (element_size - shift_size);
-    __ Addu(scratch0(), key, Operand(additional_index));
+    if (is_smi)
+      tmp64 = tmp64 << 32;
+    __ Addu(scratch0(), key, Operand(tmp64));
   }
 
   if (key_is_constant) {
@@ -2566,25 +2566,25 @@ MemOperand LCodeGen::PrepareKeyedOperand(Register key,
   }
 
   if (additional_index == 0) {
-    if (shift_size >= 0) {
-      __ sll(scratch0(), key, shift_size);
+    if (is_smi) {
+      __ sra(scratch0(), key, 32);
+      __ sll(scratch0(), scratch0(), element_size);
       __ Addu(scratch0(), base, scratch0());
       return MemOperand(scratch0());
     } else {
-      ASSERT_EQ(-1, shift_size);
-      __ srl(scratch0(), key, 1);
+      __ sll(scratch0(), key, element_size);
       __ Addu(scratch0(), base, scratch0());
       return MemOperand(scratch0());
     }
   }
 
-  if (shift_size >= 0) {
-    __ sll(scratch0(), scratch0(), shift_size);
+  if (is_smi) {
+    __ sra(scratch0(), scratch0(), 32);
+    __ sll(scratch0(), scratch0(), element_size);
     __ Addu(scratch0(), base, scratch0());
     return MemOperand(scratch0());
   } else {
-    ASSERT_EQ(-1, shift_size);
-    __ srl(scratch0(), scratch0(), 1);
+    __ sll(scratch0(), scratch0(), element_size);
     __ Addu(scratch0(), base, scratch0());
     return MemOperand(scratch0());
   }
@@ -2969,8 +2969,7 @@ void LCodeGen::DoStoreKeyedExternalArray(LStoreKeyed* instr) {
     key = ToRegister(instr->key());
   }
   int element_size_shift = ElementsKindToShiftSize(elements_kind);
-  int shift_size = (instr->hydrogen()->key()->representation().IsSmi())
-      ? (element_size_shift - kSmiTagSize) : element_size_shift;
+  int is_smi = instr->hydrogen()->key()->representation().IsSmi();
   int additional_offset = instr->additional_index() << element_size_shift;
 
   if (elements_kind == EXTERNAL_FLOAT_ELEMENTS ||
@@ -2980,7 +2979,8 @@ void LCodeGen::DoStoreKeyedExternalArray(LStoreKeyed* instr) {
       __ Addu(scratch0(), external_pointer, constant_key <<
           element_size_shift);
     } else {
-      __ sll(scratch0(), key, shift_size);
+      __ sra(scratch0(), key, 32);
+      __ sll(scratch0(), scratch0(), element_size_shift);
       __ Addu(scratch0(), scratch0(), external_pointer);
     }
 
@@ -2998,7 +2998,7 @@ void LCodeGen::DoStoreKeyedExternalArray(LStoreKeyed* instr) {
     Register value(ToRegister(instr->value()));
     MemOperand mem_operand = PrepareKeyedOperand(
         key, external_pointer, key_is_constant, constant_key,
-        element_size_shift, shift_size,
+        element_size_shift, is_smi,
         instr->additional_index(), additional_offset);
     switch (elements_kind) {
       case EXTERNAL_PIXEL_ELEMENTS:
@@ -3051,13 +3051,12 @@ void LCodeGen::DoStoreKeyedFixedDoubleArray(LStoreKeyed* instr) {
     key = ToRegister(instr->key());
   }
   int element_size_shift = ElementsKindToShiftSize(FAST_DOUBLE_ELEMENTS);
-  int shift_size = (instr->hydrogen()->key()->representation().IsSmi())
-      ? (element_size_shift - kSmiTagSize) : element_size_shift;
   if (key_is_constant) {
     __ Addu(scratch, elements, Operand((constant_key << element_size_shift) +
             FixedDoubleArray::kHeaderSize - kHeapObjectTag));
   } else {
-    __ sll(scratch, key, shift_size);
+    __ sra(scratch, key, 32);
+    __ sll(scratch, scratch, element_size_shift);
     __ Addu(scratch, elements, Operand(scratch));
     __ Addu(scratch, scratch,
             Operand(FixedDoubleArray::kHeaderSize - kHeapObjectTag));
@@ -3109,7 +3108,7 @@ void LCodeGen::DoStoreKeyedFixedArray(LStoreKeyed* instr) {
     // during bound check elimination with the index argument to the bounds
     // check, which can be tagged, so that case must be handled here, too.
     if (instr->hydrogen()->key()->representation().IsSmi()) {
-      __ srl(scratch, key, kSmiTagSize + kSmiShiftSize);
+      __ sra(scratch, key, kSmiTagSize + kSmiShiftSize);
       __ sll(scratch, scratch, kPointerSizeLog2);
       __ add(scratch, elements, scratch);
     } else {
@@ -3891,7 +3890,7 @@ void LCodeGen::DoLoadFieldByIndex(LLoadFieldByIndex* instr) {
   Register scratch = scratch0();
 
   Label out_of_object, done;
-  __ srl(scratch, index, kSmiTagSize + kSmiShiftSize);  // In delay slot.
+  __ sra(scratch, index, kSmiTagSize + kSmiShiftSize);  // In delay slot.
   __ sll(scratch, scratch, kPointerSizeLog2);  // In delay slot.
   __ Branch(&out_of_object, lt, index, Operand(zero));
 

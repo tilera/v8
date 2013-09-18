@@ -944,7 +944,7 @@ Address Assembler::target_address_at(Address pc) {
     // Assemble the 48 bit value.
     // FIXME: currently, we always assume they are encoded in X1 slot.
     return reinterpret_cast<Address>(
-        ((long)get_Imm16_X1(instr1) << 32) | (get_Imm16_X1(instr2) << 16) | get_Imm16_X1(instr3));
+        ((long)((short)get_Imm16_X1(instr1)) << 32) | (get_Imm16_X1(instr2) << 16) | get_Imm16_X1(instr3));
   }
 
   // We should never get here, force a bad address if we do.
