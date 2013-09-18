@@ -3476,9 +3476,11 @@ void FullCodeGenerator::EmitTwoByteSeqStringSetChar(CallRuntime* expr) {
   }
 
   __ SmiUntag(value, value);
+  __ SmiUntag(index, index);
   __ Addu(at,
           string,
           Operand(SeqTwoByteString::kHeaderSize - kHeapObjectTag));
+  __ sll(index, index, 1);
   __ Addu(at, at, index);
   STATIC_ASSERT(kSmiTagSize == 1 && kSmiTag == 0);
   __ st2(value, MemOperand(at));

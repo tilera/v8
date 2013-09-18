@@ -3659,19 +3659,19 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       switch (elements_kind) {
         case EXTERNAL_BYTE_ELEMENTS:
         case EXTERNAL_UNSIGNED_BYTE_ELEMENTS:
-          __ srl(t8, key, 32);
+          __ sra(t8, key, 32);
           __ add(t8, a3, t8);
           __ st1(t3, MemOperand(t8));
           break;
         case EXTERNAL_SHORT_ELEMENTS:
         case EXTERNAL_UNSIGNED_SHORT_ELEMENTS:
-          __ srl(t8, key, 31);
+          __ sra(t8, key, 31);
           __ add(t8, a3, t8);
           __ st2(t3, MemOperand(t8));
           break;
         case EXTERNAL_INT_ELEMENTS:
         case EXTERNAL_UNSIGNED_INT_ELEMENTS:
-          __ srl(t8, key, 30);
+          __ sra(t8, key, 30);
           __ add(t8, a3, t8);
           __ st(t3, MemOperand(t8));
           break;
