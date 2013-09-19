@@ -393,29 +393,29 @@ void MacroAssembler::GetNumberHash(Register reg0, Register scratch) {
   //
   // hash = ~hash + (hash << 15);
   nor(scratch, reg0, zero);
-  sll(at, reg0, 15);
+  sllx(at, reg0, 15);
   add(reg0, scratch, at);
 
   // hash = hash ^ (hash >> 12);
-  srl(at, reg0, 12);
+  srlx(at, reg0, 12);
   xor_(reg0, reg0, at);
 
   // hash = hash + (hash << 2);
-  sll(at, reg0, 2);
+  sllx(at, reg0, 2);
   add(reg0, reg0, at);
 
   // hash = hash ^ (hash >> 4);
-  srl(at, reg0, 4);
+  srlx(at, reg0, 4);
   xor_(reg0, reg0, at);
 
   // hash = hash * 2057;
-  sll(scratch, reg0, 11);
-  sll(at, reg0, 3);
+  sllx(scratch, reg0, 11);
+  sllx(at, reg0, 3);
   add(reg0, reg0, at);
   add(reg0, reg0, scratch);
 
   // hash = hash ^ (hash >> 16);
-  srl(at, reg0, 16);
+  srlx(at, reg0, 16);
   xor_(reg0, reg0, at);
 }
 

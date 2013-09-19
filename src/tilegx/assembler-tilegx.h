@@ -314,6 +314,14 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(SHL_RRR_0_OPCODE_X1) | FNOP_X0
 
+#define SHLXI_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHIFT_OPCODE_X1) |             \
+      create_ShiftOpcodeExtension_X1(SHLXI_SHIFT_OPCODE_X1) | FNOP_X0
+
+#define SHLX_X1                                                                 \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SHLX_RRR_0_OPCODE_X1) | FNOP_X0
+
 #define SHRSI_X1                                                               \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHIFT_OPCODE_X1) |             \
       create_ShiftOpcodeExtension_X1(SHRSI_SHIFT_OPCODE_X1) | FNOP_X0
@@ -329,6 +337,14 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 #define SHRU_X1                                                                \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(SHRU_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define SHRUXI_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHIFT_OPCODE_X1) |             \
+      create_ShiftOpcodeExtension_X1(SHRUXI_SHIFT_OPCODE_X1) | FNOP_X0
+
+#define SHRUX_X1                                                                \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+      create_RRROpcodeExtension_X1(SHRUX_RRR_0_OPCODE_X1) | FNOP_X0
 
 #define BEQZ_X1                                                                \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(BRANCH_OPCODE_X1) |            \
@@ -957,6 +973,12 @@ class Assembler : public AssemblerBase {
   void sra(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void sll(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void sll(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+
+  void srlx(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void srlx(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+  void sllx(const Register& rd, const Register& rs, int16_t imm, int line = 0);
+  void sllx(const Register& rd, const Register& rs, const Register& rt, int line = 0);
+
   void moveli(const Register& rd, int16_t imm, int line = 0);
   void shl16insli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void move(const Register& rt, const Register& rs, int line = 0);
@@ -969,6 +991,7 @@ class Assembler : public AssemblerBase {
   void movn(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void movz(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void clz(const Register& rd, const Register& rs, int line = 0);
+  void v4int_l(const Register& rd, const Register& rs, const Register& rt, int line = 0);
 
   void mul_lu_lu(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void mul_ls_ls(const Register& rd, const Register& rs, const Register& rt, int line = 0);

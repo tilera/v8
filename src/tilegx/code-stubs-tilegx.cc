@@ -5484,10 +5484,10 @@ void StringHelper::GenerateHashInit(MacroAssembler* masm,
   // Untag smi seed and add the character.
   __ SmiUntag(hash);
   __ add(hash, hash, character);
-  __ sll(at, hash, 10);
+  __ sllx(at, hash, 10);
   __ add(hash, hash, at);
   // hash ^= hash >> 6;
-  __ srl(at, hash, 6);
+  __ srlx(at, hash, 6);
   __ xor_(hash, hash, at);
 }
 
@@ -5498,10 +5498,10 @@ void StringHelper::GenerateHashAddCharacter(MacroAssembler* masm,
   // hash += character;
   __ add(hash, hash, character);
   // hash += hash << 10;
-  __ sll(at, hash, 10);
+  __ sllx(at, hash, 10);
   __ add(hash, hash, at);
   // hash ^= hash >> 6;
-  __ srl(at, hash, 6);
+  __ srlx(at, hash, 6);
   __ xor_(hash, hash, at);
 }
 
@@ -5509,13 +5509,13 @@ void StringHelper::GenerateHashAddCharacter(MacroAssembler* masm,
 void StringHelper::GenerateHashGetHash(MacroAssembler* masm,
                                        Register hash) {
   // hash += hash << 3;
-  __ sll(at, hash, 3);
+  __ sllx(at, hash, 3);
   __ add(hash, hash, at);
   // hash ^= hash >> 11;
-  __ srl(at, hash, 11);
+  __ srlx(at, hash, 11);
   __ xor_(hash, hash, at);
   // hash += hash << 15;
-  __ sll(at, hash, 15);
+  __ sllx(at, hash, 15);
   __ add(hash, hash, at);
 
   __ li(at, Operand(String::kHashBitMask));

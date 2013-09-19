@@ -654,6 +654,13 @@ void Assembler::clz(const Register& rd, const Register& rs, int line) {
   emit(instr, line);
 }
 
+void Assembler::v4int_l(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = V4INT_L_X1 | DEST_X1(rd.code())
+	              | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
+  emit(instr, line);
+}
+
 void Assembler::movz(const Register& rd, const Register& rs, const Register& rt, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
   Instr instr = CMOVEQZ_X0 | DEST_X0(rd.code())
@@ -672,6 +679,20 @@ void Assembler::srl(const Register& rd, const Register& rs, const Register& rt, 
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = SHRU_X1 | DEST_X1(rd.code())
 	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
+  emit(instr, line);
+}
+
+void Assembler::srlx(const Register& rd, const Register& rs, int16_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHRUXI_X1 | DEST_X1(rd.code())
+	                  | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::srlx(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHRUX_X1 | DEST_X1(rd.code())
+	                 | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
   emit(instr, line);
 }
 
@@ -699,6 +720,20 @@ void Assembler::sll(const Register& rd, const Register& rs, int16_t imm, int lin
 void Assembler::sll(const Register& rd, const Register& rs, const Register& rt, int line) {
   ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
   Instr instr = SHL_X1 | DEST_X1(rd.code())
+	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
+  emit(instr, line);
+}
+
+void Assembler::sllx(const Register& rd, const Register& rs, int16_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = SHLXI_X1 | DEST_X1(rd.code())
+	                 | SRCA_X1(rs.code()) | SHIFTIMM_X1(imm);
+  emit(instr, line);
+}
+
+void Assembler::sllx(const Register& rd, const Register& rs, const Register& rt, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid());
+  Instr instr = SHLX_X1 | DEST_X1(rd.code())
 	                | SRCA_X1(rs.code()) | SRCB_X1(rt.code());
   emit(instr, line);
 }
