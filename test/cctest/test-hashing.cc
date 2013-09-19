@@ -99,6 +99,7 @@ void generate(MacroAssembler* masm, i::Vector<const uint8_t> string) {
 #elif V8_TARGET_ARCH_MIPS
   __ push(kRootRegister);
   __ InitializeRootRegister();
+
   __ li(v0, Operand(0));
   __ li(t1, Operand(string.at(0)));
   StringHelper::GenerateHashInit(masm, v0, t1);
