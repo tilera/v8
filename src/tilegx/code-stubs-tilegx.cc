@@ -2834,7 +2834,6 @@ void BinaryOpStub::GenerateRegisterArgsPush(MacroAssembler* masm) {
 
 
 void TranscendentalCacheStub::Generate(MacroAssembler* masm) {
-#if 0
   // Untagged case: double input in f4, double result goes
   //   into f4.
   // Tagged case: tagged input on top of stack and in a0,
@@ -2846,105 +2845,12 @@ void TranscendentalCacheStub::Generate(MacroAssembler* masm) {
   Label invalid_cache;
   const Register scratch0 = t5;
   const Register scratch1 = t3;
+  const Register scratch2 = t6;
   const Register cache_entry = a0;
   const bool tagged = (argument_type_ == TAGGED);
 
-  if (tagged) {
-    // Argument is a number and is on stack and in a0.
-    // Load argument and check if it is a smi.
-    __ JumpIfNotSmi(a0, &input_not_smi);
-
-    // Input is a smi. Convert to double and load the low and high words
-    // of the double into a2, a3.
-    __ sra(t0, a0, kSmiTagSize);
-    __ mtc1(t0, f4);
-    __ cvt_d_w(f4, f4);
-    __ Move(a2, a3, f4);
-    __ Branch(&loaded);
-
-    __ bind(&input_not_smi);
-    // Check if input is a HeapNumber.
-    __ CheckMap(a0,
-                a1,
-                Heap::kHeapNumberMapRootIndex,
-                &calculate,
-                DONT_DO_SMI_CHECK);
-    // Input is a HeapNumber. Store the
-    // low and high words into a2, a3.
-    __ ld(a2, FieldMemOperand(a0, HeapNumber::kValueOffset));
-    __ ld(a3, FieldMemOperand(a0, HeapNumber::kValueOffset + 4));
-  } else {
-    // Input is untagged double in f4. Output goes to f4.
-    __ Move(a2, a3, f4);
-  }
-  __ bind(&loaded);
-  // a2 = low 32 bits of double value.
-  // a3 = high 32 bits of double value.
-  // Compute hash (the shifts are arithmetic):
-  //   h = (low ^ high); h ^= h >> 16; h ^= h >> 8; h = h & (cacheSize - 1);
-  __ Xor(a1, a2, a3);
-  __ sra(t0, a1, 16);
-  __ Xor(a1, a1, t0);
-  __ sra(t0, a1, 8);
-  __ Xor(a1, a1, t0);
-  ASSERT(IsPowerOf2(TranscendentalCache::SubCache::kCacheSize));
-  __ And(a1, a1, Operand(TranscendentalCache::SubCache::kCacheSize - 1));
-
-  // a2 = low 32 bits of double value.
-  // a3 = high 32 bits of double value.
-  // a1 = TranscendentalCache::hash(double value).
-  __ li(cache_entry, Operand(
-      ExternalReference::transcendental_cache_array_address(
-          masm->isolate())));
-  // a0 points to cache array.
-  __ ld(cache_entry, MemOperand(cache_entry, type_ * sizeof(
-      Isolate::Current()->transcendental_cache()->caches_[0])));
-  // a0 points to the cache for the type type_.
-  // If NULL, the cache hasn't been initialized yet, so go through runtime.
-  __ Branch(&invalid_cache, eq, cache_entry, Operand(zero));
-
-#ifdef DEBUG
-  // Check that the layout of cache elements match expectations.
-  { TranscendentalCache::SubCache::Element test_elem[2];
-    char* elem_start = reinterpret_cast<char*>(&test_elem[0]);
-    char* elem2_start = reinterpret_cast<char*>(&test_elem[1]);
-    char* elem_in0 = reinterpret_cast<char*>(&(test_elem[0].in[0]));
-    char* elem_in1 = reinterpret_cast<char*>(&(test_elem[0].in[1]));
-    char* elem_out = reinterpret_cast<char*>(&(test_elem[0].output));
-    CHECK_EQ(12, elem2_start - elem_start);  // Two uint_32's and a pointer.
-    CHECK_EQ(0, elem_in0 - elem_start);
-    CHECK_EQ(kIntSize, elem_in1 - elem_start);
-    CHECK_EQ(2 * kIntSize, elem_out - elem_start);
-  }
-#endif
-
-  // Find the address of the a1'st entry in the cache, i.e., &a0[a1*12].
-  __ sll(t0, a1, 1);
-  __ Addu(a1, a1, t0);
-  __ sll(t0, a1, 2);
-  __ Addu(cache_entry, cache_entry, t0);
-
-  // Check if cache matches: Double value is stored in uint32_t[2] array.
-  __ ld(t0, MemOperand(cache_entry, 0));
-  __ ld(t1, MemOperand(cache_entry, 4));
-  __ ld(t2, MemOperand(cache_entry, 8));
-  __ Branch(&calculate, ne, a2, Operand(t0));
-  __ Branch(&calculate, ne, a3, Operand(t1));
-  // Cache hit. Load result, cleanup and return.
-  Counters* counters = masm->isolate()->counters();
-  __ IncrementCounter(
-      counters->transcendental_cache_hit(), 1, scratch0, scratch1);
-  if (tagged) {
-    // Pop input value from stack and load result into v0.
-    __ Drop(1);
-    __ move(v0, t2);
-  } else {
-    // Load result into f4.
-    __ ldc1(f4, FieldMemOperand(t2, HeapNumber::kValueOffset));
-  }
-  __ Ret();
-
   __ bind(&calculate);
+  Counters* counters = masm->isolate()->counters();
   __ IncrementCounter(
       counters->transcendental_cache_miss(), 1, scratch0, scratch1);
   if (tagged) {
@@ -2963,42 +2869,25 @@ void TranscendentalCacheStub::Generate(MacroAssembler* masm) {
     // Store a0, a2 and a3 on stack for later before calling C function.
     __ Push(a3, a2, cache_entry);
     GenerateCallCFunction(masm, scratch0);
-    __ GetCFunctionDoubleResult(f4);
+    __ move(scratch2, v0);
 
     // Try to update the cache. If we cannot allocate a
     // heap number, we return the result without updating.
     __ Pop(a3, a2, cache_entry);
     __ LoadRoot(t1, Heap::kHeapNumberMapRootIndex);
     __ AllocateHeapNumber(t2, scratch0, scratch1, t1, &no_update);
-    __ sdc1(f4, FieldMemOperand(t2, HeapNumber::kValueOffset));
+    __ st(scratch2, FieldMemOperand(t2, HeapNumber::kValueOffset));
 
     __ st(a2, MemOperand(cache_entry, 0 * kPointerSize));
     __ st(a3, MemOperand(cache_entry, 1 * kPointerSize));
     __ st(t2, MemOperand(cache_entry, 2 * kPointerSize));
 
-    __ Ret();
     __ move(v0, cache_entry);
-
-    __ bind(&invalid_cache);
-    // The cache is invalid. Call runtime which will recreate the
-    // cache.
-    __ LoadRoot(t1, Heap::kHeapNumberMapRootIndex);
-    __ AllocateHeapNumber(a0, scratch0, scratch1, t1, &skip_cache);
-    __ sdc1(f4, FieldMemOperand(a0, HeapNumber::kValueOffset));
-    {
-      FrameScope scope(masm, StackFrame::INTERNAL);
-      __ push(a0);
-      __ CallRuntime(RuntimeFunction(), 1);
-    }
-    __ ldc1(f4, FieldMemOperand(v0, HeapNumber::kValueOffset));
     __ Ret();
 
-    __ bind(&skip_cache);
-    // Call C function to calculate the result and answer directly
-    // without updating the cache.
-    GenerateCallCFunction(masm, scratch0);
-    __ GetCFunctionDoubleResult(f4);
+
     __ bind(&no_update);
+    __ move(v0, scratch2);
 
     // We return the value in f4 without adding it to the cache, but
     // we cause a scavenging GC so that future allocations will succeed.
@@ -3013,59 +2902,45 @@ void TranscendentalCacheStub::Generate(MacroAssembler* masm) {
     }
     __ Ret();
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 void TranscendentalCacheStub::GenerateCallCFunction(MacroAssembler* masm,
                                                     Register scratch) {
-#if 0
   __ push(ra);
   __ PrepareCallCFunction(2, scratch);
-  if (IsMipsSoftFloatABI) {
-    __ Move(a0, a1, f4);
-  } else {
-    __ mov_d(f12, f4);
-  }
+
   AllowExternalCallThatCantCauseGC scope(masm);
   Isolate* isolate = masm->isolate();
   switch (type_) {
     case TranscendentalCache::SIN:
       __ CallCFunction(
           ExternalReference::math_sin_double_function(isolate),
-          0, 1);
+          1);
       break;
     case TranscendentalCache::COS:
       __ CallCFunction(
           ExternalReference::math_cos_double_function(isolate),
-          0, 1);
+          1);
       break;
     case TranscendentalCache::TAN:
       __ CallCFunction(ExternalReference::math_tan_double_function(isolate),
-          0, 1);
+          1);
       break;
     case TranscendentalCache::LOG:
       __ CallCFunction(
           ExternalReference::math_log_double_function(isolate),
-          0, 1);
+          1);
       break;
     default:
       UNIMPLEMENTED();
       break;
   }
   __ pop(ra);
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
 Runtime::FunctionId TranscendentalCacheStub::RuntimeFunction() {
-#if 0
   switch (type_) {
     // Add more cases when necessary.
     case TranscendentalCache::SIN: return Runtime::kMath_sin;
@@ -3076,10 +2951,6 @@ Runtime::FunctionId TranscendentalCacheStub::RuntimeFunction() {
       UNIMPLEMENTED();
       return Runtime::kAbort;
   }
-#else
-  printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-  abort();
-#endif
 }
 
 
