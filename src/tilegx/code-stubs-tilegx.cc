@@ -1655,8 +1655,8 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
     __ ld(map, FieldMemOperand(tos_, HeapObject::kMapOffset));
 
     if (types_.CanBeUndetectable()) {
-      __ ld1u(at, FieldMemOperand(map, Map::kBitFieldOffset));
-      __ And(at, at, Operand(1 << Map::kIsUndetectable));
+      __ ld1u(at2, FieldMemOperand(map, Map::kBitFieldOffset));
+      __ And(at, at2, Operand(1 << Map::kIsUndetectable));
       // Undetectable -> false.
       __ movn(tos_, zero, at);
       __ Ret(ne, at, Operand(zero));

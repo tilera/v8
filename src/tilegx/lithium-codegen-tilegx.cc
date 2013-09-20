@@ -1534,8 +1534,8 @@ void LCodeGen::DoBranch(LBranch* instr) {
         __ ld(map, FieldMemOperand(reg, HeapObject::kMapOffset));
         if (expected.CanBeUndetectable()) {
           // Undetectable -> false.
-          __ ld1u(at, FieldMemOperand(map, Map::kBitFieldOffset));
-          __ And(at, at, Operand(1 << Map::kIsUndetectable));
+          __ ld1u(at2, FieldMemOperand(map, Map::kBitFieldOffset));
+          __ And(at, at2, Operand(1 << Map::kIsUndetectable));
           __ Branch(false_label, ne, at, Operand(zero));
         }
       }
@@ -3691,10 +3691,9 @@ Condition LCodeGen::EmitTypeofIs(Label* true_label,
     __ GetObjectType(input, input, scratch);
     // input is an object so we can load the BitFieldOffset even if we take the
     // other branch.
-    __ info(__LINE__);
-    __ ld1u(at, FieldMemOperand(input, Map::kBitFieldOffset));
     __ Branch(false_label, ge, scratch, Operand(FIRST_NONSTRING_TYPE));
-    __ And(at, at, 1 << Map::kIsUndetectable);
+    __ ld1u(at2, FieldMemOperand(input, Map::kBitFieldOffset));
+    __ And(at, at2, 1 << Map::kIsUndetectable);
     cmp1 = at;
     cmp2 = Operand(zero);
     final_branch_condition = eq;
@@ -3728,8 +3727,8 @@ Condition LCodeGen::EmitTypeofIs(Label* true_label,
     __ JumpIfSmi(input, false_label);
     // Check for undetectable objects => true.
     __ ld(input, FieldMemOperand(input, HeapObject::kMapOffset));
-    __ ld1u(at, FieldMemOperand(input, Map::kBitFieldOffset));
-    __ And(at, at, 1 << Map::kIsUndetectable);
+    __ ld1u(at2, FieldMemOperand(input, Map::kBitFieldOffset));
+    __ And(at, at2, 1 << Map::kIsUndetectable);
     cmp1 = at;
     cmp2 = Operand(zero);
     final_branch_condition = ne;
@@ -3755,11 +3754,11 @@ Condition LCodeGen::EmitTypeofIs(Label* true_label,
               lt, scratch, Operand(FIRST_NONCALLABLE_SPEC_OBJECT_TYPE));
     // map is still valid, so the BitField can be loaded in delay slot.
     // Check for undetectable objects => false.
-    __ ld1u(at, FieldMemOperand(map, Map::kBitFieldOffset));
 
     __ Branch(false_label,
               gt, scratch, Operand(LAST_NONCALLABLE_SPEC_OBJECT_TYPE));
-    __ And(at, at, 1 << Map::kIsUndetectable);
+    __ ld1u(at2, FieldMemOperand(map, Map::kBitFieldOffset));
+    __ And(at, at2, 1 << Map::kIsUndetectable);
     cmp1 = at;
     cmp2 = Operand(zero);
     final_branch_condition = eq;

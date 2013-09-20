@@ -3420,10 +3420,10 @@ void FullCodeGenerator::EmitSeqStringSetCharCheck(Register string,
   __ Check(ge, "Index is negative", index, Operand(zero));
 
   __ ld(at, FieldMemOperand(string, HeapObject::kMapOffset));
-  __ ld1u(at, FieldMemOperand(at, Map::kInstanceTypeOffset));
+  __ ld1u(at2, FieldMemOperand(at, Map::kInstanceTypeOffset));
 
-  __ And(at, at, Operand(kStringRepresentationMask | kStringEncodingMask));
-  __ Subu(at, at, Operand(encoding_mask));
+  __ And(at2, at2, Operand(kStringRepresentationMask | kStringEncodingMask));
+  __ Subu(at, at2, Operand(encoding_mask));
   __ Check(eq, "Unexpected string type", at, Operand(zero));
 }
 
