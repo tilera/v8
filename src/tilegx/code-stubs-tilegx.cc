@@ -4689,8 +4689,8 @@ static void GenerateRecordCallTargetNoArray(MacroAssembler* masm) {
 
   // MegamorphicSentinel is an immortal immovable object (undefined) so no
   // write-barrier is needed.
-  __ LoadRoot(tt, Heap::kUndefinedValueRootIndex);
-  __ st(tt, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+  __ LoadRoot(tt2, Heap::kUndefinedValueRootIndex);
+  __ st(tt2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
 
   __ bind(&done);
 }
@@ -4741,8 +4741,8 @@ static void GenerateRecordCallTarget(MacroAssembler* masm) {
   // MegamorphicSentinel is an immortal immovable object (undefined) so no
   // write-barrier is needed.
   __ bind(&megamorphic);
-  __ LoadRoot(tt, Heap::kUndefinedValueRootIndex);
-  __ st(tt, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+  __ LoadRoot(tt2, Heap::kUndefinedValueRootIndex);
+  __ st(tt2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
   __ jmp(&done);
 
   // An uninitialized cache is patched with the function or sentinel to
@@ -4837,8 +4837,8 @@ void CallFunctionStub::Generate(MacroAssembler* masm) {
     // object (undefined) so no write barrier is needed.
     ASSERT_EQ(*TypeFeedbackCells::MegamorphicSentinel(masm->isolate()),
               masm->isolate()->heap()->undefined_value());
-    __ LoadRoot(tt, Heap::kUndefinedValueRootIndex);
-    __ st(tt, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+    __ LoadRoot(tt2, Heap::kUndefinedValueRootIndex);
+    __ st(tt2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
   }
   // Check for function proxy.
   __ Branch(&non_function, ne, a3, Operand(JS_FUNCTION_PROXY_TYPE));
