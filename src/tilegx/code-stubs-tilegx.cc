@@ -5468,10 +5468,10 @@ void SubStringStub::Generate(MacroAssembler* masm) {
   // If the string is not indirect, it can only be sequential or external.
   STATIC_ASSERT(kIsIndirectStringMask == (kSlicedStringTag & kConsStringTag));
   STATIC_ASSERT(kIsIndirectStringMask != 0);
-  __ And(t0, a1, Operand(kIsIndirectStringMask));
+  __ And(at, a1, Operand(kIsIndirectStringMask));
   // t0 is used as a scratch register and can be overwritten in either case.
   __ And(t0, a1, Operand(kSlicedNotConsMask));
-  __ Branch(&seq_or_external_string, eq, t0, Operand(zero));
+  __ Branch(&seq_or_external_string, eq, at, Operand(zero));
   __ Branch(&sliced_string, ne, t0, Operand(zero));
   // Cons string.  Check whether it is flat, then fetch first part.
   __ ld(t1, FieldMemOperand(v0, ConsString::kSecondOffset));
