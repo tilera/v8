@@ -2959,9 +2959,9 @@ void FullCodeGenerator::EmitIsUndetectableObject(CallRuntime* expr) {
   __ JumpIfSmi(v0, if_false);
   __ ld(a1, FieldMemOperand(v0, HeapObject::kMapOffset));
   __ ld1u(a1, FieldMemOperand(a1, Map::kBitFieldOffset));
-  __ And(at, a1, Operand(1 << Map::kIsUndetectable));
+  __ And(at2, a1, Operand(1 << Map::kIsUndetectable));
   PrepareForBailoutBeforeSplit(expr, true, if_true, if_false);
-  Split(ne, at, Operand(zero), if_true, if_false, fall_through);
+  Split(ne, at2, Operand(zero), if_true, if_false, fall_through);
 
   context()->Plug(if_true, if_false);
 }

@@ -50,6 +50,7 @@ static void ProbeTable(Isolate* isolate,
                        Register scratch,
                        Register scratch2,
                        Register offset_scratch) {
+  ASSERT(!offset_scratch.is(at));
   ExternalReference key_offset(isolate->stub_cache()->key_reference(table));
   ExternalReference value_offset(isolate->stub_cache()->value_reference(table));
   ExternalReference map_offset(isolate->stub_cache()->map_reference(table));
@@ -84,9 +85,9 @@ static void ProbeTable(Isolate* isolate,
   __ Branch(&miss, ne, name, Operand(at));
 
   // Check the map matches.
-  __ ld(at, MemOperand(base_addr, map_off_addr - key_off_addr));
+  __ ld(offset_scratch, MemOperand(base_addr, map_off_addr - key_off_addr));
   __ ld(scratch2, FieldMemOperand(receiver, HeapObject::kMapOffset));
-  __ Branch(&miss, ne, at, Operand(scratch2));
+  __ Branch(&miss, ne, offset_scratch, Operand(scratch2));
 
   // Get the code entry from the cache.
   Register code = scratch2;
