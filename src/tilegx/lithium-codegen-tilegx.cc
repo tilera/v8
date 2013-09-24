@@ -3706,9 +3706,9 @@ Condition LCodeGen::EmitTypeofIs(Label* true_label,
     final_branch_condition = eq;
 
   } else if (type_name->Equals(heap()->boolean_string())) {
-    __ LoadRoot(at, Heap::kTrueValueRootIndex);
+    __ LoadRoot(at2, Heap::kTrueValueRootIndex);
     __ LoadRoot(at, Heap::kFalseValueRootIndex);
-    __ Branch(true_label, eq, at, Operand(input));
+    __ Branch(true_label, eq, at2, Operand(input));
     cmp1 = at;
     cmp2 = Operand(input);
     final_branch_condition = eq;
