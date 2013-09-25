@@ -512,9 +512,9 @@ void MacroAssembler::Addu(Register rd, Register rs, const Operand& rt) {
       addli(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
-      ASSERT(!rs.is(tt));
-      li(tt, rt);
-      add(rd, rs, tt);
+      ASSERT(!rs.is(at));
+      li(at, rt);
+      add(rd, rs, at);
     }
   }
 }
@@ -528,9 +528,9 @@ void MacroAssembler::Subu(Register rd, Register rs, const Operand& rt)
       addli(rd, rs, -rt.imm64_);
     } else {
       // li handles the relocation.
-      ASSERT(!rs.is(tt));
-      li(tt, rt);
-      sub(rd, rs, tt);
+      ASSERT(!rs.is(at));
+      li(at, rt);
+      sub(rd, rs, at);
     }
   }
 }
@@ -567,9 +567,9 @@ void MacroAssembler::And(Register rd, Register rs, const Operand& rt) {
       andi(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
-      ASSERT(!rs.is(tt));
-      li(tt, rt);
-      and_(rd, rs, tt);
+      ASSERT(!rs.is(at));
+      li(at, rt);
+      and_(rd, rs, at);
     }
   }
 }
@@ -583,9 +583,9 @@ void MacroAssembler::Or(Register rd, Register rs, const Operand& rt) {
       ori(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
-      ASSERT(!rs.is(tt));
-      li(tt, rt);
-      or_(rd, rs, tt);
+      ASSERT(!rs.is(at));
+      li(at, rt);
+      or_(rd, rs, at);
     }
   }
 }
@@ -599,9 +599,9 @@ void MacroAssembler::Xor(Register rd, Register rs, const Operand& rt) {
       xori(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
-      ASSERT(!rs.is(tt));
-      li(tt, rt);
-      xor_(rd, rs, tt);
+      ASSERT(!rs.is(at));
+      li(at, rt);
+      xor_(rd, rs, at);
     }
   }
 }
@@ -728,11 +728,11 @@ void MacroAssembler::Jalr(Label* L) {
     // Buffer growth (and relocation) must be blocked for internal references
     // until associated instructions are emitted and available to be patched.
     RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
-    moveli(tt, (imm64 >> 32) & 0xFFFF);
-    shl16insli(tt, tt, (imm64 >> 16) & 0xFFFF);
-    shl16insli(tt, tt, imm64 & 0xFFFF);
+    moveli(at, (imm64 >> 32) & 0xFFFF);
+    shl16insli(at, at, (imm64 >> 16) & 0xFFFF);
+    shl16insli(at, at, imm64 & 0xFFFF);
   }
-  jalr(tt);
+  jalr(at);
 }
 
 void MacroAssembler::J(Label* L) {
@@ -756,11 +756,11 @@ void MacroAssembler::Jr(Label* L) {
     // Buffer growth (and relocation) must be blocked for internal references
     // until associated instructions are emitted and available to be patched.
     RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
-    moveli(tt, (imm64 >> 32) & 0xFFFF);
-    shl16insli(tt, tt, (imm64 >> 16) & 0xFFFF);
-    shl16insli(tt, tt, imm64 & 0xFFFF);
+    moveli(at, (imm64 >> 32) & 0xFFFF);
+    shl16insli(at, at, (imm64 >> 16) & 0xFFFF);
+    shl16insli(at, at, imm64 & 0xFFFF);
   }
-  jr(tt);
+  jr(at);
 }
 
 // Emulated condtional branches do not emit a nop in the branch delay slot.
@@ -825,7 +825,7 @@ void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
   BRANCH_ARGS_CHECK(cond, rs, rt);
   ASSERT(!rs.is(zero));
   Register r2 = no_reg;
-  Register scratch = tt2;
+  Register scratch = at2;
 
   if (rt.is_reg()) {
     // NOTE: 'at' can be clobbered by Branch but it is legal to use it as rs or
@@ -1494,7 +1494,7 @@ int MacroAssembler::CallSize(Address target,
                              Condition cond,
                              Register rs,
                              const Operand& rt) {
-  int size = CallSize(tt, cond, rs, rt);
+  int size = CallSize(at, cond, rs, rt);
   return size + 3 * kInstrSize;
 } 
 
@@ -1675,8 +1675,8 @@ void MacroAssembler::PopTryHandler() {
   //STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
   pop(r1);
   Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
-  li(tt, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
-  st(r1, MemOperand(tt));
+  li(at, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
+  st(r1, MemOperand(at));
 }
 
 
@@ -1691,9 +1691,9 @@ void MacroAssembler::JumpToHandlerEntry() {
   Addu(r2, r3, r2);
   ld(r2, MemOperand(r2));  // Smi-tagged offset.
   Addu(r1, r1, Operand(Code::kHeaderSize - kHeapObjectTag));  // Code start.
-  sra(tt, r2, kSmiTagSize + kSmiShiftSize);
-  Addu(tt, tt, r1);
-  Jump(tt);  // Jump.
+  sra(at, r2, kSmiTagSize + kSmiShiftSize);
+  Addu(at, at, r1);
+  Jump(at);  // Jump.
 }
 
 
@@ -2504,8 +2504,8 @@ void MacroAssembler::CheckMap(Register obj,
     JumpIfSmi(obj, fail);
   }
   ld(scratch, FieldMemOperand(obj, HeapObject::kMapOffset));
-  LoadRoot(tt, index);
-  Branch(fail, ne, scratch, Operand(tt));
+  LoadRoot(at, index);
+  Branch(fail, ne, scratch, Operand(at));
 }
 
 void MacroAssembler::SetCallKind(Register dst, CallKind call_kind) {
@@ -3092,24 +3092,24 @@ void MacroAssembler::Assert(Condition cc, const char* msg,
 void MacroAssembler::AssertRegisterIsRoot(Register reg,
                                           Heap::RootListIndex index) {
   if (emit_debug_code()) {
-    LoadRoot(tt, index);
-    Check(eq, "Register did not match expected root", reg, Operand(tt));
+    LoadRoot(at, index);
+    Check(eq, "Register did not match expected root", reg, Operand(at));
   }
 }
 
 
 void MacroAssembler::AssertFastElements(Register elements) {
   if (emit_debug_code()) {
-    ASSERT(!elements.is(tt));
+    ASSERT(!elements.is(at));
     Label ok;
     push(elements);
     ld(elements, FieldMemOperand(elements, HeapObject::kMapOffset));
-    LoadRoot(tt, Heap::kFixedArrayMapRootIndex);
-    Branch(&ok, eq, elements, Operand(tt));
-    LoadRoot(tt, Heap::kFixedDoubleArrayMapRootIndex);
-    Branch(&ok, eq, elements, Operand(tt));
-    LoadRoot(tt, Heap::kFixedCOWArrayMapRootIndex);
-    Branch(&ok, eq, elements, Operand(tt));
+    LoadRoot(at, Heap::kFixedArrayMapRootIndex);
+    Branch(&ok, eq, elements, Operand(at));
+    LoadRoot(at, Heap::kFixedDoubleArrayMapRootIndex);
+    Branch(&ok, eq, elements, Operand(at));
+    LoadRoot(at, Heap::kFixedCOWArrayMapRootIndex);
+    Branch(&ok, eq, elements, Operand(at));
     Abort("JSObject with fast elements map has slow elements");
     bind(&ok);
     pop(elements);
@@ -3368,8 +3368,8 @@ void MacroAssembler::EnterExitFrame(bool save_doubles,
 
   // Set the exit frame sp value to point just before the return address
   // location.
-  addi(tt2, sp, kPointerSize);
-  st(tt2, MemOperand(fp, ExitFrameConstants::kSPOffset));
+  addi(at2, sp, kPointerSize);
+  st(at2, MemOperand(fp, ExitFrameConstants::kSPOffset));
 }
 
 void MacroAssembler::LeaveExitFrame(bool save_doubles,
@@ -3443,8 +3443,8 @@ void MacroAssembler::AssertStackIsAligned() {
     if (frame_alignment > kPointerSize) {
       Label alignment_as_expected;
       ASSERT(IsPowerOf2(frame_alignment));
-      andi(tt, sp, frame_alignment_mask);
-      Branch(&alignment_as_expected, eq, tt, Operand(zero));
+      andi(at, sp, frame_alignment_mask);
+      Branch(&alignment_as_expected, eq, at, Operand(zero));
       // Don't use Check here, as it will call Runtime_Abort re-entering here.
       stop("Unexpected stack alignment");
       bind(&alignment_as_expected);
@@ -3496,8 +3496,8 @@ void MacroAssembler::JumpIfNotBothSmi(Register reg1,
                                       Label* on_not_both_smi) {
   STATIC_ASSERT(kSmiTag == 0);
   ASSERT_EQ(1, (int)kSmiTagMask);
-  or_(tt, reg1, reg2);
-  JumpIfNotSmi(tt, on_not_both_smi);
+  or_(at, reg1, reg2);
+  JumpIfNotSmi(at, on_not_both_smi);
 }
 
 void MacroAssembler::JumpIfEitherSmi(Register reg1,
@@ -3506,23 +3506,23 @@ void MacroAssembler::JumpIfEitherSmi(Register reg1,
   STATIC_ASSERT(kSmiTag == 0);
   ASSERT_EQ(1, (int)kSmiTagMask);
   // Both Smi tags must be 1 (not Smi).
-  and_(tt, reg1, reg2);
-  JumpIfSmi(tt, on_either_smi);
+  and_(at, reg1, reg2);
+  JumpIfSmi(at, on_either_smi);
 }
 
 void MacroAssembler::AssertNotSmi(Register object) {
   if (emit_debug_code()) {
     STATIC_ASSERT(kSmiTag == 0);
-    andi(tt, object, kSmiTagMask);
-    Check(ne, "Operand is a smi", tt, Operand(zero));
+    andi(at, object, kSmiTagMask);
+    Check(ne, "Operand is a smi", at, Operand(zero));
   }
 }
 
 void MacroAssembler::AssertSmi(Register object) {
   if (emit_debug_code()) {
     STATIC_ASSERT(kSmiTag == 0);
-    andi(tt, object, kSmiTagMask);
-    Check(eq, "Operand is a smi", tt, Operand(zero));
+    andi(at, object, kSmiTagMask);
+    Check(eq, "Operand is a smi", at, Operand(zero));
   }
 }
 
@@ -3556,9 +3556,9 @@ void MacroAssembler::AssertRootValue(Register src,
                                      Heap::RootListIndex root_value_index,
                                      const char* message) {
   if (emit_debug_code()) {
-    ASSERT(!src.is(tt));
-    LoadRoot(tt, root_value_index);
-    Check(eq, message, src, Operand(tt));
+    ASSERT(!src.is(at));
+    LoadRoot(at, root_value_index);
+    Check(eq, message, src, Operand(at));
   }
 }
 
@@ -3689,8 +3689,8 @@ void MacroAssembler::CallCFunctionHelper(Register function,
     if (frame_alignment > kPointerSize) {
       ASSERT(IsPowerOf2(frame_alignment));
       Label alignment_as_expected;
-      And(tt, sp, Operand(frame_alignment_mask));
-      Branch(&alignment_as_expected, eq, tt, Operand(zero));
+      And(at, sp, Operand(frame_alignment_mask));
+      Branch(&alignment_as_expected, eq, at, Operand(zero));
       // Don't use Check here, as it will call Runtime_Abort possibly
       // re-entering here.
       stop("Unexpected alignment in CallCFunction");
@@ -4137,8 +4137,8 @@ void MacroAssembler::GetRelocatedValue(Register li_location,
   }
   // "scratch" now holds an ori instruction. Extract the immediate.
   // FIXME
-  li(tt, Operand(kImm16Mask));
-  and_(scratch, scratch, tt);
+  li(at, Operand(kImm16Mask));
+  and_(scratch, scratch, at);
 
   // Merge the results.
   or_(value, value, scratch);

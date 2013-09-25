@@ -600,8 +600,8 @@ const int kRegister_s5_Code = 44;
 const int kRegister_s6_Code = 45;
 const int kRegister_s7_Code = 46;
 
-const int kRegister_tt_Code = 28;
-const int kRegister_tt2_Code = 29;
+const int kRegister_at_Code = 28;
+const int kRegister_at2_Code = 29;
 
 const int kRegister_pc_Code = 50;
 const int kRegister_gp_Code = 51;
@@ -640,10 +640,8 @@ const Register s5  = { kRegister_s5_Code };
 const Register s6  = { kRegister_s6_Code };
 const Register s7  = { kRegister_s7_Code };
 
-const Register at  = { kRegister_tt_Code };
-const Register tt  = { kRegister_tt_Code };
-const Register at2  = { kRegister_tt2_Code };
-const Register tt2  = { kRegister_tt2_Code };
+const Register at  = { kRegister_at_Code };
+const Register at2  = { kRegister_at2_Code };
 const Register pc  = { kRegister_pc_Code };
 const Register gp  = { kRegister_gp_Code };
 const Register fp  = { kRegister_fp_Code };

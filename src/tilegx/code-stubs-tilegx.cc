@@ -4672,8 +4672,8 @@ static void GenerateRecordCallTargetNoArray(MacroAssembler* masm) {
   // A monomorphic cache hit or an already megamorphic state: invoke the
   // function without changing the state.
   __ Branch(&done, eq, a3, Operand(a1));
-  __ LoadRoot(tt, Heap::kUndefinedValueRootIndex);
-  __ Branch(&done, eq, a3, Operand(tt));
+  __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
+  __ Branch(&done, eq, a3, Operand(at));
 
   // A monomorphic miss (i.e, here the cache is not uninitialized) goes
   // megamorphic.
@@ -4689,8 +4689,8 @@ static void GenerateRecordCallTargetNoArray(MacroAssembler* masm) {
 
   // MegamorphicSentinel is an immortal immovable object (undefined) so no
   // write-barrier is needed.
-  __ LoadRoot(tt2, Heap::kUndefinedValueRootIndex);
-  __ st(tt2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+  __ LoadRoot(at2, Heap::kUndefinedValueRootIndex);
+  __ st(at2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
 
   __ bind(&done);
 }
@@ -4716,8 +4716,8 @@ static void GenerateRecordCallTarget(MacroAssembler* masm) {
   // A monomorphic cache hit or an already megamorphic state: invoke the
   // function without changing the state.
   __ Branch(&done, eq, a3, Operand(a1));
-  __ LoadRoot(tt, Heap::kUndefinedValueRootIndex);
-  __ Branch(&done, eq, a3, Operand(tt));
+  __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
+  __ Branch(&done, eq, a3, Operand(at));
 
   // Special handling of the Array() function, which caches not only the
   // monomorphic Array function but the initial ElementsKind with special
@@ -4736,13 +4736,13 @@ static void GenerateRecordCallTarget(MacroAssembler* masm) {
 
   // A monomorphic miss (i.e, here the cache is not uninitialized) goes
   // megamorphic.
-  __ LoadRoot(tt, Heap::kTheHoleValueRootIndex);
-  __ Branch(&initialize, eq, a3, Operand(tt));
+  __ LoadRoot(at, Heap::kTheHoleValueRootIndex);
+  __ Branch(&initialize, eq, a3, Operand(at));
   // MegamorphicSentinel is an immortal immovable object (undefined) so no
   // write-barrier is needed.
   __ bind(&megamorphic);
-  __ LoadRoot(tt2, Heap::kUndefinedValueRootIndex);
-  __ st(tt2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+  __ LoadRoot(at2, Heap::kUndefinedValueRootIndex);
+  __ st(at2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
   __ jmp(&done);
 
   // An uninitialized cache is patched with the function or sentinel to
@@ -4783,8 +4783,8 @@ void CallFunctionStub::Generate(MacroAssembler* masm) {
     // function, receiver [, arguments]
     __ ld(t0, MemOperand(sp, argc_ * kPointerSize));
     // Call as function is indicated with the hole.
-    __ LoadRoot(tt, Heap::kTheHoleValueRootIndex);
-    __ Branch(&call, ne, t0, Operand(tt));
+    __ LoadRoot(at, Heap::kTheHoleValueRootIndex);
+    __ Branch(&call, ne, t0, Operand(at));
     // Patch the receiver on the stack with the global receiver object.
     __ ld(a3,
           MemOperand(cp, Context::SlotOffset(Context::GLOBAL_OBJECT_INDEX)));
@@ -4814,8 +4814,8 @@ void CallFunctionStub::Generate(MacroAssembler* masm) {
 
   if (ReceiverMightBeImplicit()) {
     Label call_as_function;
-    __ LoadRoot(tt, Heap::kTheHoleValueRootIndex);
-    __ Branch(&call_as_function, eq, t0, Operand(tt));
+    __ LoadRoot(at, Heap::kTheHoleValueRootIndex);
+    __ Branch(&call_as_function, eq, t0, Operand(at));
     __ InvokeFunction(a1,
                       actual,
                       JUMP_FUNCTION,
@@ -4837,8 +4837,8 @@ void CallFunctionStub::Generate(MacroAssembler* masm) {
     // object (undefined) so no write barrier is needed.
     ASSERT_EQ(*TypeFeedbackCells::MegamorphicSentinel(masm->isolate()),
               masm->isolate()->heap()->undefined_value());
-    __ LoadRoot(tt2, Heap::kUndefinedValueRootIndex);
-    __ st(tt2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
+    __ LoadRoot(at2, Heap::kUndefinedValueRootIndex);
+    __ st(at2, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
   }
   // Check for function proxy.
   __ Branch(&non_function, ne, a3, Operand(JS_FUNCTION_PROXY_TYPE));
@@ -4890,8 +4890,8 @@ void CallConstructStub::Generate(MacroAssembler* masm) {
   __ ld(jmp_reg, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
   __ ld(jmp_reg, FieldMemOperand(jmp_reg,
                                  SharedFunctionInfo::kConstructStubOffset));
-  __ Addu(tt, jmp_reg, Operand(Code::kHeaderSize - kHeapObjectTag));
-  __ Jump(tt);
+  __ Addu(at, jmp_reg, Operand(Code::kHeaderSize - kHeapObjectTag));
+  __ Jump(at);
 
   // a0: number of arguments
   // a1: called object

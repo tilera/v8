@@ -480,8 +480,8 @@ void Builtins::Generate_JSConstructStubApi(MacroAssembler* masm) {
 static void GenerateTailCallToSharedCode(MacroAssembler* masm) {
   __ ld(a2, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
   __ ld(a2, FieldMemOperand(a2, SharedFunctionInfo::kCodeOffset));
-  __ Addu(tt, a2, Operand(Code::kHeaderSize - kHeapObjectTag));
-  __ Jump(tt);
+  __ Addu(at, a2, Operand(Code::kHeaderSize - kHeapObjectTag));
+  __ Jump(at);
 }
 
 void Builtins::Generate_InRecompileQueue(MacroAssembler* masm) {

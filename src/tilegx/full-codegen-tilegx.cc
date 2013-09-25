@@ -822,8 +822,8 @@ void FullCodeGenerator::VisitVariableDeclaration(
       if (hole_init) {
         Comment cmnt(masm_, "[ VariableDeclaration");
         EmitDebugCheckDeclarationContext(variable);
-          __ LoadRoot(tt2, Heap::kTheHoleValueRootIndex);
-          __ st(tt2, ContextOperand(cp, variable->index()));
+          __ LoadRoot(at2, Heap::kTheHoleValueRootIndex);
+          __ st(at2, ContextOperand(cp, variable->index()));
           // No write barrier since the_hole_value is in old space.
           PrepareForBailoutForId(proxy->id(), NO_REGISTERS);
       }

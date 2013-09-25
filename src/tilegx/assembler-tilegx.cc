@@ -289,18 +289,18 @@ void Assembler::st(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid());
   if (rs.offset_ != 0) {
     if (is_int16(rs.offset_)) {
-      Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+      Instr instr = ADDLI_X1 | DEST_X1(at.code())
                              | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
       emit(instr, line);
-      instr = ST_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+      instr = ST_X1 | SRCA_X1(at.code()) | SRCB_X1(rd.code());
       emit(instr, line);
     } else {
-      moveli(tt, (rs.offset_ >> 48) & 0xFFFF, line);
-      shl16insli(tt, tt, (rs.offset_ >> 32) & 0xFFFF, line);
-      shl16insli(tt, tt, (rs.offset_ >> 16) & 0xFFFF, line);
-      shl16insli(tt, tt, rs.offset_ & 0xFFFF, line);
-      add(tt, rs.rm(), tt, line);
-      st(rd, tt, line);
+      moveli(at, (rs.offset_ >> 48) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 32) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 16) & 0xFFFF, line);
+      shl16insli(at, at, rs.offset_ & 0xFFFF, line);
+      add(at, rs.rm(), at, line);
+      st(rd, at, line);
     }
   } else
     st(rd, rs.rm(), line);
@@ -315,11 +315,14 @@ void Assembler::st(const Register& rd, const Register& rs, int line) {
 void Assembler::st1(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = ST1_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+    instr = ST1_X1 | SRCA_X1(at.code()) | SRCB_X1(rd.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     st1(rd, rs.rm(), line);
 }
@@ -333,11 +336,14 @@ void Assembler::st1(const Register& rd, const Register& rs, int line) {
 void Assembler::st2(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = ST2_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+    instr = ST2_X1 | SRCA_X1(at.code()) | SRCB_X1(rd.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     st2(rd, rs.rm(), line);
 }
@@ -351,11 +357,14 @@ void Assembler::st2(const Register& rd, const Register& rs, int line) {
 void Assembler::st4(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = ST4_X1 | SRCA_X1(tt.code()) | SRCB_X1(rd.code());
+    instr = ST4_X1 | SRCA_X1(at.code()) | SRCB_X1(rd.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     st4(rd, rs.rm(), line);
 }
@@ -369,11 +378,14 @@ void Assembler::st4(const Register& rd, const Register& rs, int line) {
 void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld(rd, rs.rm(), line);
 }
@@ -387,11 +399,14 @@ void Assembler::ld(const Register& rd, const Register& rs, int line) {
 void Assembler::ld1s(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD1S_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD1S_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld1s(rd, rs.rm(), line);
 }
@@ -405,11 +420,14 @@ void Assembler::ld1s(const Register& rd, const Register& rs, int line) {
 void Assembler::ld1u(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD1U_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD1U_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld1u(rd, rs.rm(), line);
 }
@@ -423,11 +441,14 @@ void Assembler::ld1u(const Register& rd, const Register& rs, int line) {
 void Assembler::ld2s(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD2S_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD2S_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld2s(rd, rs.rm(), line);
 }
@@ -441,11 +462,14 @@ void Assembler::ld2s(const Register& rd, const Register& rs, int line) {
 void Assembler::ld2u(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD2U_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD2U_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld2u(rd, rs.rm(), line);
 }
@@ -459,11 +483,14 @@ void Assembler::ld2u(const Register& rd, const Register& rs, int line) {
 void Assembler::ld4u(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD4U_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD4U_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld4u(rd, rs.rm(), line);
 }
@@ -477,11 +504,14 @@ void Assembler::ld4u(const Register& rd, const Register& rs, int line) {
 void Assembler::ld4s(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
-    Instr instr = ADDLI_X1 | DEST_X1(tt.code())
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
                            | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
     emit(instr, line);
-    instr = LD4S_X1 | DEST_X1(rd.code()) | SRCA_X1(tt.code());
+    instr = LD4S_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
+    } else
+      UNREACHABLE();
   } else
     ld4s(rd, rs.rm(), line);
 }
