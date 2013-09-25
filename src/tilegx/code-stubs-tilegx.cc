@@ -3226,16 +3226,18 @@ void CEntryStub::Generate(MacroAssembler* masm) {
   Isolate* isolate = masm->isolate();
   ExternalReference external_caught(Isolate::kExternalCaughtExceptionAddress,
                                     isolate);
+  __ move(at, r0);
   __ li(r0, Operand(false, RelocInfo::NONE32));
   __ li(r2, Operand(external_caught));
   __ st(r0, MemOperand(r2));
 
   // Set pending exception and v0 to out of memory exception.
   Label already_have_failure;
-  JumpIfOOM(masm, r0, t0, &already_have_failure);
+  JumpIfOOM(masm, at, t0, &already_have_failure);
   Failure* out_of_memory = Failure::OutOfMemoryException(0x1);
-  __ li(r0, Operand(reinterpret_cast<int64_t>(out_of_memory)));
+  __ li(at, Operand(reinterpret_cast<int64_t>(out_of_memory)));
   __ bind(&already_have_failure);
+  __ move(r0, at);
   __ li(r2, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
   __ st(r0, MemOperand(r2));
@@ -4415,9 +4417,9 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ st(a1, MemOperand(a2, 0));  // Clear pending exception.
 
   // Check if the exception is a termination. If so, throw as uncatchable.
-  __ LoadRoot(a0, Heap::kTerminationExceptionRootIndex);
+  __ LoadRoot(at, Heap::kTerminationExceptionRootIndex);
   Label termination_exception;
-  __ Branch(&termination_exception, eq, v0, Operand(a0));
+  __ Branch(&termination_exception, eq, v0, Operand(at));
 
   __ Throw(v0);
 
@@ -5924,7 +5926,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
 
   // Allocate an ASCII cons string.
   __ bind(&ascii_data);
-  __ move(t6, v0);
+  __ move(t6, a0);
   __ AllocateAsciiConsString(v0, t2, t0, t1, &call_runtime);
   __ bind(&allocated);
   // Fill the fields of the cons string.
