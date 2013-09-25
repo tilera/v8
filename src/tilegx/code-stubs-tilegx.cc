@@ -4677,14 +4677,14 @@ static void GenerateRecordCallTargetNoArray(MacroAssembler* masm) {
 
   // A monomorphic miss (i.e, here the cache is not uninitialized) goes
   // megamorphic.
-  __ LoadRoot(tt, Heap::kTheHoleValueRootIndex);
+  __ LoadRoot(at2, Heap::kTheHoleValueRootIndex);
 
   // An uninitialized cache is patched with the function.
   // Store a1 in the delay slot. This may or may not get overwritten depending
   // on the result of the comparison.
   __ st(a1, FieldMemOperand(a2, JSGlobalPropertyCell::kValueOffset));
 
-  __ Branch(&done, eq, a3, Operand(tt));
+  __ Branch(&done, eq, a3, Operand(at2));
   // No need for a write barrier here - cells are rescanned.
 
   // MegamorphicSentinel is an immortal immovable object (undefined) so no

@@ -502,7 +502,7 @@ void Builtins::Generate_InstallRecompiledCode(MacroAssembler* masm) {
     __ push(a1);
     __ CallRuntime(Runtime::kInstallRecompiledCode, 1);
     // Calculate the entry point.
-    __ Addu(tt, r0, Operand(Code::kHeaderSize - kHeapObjectTag));
+    __ Addu(at2, r0, Operand(Code::kHeaderSize - kHeapObjectTag));
 
     // Restore call kind information.
     __ pop(t1);
@@ -513,7 +513,7 @@ void Builtins::Generate_InstallRecompiledCode(MacroAssembler* masm) {
   }
 
   // Do a tail-call of the compiled function.
-  __ Jump(tt);
+  __ Jump(at2);
 }
 
 static void EnterArgumentsAdaptorFrame(MacroAssembler* masm) {
