@@ -376,7 +376,7 @@ void Assembler::st4(const Register& rd, const Register& rs, int line) {
 }
 
 void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
-  ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
+  ASSERT(rd.is_valid() && rs.rm().is_valid());
   if (rs.offset_ != 0) {
     if (is_int16(rs.offset_)) {
     Instr instr = ADDLI_X1 | DEST_X1(at.code())
@@ -384,8 +384,14 @@ void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
     emit(instr, line);
     instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
     emit(instr, line);
-    } else
-      UNREACHABLE();
+    } else {
+      moveli(at, (rs.offset_ >> 48) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 32) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 16) & 0xFFFF, line);
+      shl16insli(at, at, rs.offset_ & 0xFFFF, line);
+      add(at, rs.rm(), at, line);
+      ld(rd, at, line);
+    }
   } else
     ld(rd, rs.rm(), line);
 }

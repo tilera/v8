@@ -385,7 +385,7 @@ void Deoptimizer::DoComputeOsrOutputFrame() {
     PrintF(" => pc=0x%0x]\n", output_[0]->GetPc());
   }
 #else
-  UNIMPLEMENTED();
+  UNREACHABLE();
 #endif
 }
 

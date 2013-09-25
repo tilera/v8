@@ -2063,7 +2063,7 @@ void BinaryOpStub::GenerateTypeTransition(MacroAssembler* masm) {
 
 void BinaryOpStub::GenerateTypeTransitionWithSavedArgs(
     MacroAssembler* masm) {
-  UNIMPLEMENTED();
+  UNREACHABLE();
 }
 
 
