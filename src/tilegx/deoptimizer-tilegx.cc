@@ -460,7 +460,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   const int kNumberOfRegisters = Register::kNumRegisters;
 
   RegList restored_regs = kJSCallerSaved | kCalleeSaved;
-  RegList saved_regs = restored_regs | sp.bit() | ra.bit();
+  RegList saved_regs = restored_regs | sp.bit() | fp.bit() | ra.bit();
 
   //FIXME
 #if 0
@@ -530,7 +530,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   // Preserve "deoptimizer" object in register v0 and get the input
   // frame descriptor pointer to a1 (deoptimizer->input_);
   // Move deopt-obj to a0 for call to Deoptimizer::ComputeOutputFrames() below.
-  __ move(a0, v0);
+  //__ move(a0, v0);
   __ ld(a1, MemOperand(v0, Deoptimizer::input_offset()));
 
   // Copy core registers into FrameDescription::registers_[kNumRegisters].
@@ -581,7 +581,7 @@ void Deoptimizer::EntryGenerator::Generate() {
   __ Branch(&pop_loop_header);
   __ bind(&pop_loop);
   __ pop(t0);
-  __ st(t0, MemOperand(a3, 0));
+  __ st(t0, MemOperand(a3));
   __ addi(a3, a3, 8);
   __ bind(&pop_loop_header);
   __ Branch(&pop_loop, ne, a2, Operand(sp));
@@ -696,7 +696,7 @@ void Deoptimizer::TableEntryGenerator::GeneratePrologue() {
     __ Addu(t9, t9, remaining_entries);
     // 'at' was clobbered so we can only load the current entry value here.
     __ li(at, i);
-    __ st(at, MemOperand(sp, 0 * kPointerSize));
+    __ st(at, MemOperand(sp));
     __ jr(t9);
 
     // Pad the rest of the code.
