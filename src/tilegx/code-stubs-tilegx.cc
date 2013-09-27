@@ -5941,7 +5941,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   __ st(t6, FieldMemOperand(t3, ConsString::kFirstOffset));
   __ RecordWriteField(t3,
                       ConsString::kFirstOffset,
-                      a0,
+                      t6,
                       t0,
                       kRAHasNotBeenSaved,
                       kDontSaveFPRegs);
@@ -6821,6 +6821,7 @@ static const AheadOfTimeWriteBarrierStubList kAheadOfTime[] = {
   // FastNewClosureStub::Generate
   { REG(a2), REG(t0), REG(a1), EMIT_REMEMBERED_SET },
   // StringAddStub::Generate
+  { REG(t3), REG(t6), REG(t0), EMIT_REMEMBERED_SET },
   { REG(t3), REG(a1), REG(t0), EMIT_REMEMBERED_SET },
   { REG(t3), REG(a0), REG(t0), EMIT_REMEMBERED_SET },
   // Null termination.
