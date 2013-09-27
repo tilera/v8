@@ -855,12 +855,19 @@ void FloatingPointHelper::CallCCodeForDoubleOperation(
     Register heap_number_result,
     Register scratch) {
   // Using core registers:
+  //
+  // Incoming:
   // a2: Left value
   // a3: Right value
+  //
+  // we need to move them to a0/a1.
 
   // Assert that heap_number_result is saved.
   // We currently always use s0 to pass it.
   ASSERT(heap_number_result.is(s0));
+
+  __ move(a0, a2);
+  __ move(a1, a3);
 
   // Push the current return address before the C call.
   __ push(ra);
