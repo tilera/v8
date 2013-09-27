@@ -523,12 +523,13 @@ void FloatingPointHelper::LoadSmis(MacroAssembler* masm,
                                    Register scratch3) {
   ASSERT(destination == kCoreRegisters);
   // Write Smi from a0 to a3 and a2 in double format.
-  __ move(scratch3, a1);
-  ConvertToDoubleStub stub1(a1, a0, scratch1, scratch2);
+  __ move(scratch3, a0);
+  ConvertToDoubleStub stub1(a3, scratch3, scratch1, scratch2);
   __ push(ra);
   __ Call(stub1.GetCode(masm->isolate()));
   // Write Smi from a1 to a1 and a0 in double format.
-  ConvertToDoubleStub stub2(a0, scratch3, scratch1, scratch2);
+  __ move(scratch3, a1);
+  ConvertToDoubleStub stub2(a2, scratch3, scratch1, scratch2);
   __ Call(stub2.GetCode(masm->isolate()));
   __ pop(ra);
 }
@@ -854,8 +855,8 @@ void FloatingPointHelper::CallCCodeForDoubleOperation(
     Register heap_number_result,
     Register scratch) {
   // Using core registers:
-  // a0: Left value
-  // a1: Right value
+  // a2: Left value
+  // a3: Right value
 
   // Assert that heap_number_result is saved.
   // We currently always use s0 to pass it.
@@ -2234,24 +2235,24 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
         // Load right operand to f14 or a2/a3.
         if (right_type == BinaryOpIC::INT32) {
           FloatingPointHelper::LoadNumberAsInt32Double(
-              masm, right, destination, a1, heap_number_map,
+              masm, right, destination, a3, heap_number_map,
               scratch1, scratch2, scratch3, miss);
         } else {
           Label* fail = (right_type == BinaryOpIC::NUMBER) ? miss : not_numbers;
           FloatingPointHelper::LoadNumber(
-              masm, destination, right, a1, heap_number_map,
+              masm, destination, right, a3, heap_number_map,
               scratch1, scratch2, scratch3, fail);
         }
         // Load left operand to f12 or a0/a1. This keeps a0/a1 intact if it
         // jumps to |miss|.
         if (left_type == BinaryOpIC::INT32) {
           FloatingPointHelper::LoadNumberAsInt32Double(
-              masm, left, destination, a0, heap_number_map,
+              masm, left, destination, a2, heap_number_map,
               scratch1, scratch2, scratch3, miss);
         } else {
           Label* fail = (left_type == BinaryOpIC::NUMBER) ? miss : not_numbers;
           FloatingPointHelper::LoadNumber(
-              masm, destination, left, a0, heap_number_map,
+              masm, destination, left, a2, heap_number_map,
               scratch1, scratch2, scratch3, fail);
         }
       }
@@ -2516,7 +2517,7 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
       FloatingPointHelper::LoadNumberAsInt32Double(masm,
                                                    right,
                                                    destination,
-                                                   a1,
+                                                   a3,
                                                    heap_number_map,
                                                    scratch1,
                                                    scratch2,
@@ -2525,7 +2526,7 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
       FloatingPointHelper::LoadNumberAsInt32Double(masm,
                                                    left,
                                                    destination,
-                                                   t0,
+                                                   a2,
                                                    heap_number_map,
                                                    scratch1,
                                                    scratch2,
