@@ -3798,7 +3798,8 @@ void ArgumentsAccessStub::GenerateNewNonStrictSlow(MacroAssembler* masm) {
   // Patch the arguments.length and the parameters pointer in the current frame.
   __ ld(a2, MemOperand(a3, ArgumentsAdaptorFrameConstants::kLengthOffset));
   __ st(a2, MemOperand(sp, 0 * kPointerSize));
-  __ sll(t3, a2, 1);
+  __ sra(a2, a2, 32);
+  __ sll(t3, a2, 3);
   __ Addu(a3, a3, Operand(t3));
   __ addli(a3, a3, StandardFrameConstants::kCallerSPOffset);
   __ st(a3, MemOperand(sp, 1 * kPointerSize));
@@ -5536,7 +5537,7 @@ void SubStringStub::Generate(MacroAssembler* masm) {
     __ bind(&two_byte_slice);
     __ AllocateTwoByteSlicedString(v0, a2, t2, t3, &runtime);
     __ bind(&set_slice_header);
-    __ sll(a3, a3, 1);
+    __ sll(a3, a3, 32);
     __ st(t1, FieldMemOperand(v0, SlicedString::kParentOffset));
     __ st(a3, FieldMemOperand(v0, SlicedString::kOffsetOffset));
     __ jmp(&return_v0);
