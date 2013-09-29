@@ -952,7 +952,7 @@ void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
   // a double because it uses a sign bit instead of using two's complement.
   // The actual mantissa bits stored are all 0 because the implicit most
   // significant 1 bit is not stored.
-  non_smi_exponent += 1 << HeapNumber::kExponentShift;
+  non_smi_exponent += 1L << 52;
   __ li(scratch_, Operand(0x8000000000000000L | non_smi_exponent));
   __ st(scratch_,
         FieldMemOperand(the_heap_number_, HeapNumber::kValueOffset));

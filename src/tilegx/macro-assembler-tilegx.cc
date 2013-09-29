@@ -579,7 +579,7 @@ void MacroAssembler::Or(Register rd, Register rs, const Operand& rt) {
   if (rt.is_reg()) {
     or_(rd, rs, rt.rm());
   } else {
-    if (is_uint8(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+    if (is_lintn(rt.imm64_, 8) && !MustUseReg(rt.rmode_)) {
       ori(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
@@ -595,7 +595,7 @@ void MacroAssembler::Xor(Register rd, Register rs, const Operand& rt) {
   if (rt.is_reg()) {
     xor_(rd, rs, rt.rm());
   } else {
-    if (is_uint8(rt.imm64_) && !MustUseReg(rt.rmode_)) {
+    if (is_lintn(rt.imm64_, 8) && !MustUseReg(rt.rmode_)) {
       xori(rd, rs, rt.imm64_);
     } else {
       // li handles the relocation.
@@ -4195,7 +4195,7 @@ void MacroAssembler::ConvertToInt32(Register source,
   And(scratch2, scratch, Operand(0x8000000000000000L));
   Or(dest, dest, Operand(scratch2));
   // Put back the implicit 1, just above mantissa field.
-  Or(scratch, scratch, Operand(1 << HeapNumber::kExponentShift));
+  Or(scratch, scratch, Operand(1L << 52));
 
   // Shift up the mantissa bits to take up the space the exponent used to
   // take. We just orred in the implicit bit so that took care of one and
@@ -4204,7 +4204,9 @@ void MacroAssembler::ConvertToInt32(Register source,
   // left, then shift right one bit.
   const int shift_distance = HeapNumber::kNonMantissaBitsInTopWord - 2;
   sll(scratch, scratch, shift_distance + 1);
-  srl(scratch, scratch, 1);
+  srl(scratch, scratch, 32 + 1);
+
+  //srl(scratch, scratch, 32);
 
   // Move down according to the exponent.
   srl(scratch, scratch, dest);
