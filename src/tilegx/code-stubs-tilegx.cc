@@ -1700,8 +1700,11 @@ void ToBooleanStub::Generate(MacroAssembler* masm) {
     __ and_(t6, at, at2);
     __ Branch(&zero_or_nan, eq, t6, Operand(zero));
 
-    __ xor_(at2, t6, t5);
-    __ Branch(&number, ne, at2, Operand(zero));
+    // at is still with HeapNumber.
+    // at2 is still with 0x7FF0000000000000L.
+    __ Branch(&zero_or_nan, gt, at, Operand(at2));
+
+    __ Branch(&number);
     // "tos_" is a register, and contains a non zero value by default.
     // Hence we only need to overwrite "tos_" with zero to return false for
     // FP_ZERO or FP_NAN cases. Otherwise, by default it returns true.
