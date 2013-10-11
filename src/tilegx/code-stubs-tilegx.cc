@@ -5664,7 +5664,7 @@ void StringCompareStub::GenerateFlatAsciiStringEquals(MacroAssembler* masm,
   __ bind(&compare_chars);
 
   GenerateAsciiCharsCompareLoop(masm,
-                                left, right, length, scratch2, scratch3, v0,
+                                left, right, length, scratch2, scratch3, at,
                                 &strings_not_equal);
 
   // Characters are equal.
@@ -5694,7 +5694,7 @@ void StringCompareStub::GenerateCompareFlatAsciiStrings(MacroAssembler* masm,
 
   // Compare loop.
   GenerateAsciiCharsCompareLoop(masm,
-                                left, right, min_length, scratch2, scratch4, v0,
+                                left, right, min_length, scratch2, scratch4, at,
                                 &result_not_equal);
 
   // Compare lengths - strings up to min-length are equal.
@@ -5727,6 +5727,9 @@ void StringCompareStub::GenerateAsciiCharsCompareLoop(
     Register scratch2,
     Register scratch3,
     Label* chars_not_equal) {
+
+  ASSERT(scratch3.is(at));
+
   // Change index to run from -length to -1 by adding length to string
   // start. This means that loop ends when index reaches zero, which
   // doesn't need an additional compare.

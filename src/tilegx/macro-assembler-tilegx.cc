@@ -3812,7 +3812,7 @@ void MacroAssembler::GetMarkBits(Register addr_reg,
   Addu(bitmap_reg, bitmap_reg, t8);
   li(t8, Operand(1));
   sll(mask_reg, t8, mask_reg);
- }
+}
 
 
 void MacroAssembler::EnsureNotWhite(
