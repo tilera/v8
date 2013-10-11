@@ -2369,7 +2369,7 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
       // Tail call that writes the int32 in a2 to the heap number in v0, using
       // a3 and a0 as scratch. v0 is preserved and returned.
      
-      WriteInt32ToHeapNumberStub stub(a2, v0, a3, a0);
+      WriteInt32ToHeapNumberStub stub(a2, v0, a3, r4);
       __ TailCallStub(&stub);
 
       break;
@@ -2664,7 +2664,7 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
       // Tail call that writes the int32 in a2 to the heap number in v0, using
       // a3 and a0 as scratch. v0 is preserved and returned.
       __ move(v0, t1);
-      WriteInt32ToHeapNumberStub stub(a2, v0, a3, a0);
+      WriteInt32ToHeapNumberStub stub(a2, v0, a3, r4);
       __ TailCallStub(&stub);
 
       break;
