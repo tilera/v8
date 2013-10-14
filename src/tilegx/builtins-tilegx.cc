@@ -1078,9 +1078,8 @@ void Builtins::Generate_FunctionCall(MacroAssembler* masm) {
   // a0: actual number of arguments
   // a1: function
   __ ld(a3, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
-  __ ld(a2,
+  __ ld4s(a2,
          FieldMemOperand(a3, SharedFunctionInfo::kFormalParameterCountOffset));
-  __ sra(a2, a2, kSmiTagSize + kSmiShiftSize);
   __ ld(a3, FieldMemOperand(a1, JSFunction::kCodeEntryOffset));
   __ SetCallKind(t1, CALL_AS_METHOD);
   // Check formal and actual parameter counts.
