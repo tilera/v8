@@ -2731,7 +2731,7 @@ void MacroAssembler::TryGetFunctionPrototype(Register function,
     ld4u(scratch,
        FieldMemOperand(scratch, SharedFunctionInfo::kCompilerHintsOffset));
     And(scratch, scratch,
-        Operand(SharedFunctionInfo::kBoundFunction));
+        Operand(1 << SharedFunctionInfo::kBoundFunction));
     Branch(miss, ne, scratch, Operand(zero));
   }
 
