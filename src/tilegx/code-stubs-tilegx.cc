@@ -6647,7 +6647,7 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
   // cover ~93% of loads from dictionaries.
   for (int i = 0; i < kInlinedProbes; i++) {
     // Compute the masked index: (hash + i + i * i) & mask.
-    __ ld(scratch2, FieldMemOperand(name, Name::kHashFieldOffset));
+    __ ld4u(scratch2, FieldMemOperand(name, Name::kHashFieldOffset));
     if (i > 0) {
       // Add the probe offset (i + i * i) left shifted to avoid right shifting
       // the hash in a separate instruction. The value hash + i + i * i is right
@@ -6726,7 +6726,7 @@ void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
   __ sra(mask, mask, 32);
   __ Subu(mask, mask, Operand(1));
 
-  __ ld(hash, FieldMemOperand(key, Name::kHashFieldOffset));
+  __ ld4u(hash, FieldMemOperand(key, Name::kHashFieldOffset));
 
   __ LoadRoot(undefined, Heap::kUndefinedValueRootIndex);
 

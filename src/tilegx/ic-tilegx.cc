@@ -324,7 +324,7 @@ static void GenerateKeyNameCheck(MacroAssembler* masm,
   __ Branch(&unique, eq, hash, Operand(LAST_UNIQUE_NAME_TYPE));
 
   // Is the string an array index, with cached numeric value?
-  __ ld(hash, FieldMemOperand(key, Name::kHashFieldOffset));
+  __ ld4u(hash, FieldMemOperand(key, Name::kHashFieldOffset));
   __ And(at, hash, Operand(Name::kContainsCachedArrayIndexMask));
   __ Branch(index_string, eq, at, Operand(zero));
 
@@ -999,7 +999,7 @@ void KeyedLoadIC::GenerateGeneric(MacroAssembler* masm) {
   // based on 32 bits of the map pointer and the name hash.
   __ ld(a2, FieldMemOperand(a1, HeapObject::kMapOffset));
   __ sra(a3, a2, KeyedLookupCache::kMapHashShift);
-  __ ld(t0, FieldMemOperand(a0, Name::kHashFieldOffset));
+  __ ld4u(t0, FieldMemOperand(a0, Name::kHashFieldOffset));
   __ sra(at, t0, Name::kHashShift);
   __ xor_(a3, a3, at);
   int mask = KeyedLookupCache::kCapacityMask & KeyedLookupCache::kHashMask;

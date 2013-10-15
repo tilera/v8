@@ -97,7 +97,7 @@ static void ProbeTable(Isolate* isolate,
   // Check that the flags match what we're looking for.
   Register flags_reg = base_addr;
   base_addr = no_reg;
-  __ ld4s(flags_reg, FieldMemOperand(code, Code::kFlagsOffset));
+  __ ld4u(flags_reg, FieldMemOperand(code, Code::kFlagsOffset));
   __ And(flags_reg, flags_reg, Operand(~Code::kFlagsNotUsedInLookup));
   __ Branch(&miss, ne, flags_reg, Operand(flags));
 
@@ -218,7 +218,7 @@ void StubCache::GenerateProbe(MacroAssembler* masm,
   __ JumpIfSmi(receiver, &miss);
 
   // Get the map of the receiver and compute the hash.
-  __ ld(scratch, FieldMemOperand(name, Name::kHashFieldOffset));
+  __ ld4u(scratch, FieldMemOperand(name, Name::kHashFieldOffset));
   __ ld(at, FieldMemOperand(receiver, HeapObject::kMapOffset));
   __ Addu(scratch, scratch, at);
   uint32_t mask = kPrimaryTableSize - 1;
@@ -3486,7 +3486,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
     case EXTERNAL_UNSIGNED_INT_ELEMENTS:
       __ sra(t8, key, 30); // Untag, then multiply 4
       __ add(t8, a3, t8);
-      __ st(t1, MemOperand(t8));
+      __ st4(t1, MemOperand(t8));
       break;
     case EXTERNAL_FLOAT_ELEMENTS:
       // Perform int-to-float conversion and store to memory.
@@ -3674,7 +3674,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
         case EXTERNAL_UNSIGNED_INT_ELEMENTS:
           __ sra(t8, key, 30);
           __ add(t8, a3, t8);
-          __ st(t3, MemOperand(t8));
+          __ st4(t3, MemOperand(t8));
           break;
         case EXTERNAL_PIXEL_ELEMENTS:
         case EXTERNAL_FLOAT_ELEMENTS:
