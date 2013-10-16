@@ -146,7 +146,7 @@ static void GenerateDictionaryLoad(MacroAssembler* masm,
   __ ld(scratch1, FieldMemOperand(scratch2, kDetailsOffset));
   __ And(at,
          scratch1,
-         Operand(static_cast<uint64_t>(PropertyDetails::TypeField::kMask) << 32));
+         Operand((static_cast<uint64_t>(PropertyDetails::TypeField::kMask)) << 32));
   __ Branch(miss, ne, at, Operand(zero));
 
   // Get the value at the masked, scaled index and return.
@@ -199,7 +199,7 @@ static void GenerateDictionaryStore(MacroAssembler* masm,
   //FIXME:
   const uint64_t kTypeAndReadOnlyMask =
       static_cast<uint64_t>((PropertyDetails::TypeField::kMask |
-       PropertyDetails::AttributesField::encode(READ_ONLY))) << 33;
+       PropertyDetails::AttributesField::encode(READ_ONLY))) << 32;
   __ ld(scratch1, FieldMemOperand(scratch2, kDetailsOffset));
   __ And(at, scratch1, Operand(kTypeAndReadOnlyMask));
   __ Branch(miss, ne, at, Operand(zero));
