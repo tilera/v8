@@ -63,59 +63,6 @@ double fast_exp_simulator(double x) {
 
 UnaryMathFunction CreateExpFunction() {
   return &exp;
-#if 0
-  if (!FLAG_fast_math) return &exp;
-  size_t actual_size;
-  byte* buffer = static_cast<byte*>(OS::Allocate(1 * KB, &actual_size, true));
-  if (buffer == NULL) return &exp;
-  ExternalReference::InitializeMathExpData();
-
-  MacroAssembler masm(NULL, buffer, static_cast<int>(actual_size));
-
-  //FIXME
-#if 0
-  {
-    DoubleRegister input = f12;
-    DoubleRegister result = f0;
-    DoubleRegister double_scratch1 = f4;
-    DoubleRegister double_scratch2 = f6;
-    Register temp1 = t0;
-    Register temp2 = t1;
-    Register temp3 = t2;
-
-    if (!IsMipsSoftFloatABI) {
-      // Input value is in f12 anyway, nothing to do.
-    } else {
-      __ Move(input, a0, a1);
-    }
-    __ Push(temp3, temp2, temp1);
-    MathExpGenerator::EmitMathExp(
-        &masm, input, result, double_scratch1, double_scratch2,
-        temp1, temp2, temp3);
-    __ Pop(temp3, temp2, temp1);
-    if (!IsMipsSoftFloatABI) {
-      // Result is already in f0, nothing to do.
-    } else {
-      __ Move(v0, v1, result);
-    }
-    __ Ret();
-  }
-#endif
-
-  CodeDesc desc;
-  masm.GetCode(&desc);
-  ASSERT(!RelocInfo::RequiresRelocation(desc));
-
-  CPU::FlushICache(buffer, actual_size);
-  OS::ProtectCode(buffer, actual_size);
-
-#if !defined(USE_SIMULATOR)
-  return FUNCTION_CAST<UnaryMathFunction>(buffer);
-#else
-  fast_exp_mips_machine_code = buffer;
-  return &fast_exp_simulator;
-#endif
-#endif
 }
 
 
@@ -207,10 +154,9 @@ void ElementsTransitionGenerator::GenerateSmiToDouble(
   // t1: number of elements (smi-tagged)
 
   // Allocate new FixedDoubleArray.
-  __ sll(scratch, t1, 2);
+  __ sra(scratch, t1, 32);
+  __ sll(scratch, scratch, 3);
   __ Addu(scratch, scratch, FixedDoubleArray::kHeaderSize);
-  __ info(__LINE__);
-  __ bpt();
   __ Allocate(scratch, t2, t3, t5, &gc_required, NO_ALLOCATION_FLAGS);
   // t2: destination FixedDoubleArray, not tagged as heap object
 
@@ -245,10 +191,11 @@ void ElementsTransitionGenerator::GenerateSmiToDouble(
   // Prepare for conversion loop.
   __ Addu(a3, t0, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
   __ Addu(t3, t2, Operand(FixedDoubleArray::kHeaderSize));
-  __ sll(t2, t1, 2);
+  __ sra(t2, t1, 32);
+  __ sll(t2, t2, 3);
   __ Addu(t2, t2, t3);
-  __ li(t0, Operand(kHoleNanLower32));
-  __ li(t1, Operand(kHoleNanUpper32));
+  __ li(t0, Operand(kHoleNanInt64));
+  //__ li(t1, Operand(kHoleNanUpper32));
   // t0: kHoleNanLower32
   // t1: kHoleNanUpper32
   // t2: end of destination FixedDoubleArray, not tagged
@@ -276,18 +223,14 @@ void ElementsTransitionGenerator::GenerateSmiToDouble(
   // Convert and copy elements.
   __ bind(&loop);
   __ ld(t5, MemOperand(a3));
-  __ Addu(a3, a3, kIntSize);
+  __ Addu(a3, a3, kDoubleSize);
   // t5: current element
   __ UntagAndJumpIfNotSmi(t5, t5, &convert_hole);
 
-  //FIXME
-#if 0
-  // Normal smi, convert to double and store.
-  __ mtc1(t5, f0);
-  __ cvt_d_w(f0, f0);
-  __ sdc1(f0, MemOperand(t3));
+  FloatingPointHelper::ConvertIntToDouble(masm, t5,
+     FloatingPointHelper::kCoreRegisters, at, at2, t1);
+  __ st(at, MemOperand(t3));
   __ Addu(t3, t3, kDoubleSize);
-#endif
 
   __ Branch(&entry);
 
@@ -300,8 +243,8 @@ void ElementsTransitionGenerator::GenerateSmiToDouble(
     __ LoadRoot(at, Heap::kTheHoleValueRootIndex);
     __ Assert(eq, "object found in smi-only array", at, Operand(t5));
   }
-  __ st(t0, MemOperand(t3));  // mantissa
-  __ st(t1, MemOperand(t3, kIntSize));  // exponent
+  __ st(t0, MemOperand(t3));
+  //__ st(t1, MemOperand(t3, kIntSize));  // exponent
   __ Addu(t3, t3, kDoubleSize);
 
   __ bind(&entry);
@@ -352,7 +295,7 @@ void ElementsTransitionGenerator::GenerateDoubleToObject(
   __ st(t5, MemOperand(t2, HeapObject::kMapOffset));
 
   // Prepare for conversion loop.
-  __ Addu(t0, t0, Operand(FixedDoubleArray::kHeaderSize - kHeapObjectTag + 4));
+  __ Addu(t0, t0, Operand(FixedDoubleArray::kHeaderSize - kHeapObjectTag));
   __ Addu(a3, t2, Operand(FixedArray::kHeaderSize));
   __ Addu(t2, t2, Operand(kHeapObjectTag));
   __ sra(t1, t1, 32);
@@ -380,17 +323,15 @@ void ElementsTransitionGenerator::GenerateDoubleToObject(
   __ Addu(t0, t0, kDoubleSize);
   // a1: current element's upper 32 bit
   // t0: address of next element's upper 32 bit
-  __ Branch(&convert_hole, eq, a1, Operand(kHoleNanUpper32));
+  __ Branch(&convert_hole, eq, a1, Operand(kHoleNanInt64));
 
   // Non-hole double, copy value into a heap number.
   __ AllocateHeapNumber(a2, a0, t6, t5, &gc_required);
   // a2: new heap number
-  __ ld(a0, MemOperand(t0, -12));
-  __ st(a0, FieldMemOperand(a2, HeapNumber::kMantissaOffset));
-  __ st(a1, FieldMemOperand(a2, HeapNumber::kExponentOffset));
+  __ st(a1, FieldMemOperand(a2, HeapNumber::kValueOffset));
   __ move(a0, a3);
   __ st(a2, MemOperand(a3));
-  __ Addu(a3, a3, kIntSize);
+  __ Addu(a3, a3, kPointerSize);
   __ RecordWrite(t2,
                  a0,
                  a2,
@@ -403,7 +344,7 @@ void ElementsTransitionGenerator::GenerateDoubleToObject(
   // Replace the-hole NaN with the-hole pointer.
   __ bind(&convert_hole);
   __ st(t3, MemOperand(a3));
-  __ Addu(a3, a3, kIntSize);
+  __ Addu(a3, a3, kDoubleSize);
 
   __ bind(&entry);
   __ Branch(&loop, lt, a3, Operand(t1));
@@ -543,72 +484,6 @@ void MathExpGenerator::EmitMathExp(MacroAssembler* masm,
                                    Register temp2,
                                    Register temp3) {
   UNREACHABLE();
-#if 0
-  ASSERT(!input.is(result));
-  ASSERT(!input.is(double_scratch1));
-  ASSERT(!input.is(double_scratch2));
-  ASSERT(!result.is(double_scratch1));
-  ASSERT(!result.is(double_scratch2));
-  ASSERT(!double_scratch1.is(double_scratch2));
-  ASSERT(!temp1.is(temp2));
-  ASSERT(!temp1.is(temp3));
-  ASSERT(!temp2.is(temp3));
-  ASSERT(ExternalReference::math_exp_constants(0).address() != NULL);
-
-  Label done;
-
-  __ li(temp3, Operand(ExternalReference::math_exp_constants(0)));
-
-  //FIXME
-#if 0
-  __ ldc1(double_scratch1, ExpConstant(0, temp3));
-  __ Move(result, kDoubleRegZero);
-  __ BranchF(&done, NULL, ge, double_scratch1, input);
-  __ ldc1(double_scratch2, ExpConstant(1, temp3));
-  __ ldc1(result, ExpConstant(2, temp3));
-  __ BranchF(&done, NULL, ge, input, double_scratch2);
-  __ ldc1(double_scratch1, ExpConstant(3, temp3));
-  __ ldc1(result, ExpConstant(4, temp3));
-  __ mul_d(double_scratch1, double_scratch1, input);
-  __ add_d(double_scratch1, double_scratch1, result);
-  __ Move(temp2, temp1, double_scratch1);
-  __ sub_d(double_scratch1, double_scratch1, result);
-  __ ldc1(result, ExpConstant(6, temp3));
-  __ ldc1(double_scratch2, ExpConstant(5, temp3));
-  __ mul_d(double_scratch1, double_scratch1, double_scratch2);
-  __ sub_d(double_scratch1, double_scratch1, input);
-  __ sub_d(result, result, double_scratch1);
-  __ mul_d(input, double_scratch1, double_scratch1);
-  __ mul_d(result, result, input);
-  __ srl(temp1, temp2, 11);
-  __ ldc1(double_scratch2, ExpConstant(7, temp3));
-  __ mul_d(result, result, double_scratch2);
-  __ sub_d(result, result, double_scratch1);
-  __ ldc1(double_scratch2, ExpConstant(8, temp3));
-  __ add_d(result, result, double_scratch2);
-  __ li(at, 0x7ff);
-  __ And(temp2, temp2, at);
-  __ Addu(temp1, temp1, Operand(0x3ff));
-  __ sll(temp1, temp1, 20);
-#endif
-
-  // Must not call ExpConstant() after overwriting temp3!
-  __ li(temp3, Operand(ExternalReference::math_exp_log_table()));
-  __ sll(at, temp2, 3);
-  __ add(at, at, temp3);
-  __ ld(at, MemOperand(at));
-  __ Addu(temp3, temp3, Operand(kPointerSize));
-  __ sll(temp2, temp2, 3);
-  __ add(temp2, temp2, temp3);
-  __ ld(temp2, MemOperand(temp2));
-  __ Or(temp1, temp1, temp2);
-  //FIXME
-#if 0
-  __ Move(input, at, temp1);
-  __ mul_d(result, result, input);
-#endif
-  __ bind(&done);
-#endif
 }
 
 

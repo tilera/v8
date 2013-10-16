@@ -3455,15 +3455,17 @@ void MacroAssembler::AssertStackIsAligned() {
 void MacroAssembler::UntagAndJumpIfSmi(Register dst,
                                        Register src,
                                        Label* smi_case) {
+  move(at2, src);
   SmiUntag(dst, src);
-  JumpIfSmi(src, smi_case, at);
+  JumpIfSmi(at2, smi_case, at);
 }
 
 void MacroAssembler::UntagAndJumpIfNotSmi(Register dst,
                                           Register src,
                                           Label* non_smi_case) {
+  move(at2, src);
   SmiUntag(dst, src);
-  JumpIfNotSmi(src, non_smi_case, at);
+  JumpIfNotSmi(at2, non_smi_case, at);
 }
 
 void MacroAssembler::JumpIfSmi(Register value,

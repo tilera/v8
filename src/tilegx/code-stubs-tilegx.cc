@@ -6668,7 +6668,7 @@ void NameDictionaryLookupStub::GeneratePositiveLookup(MacroAssembler* masm,
     __ Addu(scratch2, scratch2, at);
 
     // Check if the key is identical to the name.
-    __ sll(at, scratch2, 2);
+    __ sll(at, scratch2, 3);
     __ Addu(scratch2, elements, at);
     __ ld(at, FieldMemOperand(scratch2, kElementsStartOffset));
     __ Branch(done, eq, name, Operand(at));
@@ -6756,7 +6756,7 @@ void NameDictionaryLookupStub::Generate(MacroAssembler* masm) {
 
 
     ASSERT_EQ(kSmiTagSize, 1);
-    __ sll(index, index, 2);
+    __ sll(index, index, 3);
     __ Addu(index, index, dictionary);
     __ ld(entry_key, FieldMemOperand(index, kElementsStartOffset));
 
