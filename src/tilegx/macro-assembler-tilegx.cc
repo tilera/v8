@@ -2250,6 +2250,7 @@ void MacroAssembler::CopyFields(Register dst,
     }
   }
   ASSERT(!tmp.is(no_reg));
+  ASSERT(!tmp.is(at));
 
   for (int i = 0; i < field_count; i++) {
     ld(tmp, FieldMemOperand(src, i * kPointerSize));
