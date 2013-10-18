@@ -219,7 +219,7 @@ void StubCache::GenerateProbe(MacroAssembler* masm,
 
   // Get the map of the receiver and compute the hash.
   __ ld4u(scratch, FieldMemOperand(name, Name::kHashFieldOffset));
-  __ ld(at, FieldMemOperand(receiver, HeapObject::kMapOffset));
+  __ ld4u(at, FieldMemOperand(receiver, HeapObject::kMapOffset));
   __ Addu(scratch, scratch, at);
   uint32_t mask = kPrimaryTableSize - 1;
   // We shift out the last two bits because they are not part of the hash and
@@ -3582,7 +3582,7 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       __ or_(t3, t7, t6);
 
       __ bind(&done);
-      __ srl(t9, key, 30);
+      __ sra(t9, key, 30);
       __ add(t9, a3, t9);
       __ st4(t3, MemOperand(t9));
 
@@ -3595,13 +3595,13 @@ void KeyedStoreStubCompiler::GenerateStoreExternalArray(
       __ And(t7, t3, Operand(0x8000000000000000L));
       __ srl(t7, t7, 32);
       __ or_(t6, t6, t7);
-      
+
       __ And(t3, t3, Operand(0xFFFFFFFFFFFFFL));
       __ srl(t4, t3, 52 - 23);
       __ or_(t3, t6, t4);
       __ Branch(&done);
     } else if (elements_kind == EXTERNAL_DOUBLE_ELEMENTS) {
-      __ srl(t8, key, 29); // Untag, then multiply by 8
+      __ sra(t8, key, 29); // Untag, then multiply by 8
       __ add(t8, a3, t8);
       __ st(t3, MemOperand(t8));
       //__ move(v0, a0);
