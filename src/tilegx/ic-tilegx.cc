@@ -1042,9 +1042,9 @@ void KeyedLoadIC::GenerateGeneric(MacroAssembler* masm) {
   for (int i = kEntriesPerBucket - 1; i >= 0; i--) {
     __ bind(&hit_on_nth_entry[i]);
     __ li(t0, Operand(cache_field_offsets));
-    __ sll(at, a3, kPointerSizeLog2);
+    __ sll(at, a3, 2);
     __ add(at, t0, at);
-    __ ld(t1, MemOperand(at, kPointerSize * i));
+    __ ld4u(t1, MemOperand(at, 4 * i));
     __ ld1u(t2, FieldMemOperand(a2, Map::kInObjectPropertiesOffset));
     __ Subu(t1, t1, t2);
     __ Branch(&property_array_property, ge, t1, Operand(zero));
