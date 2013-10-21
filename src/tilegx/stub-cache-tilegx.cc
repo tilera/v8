@@ -206,6 +206,7 @@ void StubCache::GenerateProbe(MacroAssembler* masm,
 
   // Check register validity.
   ASSERT(!scratch.is(no_reg));
+  ASSERT(!scratch.is(at));
   ASSERT(!extra.is(no_reg));
   ASSERT(!extra2.is(no_reg));
   ASSERT(!extra3.is(no_reg));
@@ -452,6 +453,9 @@ void StubCompiler::GenerateStoreTransition(MacroAssembler* masm,
   // a0 : value.
   Label exit;
 
+  ASSERT(!scratch3.is(at));
+  ASSERT(!scratch3.is(at2));
+
   // Check that the map of the object hasn't changed.
   __ CheckMap(receiver_reg, scratch1, Handle<Map>(object->map()), miss_label,
               DO_SMI_CHECK);
@@ -511,26 +515,23 @@ void StubCompiler::GenerateStoreTransition(MacroAssembler* masm,
   } else if (FLAG_track_heap_object_fields && representation.IsHeapObject()) {
     __ JumpIfSmi(value_reg, miss_restore_name);
   } else if (FLAG_track_double_fields && representation.IsDouble()) {
-    //FIXME
-#if 0
     Label do_store, heap_number;
     __ LoadRoot(scratch3, Heap::kHeapNumberMapRootIndex);
     __ AllocateHeapNumber(storage_reg, scratch1, scratch2, scratch3, slow);
 
     __ JumpIfNotSmi(value_reg, &heap_number);
     __ SmiUntag(scratch1, value_reg);
-    __ mtc1(scratch1, f6);
-    __ cvt_d_w(f4, f6);
+    FloatingPointHelper::ConvertIntToDouble(masm, scratch1,
+	FloatingPointHelper::kCoreRegisters, at2, at, scratch3);
     __ jmp(&do_store);
 
     __ bind(&heap_number);
     __ CheckMap(value_reg, scratch1, Heap::kHeapNumberMapRootIndex,
                 miss_restore_name, DONT_DO_SMI_CHECK);
-    __ ldc1(f4, FieldMemOperand(value_reg, HeapNumber::kValueOffset));
+    __ ld(at2, FieldMemOperand(value_reg, HeapNumber::kValueOffset));
 
     __ bind(&do_store);
-    __ sdc1(f4, FieldMemOperand(storage_reg, HeapNumber::kValueOffset));
-#endif
+    __ st(at2, FieldMemOperand(storage_reg, HeapNumber::kValueOffset));
   }
 
   // Stub never generated for non-global objects that require access
