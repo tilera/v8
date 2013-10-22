@@ -2348,7 +2348,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
 void FullCodeGenerator::EmitBinaryOp(BinaryOperation* expr,
                                      Token::Value op,
                                      OverwriteMode mode) {
-  __ move(a0, result_register());
+  //__ move(a0, result_register());
   __ pop(a1);
   BinaryOpStub stub(op, mode);
   JumpPatchSite patch_site(masm_);    // unbound, signals no inlined smi code.
@@ -4776,7 +4776,7 @@ void FullCodeGenerator::EnterFinallyBlock() {
   __ Subu(a1, ra, Operand(masm_->CodeObject()));
   ASSERT_EQ(32, kSmiTagSize + kSmiShiftSize);
   STATIC_ASSERT(0 == kSmiTag);
-  __ Addu(a1, a1, Operand(a1));  // Convert to smi.
+  __ SmiTag(a1);  // Convert to smi.
 
   // Store result register while executing finally block.
   __ push(a1);

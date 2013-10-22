@@ -99,7 +99,6 @@ const int kNumCalleeSaved = 20;
 
 const int kUndefIndex = -1;
 
-//FIXME
 const int kSafepointRegisterStackIndexMap[kNumRegs] = {
   0, 
   1,
