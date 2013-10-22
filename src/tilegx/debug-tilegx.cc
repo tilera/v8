@@ -167,7 +167,7 @@ static void Generate_DebugBreakCallHelper(MacroAssembler* masm,
         int r = JSCallerSavedCode(i);
         Register reg = { r };
         if ((non_object_regs & (1L << r)) != 0) {
-          __ srl(reg, reg, 32);
+          __ sra(reg, reg, 32);
         }
         if (FLAG_debug_code &&
             (((object_regs |non_object_regs) & (1L << r)) == 0)) {
@@ -325,12 +325,12 @@ void Debug::GenerateSlotDebugBreak(MacroAssembler* masm) {
 
 
 void Debug::GeneratePlainReturnLiveEdit(MacroAssembler* masm) {
-  masm->Abort("LiveEdit frame dropping is not supported on mips");
+  masm->Abort("LiveEdit frame dropping is not supported on TileGX");
 }
 
 
 void Debug::GenerateFrameDropperLiveEdit(MacroAssembler* masm) {
-  masm->Abort("LiveEdit frame dropping is not supported on mips");
+  masm->Abort("LiveEdit frame dropping is not supported on TileGX");
 }
 
 

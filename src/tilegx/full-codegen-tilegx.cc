@@ -29,14 +29,6 @@
 
 #if defined(V8_TARGET_ARCH_TILEGX)
 
-// Note on Mips implementation:
-//
-// The result_register() for mips is the 'v0' register, which is defined
-// by the ABI to contain function return values. However, the first
-// parameter to a function is defined to be 'a0'. So there are many
-// places where we have to move a previous result in v0 to a0 for the
-// next call: move(a0, v0). This is not needed on the other architectures.
-
 #include "code-stubs.h"
 #include "codegen.h"
 #include "compiler.h"
@@ -4737,6 +4729,7 @@ Register FullCodeGenerator::context_register() {
 
 void FullCodeGenerator::StoreToFrameField(int frame_offset, Register value) {
   ASSERT_EQ(POINTER_SIZE_ALIGN(frame_offset), (int64_t)frame_offset);
+  ASSERT(!value.is(at));
   __ st(value, MemOperand(fp, frame_offset));
 }
 

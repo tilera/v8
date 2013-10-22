@@ -1641,6 +1641,14 @@ void MacroAssembler::DebugBreak() {
 
 void MacroAssembler::PushTryHandler(StackHandler::Kind kind,
                                     int handler_index) {
+  // Adjust this code if not the case.
+  STATIC_ASSERT(StackHandlerConstants::kSize == 5 * kPointerSize);
+  STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0 * kPointerSize);
+  STATIC_ASSERT(StackHandlerConstants::kCodeOffset == 1 * kPointerSize);
+  STATIC_ASSERT(StackHandlerConstants::kStateOffset == 2 * kPointerSize);
+  STATIC_ASSERT(StackHandlerConstants::kContextOffset == 3 * kPointerSize);
+  STATIC_ASSERT(StackHandlerConstants::kFPOffset == 4 * kPointerSize);
+
   // For the JSEntry handler, we must preserve r0-r4
   // t1-t3 are available. We will build up the handler from the bottom by
   // pushing on the stack.
@@ -1672,9 +1680,9 @@ void MacroAssembler::PushTryHandler(StackHandler::Kind kind,
 
 
 void MacroAssembler::PopTryHandler() {
-  //STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
+  STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
   pop(r1);
-  Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
+	  Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
   li(at, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
   st(r1, MemOperand(at));
 }
