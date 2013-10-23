@@ -1014,7 +1014,7 @@ void FullCodeGenerator::VisitSwitchStatement(SwitchStatement* stmt) {
 
     // Compile the label expression.
     VisitForAccumulatorValue(clause->label());
-    __ move(a0, result_register());  // CompareStub requires args in a0, a1.
+    //__ move(a0, result_register());  // CompareStub requires args in a0, a1.
 
     // Perform the comparison as if via '==='.
     __ ld(a1, MemOperand(sp, 0));  // Switch value.
@@ -1078,14 +1078,14 @@ void FullCodeGenerator::VisitForInStatement(ForInStatement* stmt) {
   // ignore null and undefined in contrast to the specification; see
   // ECMA-262 section 12.6.4.
   VisitForAccumulatorValue(stmt->enumerable());
-  __ move(a0, result_register());  // Result as param to InvokeBuiltin below.
+  //__ move(a0, result_register());  // Result as param to InvokeBuiltin below.
   __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
   __ Branch(&exit, eq, a0, Operand(at));
   Register null_value = t1;
   __ LoadRoot(null_value, Heap::kNullValueRootIndex);
   __ Branch(&exit, eq, a0, Operand(null_value));
   PrepareForBailoutForId(stmt->PrepareId(), TOS_REG);
-  __ move(a0, v0);
+  //__ move(a0, v0);
   // Convert the object to a JS object.
   Label convert, done_convert;
   __ JumpIfSmi(a0, &convert);
@@ -1094,7 +1094,7 @@ void FullCodeGenerator::VisitForInStatement(ForInStatement* stmt) {
   __ bind(&convert);
   __ push(a0);
   __ InvokeBuiltin(Builtins::TO_OBJECT, CALL_FUNCTION);
-  __ move(a0, v0);
+  //__ move(a0, v0);
   __ bind(&done_convert);
   __ push(a0);
 
@@ -1791,7 +1791,7 @@ void FullCodeGenerator::VisitArrayLiteral(ArrayLiteral* expr) {
       __ ld(a2, FieldMemOperand(a1, JSObject::kMapOffset));
       __ li(a3, Operand(Smi::FromInt(i)));
       __ li(t0, Operand(Smi::FromInt(expr->literal_index())));
-      __ move(a0, result_register());
+      //__ move(a0, result_register());
       StoreArrayLiteralElementStub stub;
       __ CallStub(&stub);
     }
