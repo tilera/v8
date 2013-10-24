@@ -1719,7 +1719,7 @@ void FullCodeGenerator::VisitArrayLiteral(ArrayLiteral* expr) {
   Handle<FixedArrayBase> constant_elements_values(
       FixedArrayBase::cast(constant_elements->get(1)));
 
-  __ move(a0, result_register());
+  //__ move(a0, result_register());
   __ ld(a3, MemOperand(fp, JavaScriptFrameConstants::kFunctionOffset));
   __ ld(a3, FieldMemOperand(a3, JSFunction::kLiteralsOffset));
   __ li(a2, Operand(Smi::FromInt(expr->literal_index())));

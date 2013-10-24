@@ -7202,9 +7202,11 @@ void ProfileEntryHookStub::Generate(MacroAssembler* masm) {
     __ And(sp, sp, Operand(-frame_alignment));
   }
 
+  __ Subu(sp, sp, Operand(16));
   __ li(at, Operand(reinterpret_cast<int64_t>(&entry_hook_)));
   __ ld(at, MemOperand(at));
   __ Call(at);
+  __ Addu(sp, sp, Operand(16));
 
   // Restore the stack pointer if needed.
   if (frame_alignment > kPointerSize) {
