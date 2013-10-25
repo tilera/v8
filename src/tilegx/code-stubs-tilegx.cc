@@ -1074,8 +1074,10 @@ static void EmitSmiNonsmiComparison(MacroAssembler* masm,
   if (strict) {
     // If lhs was not a number and rhs was a Smi then strict equality cannot
     // succeed. Return non-equal (lhs is already not zero).
+    __ move(at, r0);
     __ move(r0, lhs);
     __ Ret(ne, t4, Operand(HEAP_NUMBER_TYPE));
+    __ move(r0, at);
   } else {
     // Smi compared non-strictly with a non-Smi non-heap-number. Call
     // the runtime.
@@ -1110,8 +1112,10 @@ static void EmitSmiNonsmiComparison(MacroAssembler* masm,
   if (strict) {
     // If lhs was not a number and rhs was a Smi then strict equality cannot
     // succeed. Return non-equal.
+    __ move(at, r0);
     __ li(r0, Operand(1));
     __ Ret(ne, t4, Operand(HEAP_NUMBER_TYPE));
+    __ move(r0, at);
   } else {
     // Smi compared non-strictly with a non-Smi non-heap-number. Call
     // the runtime.
