@@ -3912,6 +3912,8 @@ void MacroAssembler::EnsureNotWhite(
   And(t8, instance_type, Operand(kStringEncodingMask));
   {
     Label skip;
+    srl(t9, t9, 32);
+    sll(t9, t9, 1);
     Branch(&skip, eq, t8, Operand(zero));
     srl(t9, t9, 1);
     bind(&skip);
@@ -3927,9 +3929,9 @@ void MacroAssembler::EnsureNotWhite(
   st(t8, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
 
   And(bitmap_scratch, bitmap_scratch, Operand(~Page::kPageAlignmentMask));
-  ld(t8, MemOperand(bitmap_scratch, MemoryChunk::kLiveBytesOffset));
+  ld4u(t8, MemOperand(bitmap_scratch, MemoryChunk::kLiveBytesOffset));
   Addu(t8, t8, Operand(length));
-  st(t8, MemOperand(bitmap_scratch, MemoryChunk::kLiveBytesOffset));
+  st4(t8, MemOperand(bitmap_scratch, MemoryChunk::kLiveBytesOffset));
 
   bind(&done);
 }
