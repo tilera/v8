@@ -4147,6 +4147,7 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   __ TailCallRuntime(Runtime::kRegExpExec, 4, 1);
 #else  // V8_INTERPRETED_REGEXP
 
+  UNREACHABLE();
   // Stack frame on entry.
   //  sp[0]: last_match_info (expected JSArray)
   //  sp[4]: previous index
