@@ -1682,7 +1682,7 @@ void MacroAssembler::PushTryHandler(StackHandler::Kind kind,
 void MacroAssembler::PopTryHandler() {
   STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
   pop(r1);
-	  Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
+  Addu(sp, sp, Operand(StackHandlerConstants::kSize - kPointerSize));
   li(at, Operand(ExternalReference(Isolate::kHandlerAddress, isolate())));
   st(r1, MemOperand(at));
 }
