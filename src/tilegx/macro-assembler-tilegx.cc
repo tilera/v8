@@ -3849,7 +3849,8 @@ void MacroAssembler::EnsureNotWhite(
   And(t8, mask_scratch, load_scratch);
   Branch(&done, ne, t8, Operand(zero));
 
-  if (emit_debug_code()) {
+  // FIXME
+  if (0 && emit_debug_code()) {
     // Check for impossible bit pattern.
     Label ok;
     // sll may overflow, making the check conservative.
