@@ -3003,14 +3003,14 @@ void FullCodeGenerator::EmitIsStringWrapperSafeForDefaultValueOf(
   STATIC_ASSERT(kSmiTagSize == 1);
   STATIC_ASSERT(kPointerSize == 8);
   __ li(at, Operand(DescriptorArray::kDescriptorSize));
+  __ sra(a3, a3, 32);
   __ Mul(a3, a3, at);
   // Calculate location of the first key name.
   __ Addu(t0, t0, Operand(DescriptorArray::kFirstOffset - kHeapObjectTag));
   // Calculate the end of the descriptor array.
   __ move(a2, t0);
-  __ sra(t1, a3, kSmiTagSize + kSmiShiftSize);
-  __ sll(t1, t1, kPointerSizeLog2);
-  __ Addu(a2, a2, t1);
+  __ sll(a3, a3, kPointerSizeLog2);
+  __ Addu(a2, a2, a3);
 
   // Loop through all the keys in the descriptor array. If one of these is the
   // string "valueOf" the result is false.
@@ -3868,7 +3868,7 @@ void FullCodeGenerator::EmitHasCachedArrayIndex(CallRuntime* expr) {
   context()->PrepareTest(&materialize_true, &materialize_false,
                          &if_true, &if_false, &fall_through);
 
-  __ ld(a0, FieldMemOperand(v0, String::kHashFieldOffset));
+  __ ld4u(a0, FieldMemOperand(v0, String::kHashFieldOffset));
   __ And(a0, a0, Operand(String::kContainsCachedArrayIndexMask));
 
   PrepareForBailoutBeforeSplit(expr, true, if_true, if_false);
@@ -3884,7 +3884,7 @@ void FullCodeGenerator::EmitGetCachedArrayIndex(CallRuntime* expr) {
 
   __ AssertString(v0);
 
-  __ ld(v0, FieldMemOperand(v0, String::kHashFieldOffset));
+  __ ld4u(v0, FieldMemOperand(v0, String::kHashFieldOffset));
   __ IndexFromHash(v0, v0);
 
   context()->Plug(v0);
