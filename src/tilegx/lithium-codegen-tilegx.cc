@@ -1811,7 +1811,7 @@ void LCodeGen::DoGetCachedArrayIndex(LGetCachedArrayIndex* instr) {
 
   __ AssertString(input);
 
-  __ ld(result, FieldMemOperand(input, String::kHashFieldOffset));
+  __ ld4u(result, FieldMemOperand(input, String::kHashFieldOffset));
   __ IndexFromHash(result, result);
 }
 
@@ -1823,7 +1823,7 @@ void LCodeGen::DoHasCachedArrayIndexAndBranch(
   int true_block = chunk_->LookupDestination(instr->true_block_id());
   int false_block = chunk_->LookupDestination(instr->false_block_id());
 
-  __ ld(scratch,
+  __ ld4u(scratch,
          FieldMemOperand(input, String::kHashFieldOffset));
   __ And(at, scratch, Operand(String::kContainsCachedArrayIndexMask));
   EmitBranch(true_block, false_block, eq, at, Operand(zero));
