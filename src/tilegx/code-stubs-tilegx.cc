@@ -3157,7 +3157,8 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
   JumpIfOOM(masm, r0, t0, throw_out_of_memory_exception);
 
   // Clear the pending exception.
-  __ li(r3, Operand(isolate->factory()->the_hole_value()));
+  __ LoadRoot(r3, Heap::kTheHoleValueRootIndex);
+  //__ li(r3, Operand(isolate->factory()->the_hole_value()));
   __ li(t0, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
   __ st(r3, MemOperand(t0));
@@ -4425,7 +4426,8 @@ void RegExpExecStub::Generate(MacroAssembler* masm) {
   // stack overflow (on the backtrack stack) was detected in RegExp code but
   // haven't created the exception yet. Handle that in the runtime system.
   // TODO(592): Rerunning the RegExp to get the stack overflow exception.
-  __ li(a1, Operand(isolate->factory()->the_hole_value()));
+  //__ li(a1, Operand(isolate->factory()->the_hole_value()));
+  __ LoadRoot(a1, Heap::kTheHoleValueRootIndex);
   __ li(a2, Operand(ExternalReference(Isolate::kPendingExceptionAddress,
                                       isolate)));
   __ ld(v0, MemOperand(a2, 0));
