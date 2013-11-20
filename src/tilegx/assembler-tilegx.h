@@ -902,6 +902,7 @@ class Assembler : public AssemblerBase {
   }
 
   void j(int64_t target, int line = 0);
+  void jal(int32_t offset, int line = 0);
   void jr(Register target, int line = 0);
   void jalr(Register target, int line = 0);
 

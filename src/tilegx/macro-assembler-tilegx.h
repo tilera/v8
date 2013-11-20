@@ -1149,12 +1149,12 @@ class MacroAssembler: public Assembler {
   void BranchShort(int16_t offset);
   void BranchShort(int16_t offset, Condition cond, Register rs, const Operand& rt);
 
-  void BranchAndLinkShort(int16_t offset) {};
+  void BranchAndLinkShort(int16_t offset){UNREACHABLE();}
   void BranchAndLinkShort(int16_t offset, Condition cond, Register rs,
-                          const Operand& rt) {};
-  void BranchAndLinkShort(Label* L) {};
+                          const Operand& rt){UNREACHABLE();}
+  void BranchAndLinkShort(Label* L);
   void BranchAndLinkShort(Label* L, Condition cond, Register rs,
-                          const Operand& rt) {};
+                          const Operand& rt){UNREACHABLE();}
   void J(Label* L);
   void Jalr(Label* L);
 

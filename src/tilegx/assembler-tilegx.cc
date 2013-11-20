@@ -852,7 +852,7 @@ int Assembler::target_at(int32_t pos) {
   printf("==> ");
   print_insn_tilegx((unsigned char *)&instr);
 #endif
-  ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
+  ASSERT(IsBranch(instr) || IsJ(instr) || IsJAL(instr) || IsMOVELI(instr));
   // Do NOT change this to << 3. We rely on arithmetic shifts here, assuming
   // the compiler uses arithmectic shifts for signed integers.
   if (IsBranch(instr)) {
@@ -890,10 +890,7 @@ int Assembler::target_at(int32_t pos) {
       // EndOfChain sentinel is returned directly, not relative to pc or pos.
       return kEndOfChain;
     } else {
-      uint64_t instr_address = reinterpret_cast<int64_t>(buffer_ + pos);
-      int64_t delta = instr_address - imm30;
-      ASSERT(pos > delta);
-      return pos - delta;
+      return pos + imm30;
     }
   }
 }
@@ -908,7 +905,7 @@ void Assembler::target_at_put(int32_t pos, int32_t target_pos) {
     return;
   }
 
-  ASSERT(IsBranch(instr) || IsJ(instr) || IsMOVELI(instr));
+  ASSERT(IsBranch(instr) || IsJ(instr) || IsJAL(instr) || IsMOVELI(instr));
   if (IsBranch(instr)) {
     int32_t imm20 = target_pos - pos;
     ASSERT((imm20 & 7) == 0);
@@ -939,14 +936,13 @@ void Assembler::target_at_put(int32_t pos, int32_t target_pos) {
     instr_at_put(pos + 2 * Assembler::kInstrSize,
                  instr_shl16insli_1 | create_Imm16_X1(imm));
   } else {
-    uint32_t imm30 = reinterpret_cast<uint64_t>(buffer_) + target_pos;
+    int32_t imm30 = target_pos - pos;
     ASSERT((imm30 & 7) == 0);
 
-    instr &= ~create_JumpOff_X1(-1);
-    uint32_t imm27 = imm30 >> 3;
-    ASSERT(is_uintn(imm27, 27));
+    int32_t imm27 = imm30 >> 3;
+    ASSERT(is_intn(imm27, 27));
 
-    instr_at_put(pos, instr | create_JumpOff_X1(imm27));
+    instr_at_put(pos, (instr & (~create_JumpOff_X1(-1))) | create_JumpOff_X1(imm27));
   }
 }
 
@@ -977,7 +973,7 @@ void Assembler::bind_to(Label* L, int pos) {
       }
       target_at_put(fixup_pos, pos);
     } else {
-      ASSERT(IsJ(instr) || IsMOVELI(instr) || IsEmittedConstant(instr));
+      ASSERT(IsJ(instr) || IsJAL(instr) || IsMOVELI(instr) || IsEmittedConstant(instr));
       target_at_put(fixup_pos, pos);
     }
   }
@@ -1493,7 +1489,7 @@ void Assembler::GrowBuffer() {
 
 bool Assembler::is_near(Label* L) {
   if (L->is_bound()) {
-    return (pc_offset() - L->pos()) < ((1 << 18) - 1);
+    return (pc_offset() - L->pos()) < ((1 << 30) - 1);
   }
   return false;
 }
@@ -1536,6 +1532,11 @@ void Assembler::jalr(Register rs, int line) {
 
 void Assembler::j(int64_t target, int line) {
   Instr instr = J_X1 | JOFF_X1(target);
+  emit(instr, line);
+}
+
+void Assembler::jal(int32_t offset, int line) {
+  Instr instr = JAL_X1 | JOFF_X1(offset);
   emit(instr, line);
 }
 

@@ -1403,6 +1403,9 @@ void MacroAssembler::BranchAndLink(Label* L, Condition cond, Register rs,
   }
 }
 
+void MacroAssembler::BranchAndLinkShort(Label* L) {
+  jal(shifted_branch_offset(L, false));
+}
 
 void MacroAssembler::Jump(Register target,
                           Condition cond,
