@@ -5804,7 +5804,7 @@ void StringAddStub::Generate(MacroAssembler* masm) {
 
   // Stack on entry:
   // sp[0]: second argument (right).
-  // sp[4]: first argument (left).
+  // sp[8]: first argument (left).
 
   // Load the two arguments.
   __ ld(a0, MemOperand(sp, 1 * kPointerSize));  // First argument.

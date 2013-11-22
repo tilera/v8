@@ -740,14 +740,11 @@ void MacroAssembler::Jalr(Label* L) {
 void MacroAssembler::J(Label* L) {
   BlockTrampolinePoolScope block_trampoline_pool(this);
 
-  uint32_t imm30;
-  imm30 = jump_address(L);
-  imm30 &= kImm30Mask;
   { BlockGrowBufferScope block_buf_growth(this);
     // Buffer growth (and relocation) must be blocked for internal references
     // until associated instructions are emitted and available to be patched.
     RecordRelocInfo(RelocInfo::INTERNAL_REFERENCE);
-    j(imm30);
+    j(shifted_branch_offset(L, true));
   }
 }
 
@@ -819,7 +816,7 @@ void MacroAssembler::BranchShort(int16_t offset) {
 void MacroAssembler::BranchShort(Label* L) {
   // We use branch_offset as an argument for the branch instructions to be sure
   // it is called just before generating the branch instruction, as needed.
-  b(shifted_branch_offset(L, false));
+  b(shifted_branch_offset(L));
 }
 
 void MacroAssembler::BranchShort(int16_t offset, Condition cond, Register rs,
@@ -1072,88 +1069,88 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
     // target.
     switch (cond) {
       case cc_always:
-        offset = shifted_branch_offset(L, false);
+        offset = shifted_branch_offset(L);
         b(offset);
         break;
       case eq:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(rs, offset);
 	} else {
           cmpeq(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
 	}
         break;
       case ne:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(rs, offset);
 	} else {
           cmpne(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
 	}
         break;
       // Signed comparison.
       case greater:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgtz(rs, offset);
         } else {
           cmplts(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case greater_equal:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgez(rs, offset);
         } else {
           cmplts(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
       case less:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bltz(rs, offset);
         } else {
           cmplts(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case less_equal:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           blez(rs, offset);
         } else {
           cmplts(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
       // Unsigned comparison.
       case Ugreater:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgtz(rs, offset);
         } else {
           cmpltu(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case Ugreater_equal:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgez(rs, offset);
         } else {
           cmpltu(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
@@ -1163,17 +1160,17 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
           return;
         } else {
           cmpltu(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case Uless_equal:
         if (r2.is(zero)) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           b(offset);
         } else {
           cmpltu(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
@@ -1186,124 +1183,124 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
     // target.
     switch (cond) {
       case cc_always:
-        offset = shifted_branch_offset(L, false);
+        offset = shifted_branch_offset(L);
         b(offset);
         break;
       case eq:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(rs, offset);
 	} else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
 	  cmpeq(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
 	}
         break;
       case ne:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(rs, offset);
 	} else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
 	  cmpne(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
 	}
         break;
       // Signed comparison.
       case greater:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgtz(rs, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmplts(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case greater_equal:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgez(rs, offset);
         } else if (is_lintn(rt.imm64_, 8)) {
           cmpltsi(scratch, rs, rt.imm64_);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmplts(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
       case less:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bltz(rs, offset);
         } else if (is_lintn(rt.imm64_, 8)) {
           cmpltsi(scratch, rs, rt.imm64_);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmplts(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case less_equal:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           blez(rs, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmplts(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
       // Unsigned comparison.
       case Ugreater:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgtz(rs, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmpltu(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case Ugreater_equal:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bgez(rs, offset);
         } else if (is_lintn(rt.imm64_, 8)) {
           cmpltui(scratch, rs, rt.imm64_);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmpltu(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
@@ -1313,27 +1310,27 @@ void MacroAssembler::BranchShort(Label* L, Condition cond, Register rs,
           return;
         } else if (is_lintn(rt.imm64_, 8)) {
           cmpltui(scratch, rs, rt.imm64_);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmpltu(scratch, rs, r2);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           bnez(scratch, offset);
         }
         break;
       case Uless_equal:
         if (rt.imm64_ == 0) {
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           b(offset);
         } else {
           ASSERT(!scratch.is(rs));
           r2 = scratch;
           li(r2, rt);
           cmpltu(scratch, r2, rs);
-          offset = shifted_branch_offset(L, false);
+          offset = shifted_branch_offset(L);
           beqz(scratch, offset);
         }
         break;
@@ -1404,7 +1401,7 @@ void MacroAssembler::BranchAndLink(Label* L, Condition cond, Register rs,
 }
 
 void MacroAssembler::BranchAndLinkShort(Label* L) {
-  jal(shifted_branch_offset(L, false));
+  jal(shifted_branch_offset(L, true));
 }
 
 void MacroAssembler::Jump(Register target,
@@ -3587,11 +3584,11 @@ void MacroAssembler::JumpIfBothInstanceTypesAreNotSequentialAscii(
   int kFlatAsciiStringMask =
       kIsNotStringMask | kStringEncodingMask | kStringRepresentationMask;
   int kFlatAsciiStringTag = ASCII_STRING_TYPE;
-  ASSERT(kFlatAsciiStringMask <= 0xff);  // Ensure this fits 16-bit immed.
-  ASSERT(kFlatAsciiStringTag <= 0xff);  // Ensure this fits 16-bit immed.
-  andi(scratch1, first, kFlatAsciiStringMask);
+  li(scratch1, Operand(kFlatAsciiStringMask));
+  and_(scratch1, first, scratch1);
   Branch(failure, ne, scratch1, Operand(kFlatAsciiStringTag));
-  andi(scratch2, second, kFlatAsciiStringMask);
+  li(scratch2, Operand(kFlatAsciiStringMask));
+  and_(scratch2, second, scratch2);
   Branch(failure, ne, scratch2, Operand(kFlatAsciiStringTag));
 }
 

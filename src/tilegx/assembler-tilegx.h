@@ -790,9 +790,9 @@ class Assembler : public AssemblerBase {
   // Returns the branch offset to the given label from the current code
   // position. Links the label to the current position if it is still unbound.
   // Manages the jump elimination optimization if the second parameter is true.
-  int32_t branch_offset(Label* L, bool jump_elimination_allowed);
-  int32_t shifted_branch_offset(Label* L, bool jump_elimination_allowed) {
-    int32_t o = branch_offset(L, jump_elimination_allowed);
+  int32_t branch_offset(Label* L, bool is_long = false);
+  int32_t shifted_branch_offset(Label* L, bool is_long = false) {
+    int32_t o = branch_offset(L, is_long);
     ASSERT((o & 7) == 0);   // Assert the offset is aligned.
     return o >> 3;
   }
@@ -907,14 +907,14 @@ class Assembler : public AssemblerBase {
   void jalr(Register target, int line = 0);
 
   void b(int32_t offset, int line = 0);
-  void b(Label* L, int line = 0) { b(branch_offset(L, false)>>3, line); }
+  void b(Label* L, int line = 0) { b(shifted_branch_offset(L), line); }
   void beqz(const Register& rs, int32_t offset, int line = 0);
   void beqz(const Register& rs, Label* L, int line = 0) {
-    beqz(rs, branch_offset(L, false) >> 3, line);
+    beqz(rs, shifted_branch_offset(L), line);
   }
   void bnez(const Register& rs, int32_t offset, int line = 0);
   void bnez(const Register& rs, Label* L, int line = 0) {
-    bnez(rs, branch_offset(L, false)>>3, line);
+    bnez(rs, shifted_branch_offset(L), line);
   }
   void bgez(const Register& rs, int32_t offset, int line = 0);
   void bgtz(const Register& rs, int32_t offset, int line = 0);

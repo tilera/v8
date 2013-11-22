@@ -1418,7 +1418,7 @@ void Assembler::cmpleu(const Register& rd, const Register& rsa, const Register& 
   emit(instr, line);
 }
 
-int32_t Assembler::branch_offset(Label* L, bool jump_elimination_allowed) {
+int32_t Assembler::branch_offset(Label* L, bool is_long) {
   int32_t target_pos;
 
   if (L->is_bound()) {
@@ -1435,7 +1435,7 @@ int32_t Assembler::branch_offset(Label* L, bool jump_elimination_allowed) {
 
   int32_t offset = target_pos - pc_offset();
   ASSERT((offset & 7) == 0);
-  ASSERT(is_intn(offset >> 3, 17));
+  ASSERT(is_intn(offset >> 3, is_long ? 27 : 17));
 
   return offset;
 }
@@ -1693,10 +1693,7 @@ void Assembler::stop(const char* msg, uint32_t code) {
 }
 
 void Assembler::JumpLabelToJumpRegister(Address pc) {
-  Instr instr4 = instr_at(pc + 3 * kInstrSize);
-
-  if (IsJAL(instr4) || IsJ(instr4))
-    UNREACHABLE();
+  UNREACHABLE();
 }
 
 } }  // namespace v8::internal
