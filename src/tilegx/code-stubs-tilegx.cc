@@ -6000,6 +6000,8 @@ void StringAddStub::Generate(MacroAssembler* masm) {
   __ Branch(&ascii_data, eq, t0,
       Operand(kOneByteStringTag | kOneByteDataHintTag));
 
+  // Save a0 which is still alive. The following Allocate will clobber it.
+  __ move(t6, a0);
   // Allocate a two byte cons string.
   __ AllocateTwoByteConsString(v0, t2, t0, t1, &call_runtime);
   __ Branch(&allocated);
