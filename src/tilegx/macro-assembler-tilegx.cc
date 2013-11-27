@@ -4237,7 +4237,7 @@ void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
   Or(input, input, Operand(1L << 52));
 
   sll(scratch, input, scratch);
-  srl(input, scratch, 33);
+  srl(input, scratch, 32);
 
   // Restore sign if necessary.
   move(scratch, sign);
