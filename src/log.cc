@@ -1645,6 +1645,8 @@ void Logger::LogCodeInfo() {
   const char arch[] = "arm";
 #elif V8_TARGET_ARCH_MIPS
   const char arch[] = "mips";
+#elif V8_TARGET_ARCH_TILEGX
+  const char arch[] = "tilegx";
 #else
   const char arch[] = "unknown";
 #endif
