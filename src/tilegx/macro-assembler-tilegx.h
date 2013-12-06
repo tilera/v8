@@ -343,6 +343,14 @@ class MacroAssembler: public Assembler {
     sra(dst, src, kSmiTagSize + kSmiShiftSize);
   }
 
+  void SmiUntag32(Register reg) {
+    srl(reg, reg, kSmiTagSize + kSmiShiftSize);
+  }
+
+  void SmiUntag32(Register dst, Register src) {
+    srl(dst, src, kSmiTagSize + kSmiShiftSize);
+  }
+
   // Helper for throwing exceptions.  Compute a handler address and jump to
   // it.  See the implementation for register usage.
   void JumpToHandlerEntry();

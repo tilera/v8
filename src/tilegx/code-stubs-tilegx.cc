@@ -2094,6 +2094,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
   ASSERT(right.is(a0));
   STATIC_ASSERT(kSmiTag == 0);
 
+  __ move(t3, v0);
   Label not_smi_result;
   switch (op) {
     case Token::ADD:
@@ -2159,12 +2160,13 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
     case Token::SHR:
       // Remove tags from operands. We can't do this on a 31 bit number
       // because then the 0s get shifted into bit 30 instead of bit 31.
-      __ SmiUntag(scratch1, left);
+      __ SmiUntag32(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ srl(v0, scratch1, scratch2);
       // Unsigned shift is not allowed to produce a negative number, so
       // check the sign bit and the sign bit after Smi tagging.
-      __ And(scratch1, v0, Operand(0xC0000000));
+      // For 64bit platform like TileGX, our Smi is Int32.
+      __ And(scratch1, v0, Operand(0x80000000));
       __ Branch(&not_smi_result, ne, scratch1, Operand(zero));
       // Smi tag result.
       __ SmiTag(v0);
@@ -2172,11 +2174,12 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       break;
     case Token::SHL:
       // Remove tags from operands.
-      __ SmiUntag(scratch1, left);
+      __ SmiUntag32(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ sll(scratch1, scratch1, scratch2);
       // Check that the signed result fits in a Smi.
-      __ Addu(scratch2, scratch1, Operand(0x40000000));
+      // For 64bit platform like TileGX, our Smi is Int32.
+      __ Addu(scratch2, scratch1, Operand(0x80000000));
       __ Branch(&not_smi_result, lt, scratch2, Operand(zero));
       __ SmiTag(v0, scratch1);
       __ Ret();
@@ -2184,6 +2187,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
     default:
       UNREACHABLE();
   }
+  __ move(v0, t3);
   __ bind(&not_smi_result);
 }
 
@@ -2482,6 +2486,7 @@ void BinaryOpStub::GenerateBothStringStub(MacroAssembler* masm) {
 
 
 void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
+#if 0
   ASSERT(Max(left_type_, right_type_) == BinaryOpIC::INT32);
 
   Register left = a1;
@@ -2694,6 +2699,11 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
     GenerateCallRuntime(masm);
   }
   __ Ret();
+#else
+  // The int32 case is identical to the Smi case.  We avoid creating this
+  // ic state on TileGX, just like what x64 has done.
+  UNREACHABLE();
+#endif
 }
 
 
