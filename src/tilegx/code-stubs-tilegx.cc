@@ -2118,6 +2118,7 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // Go slow on zero result to handle -0.
       __ move(v0, scratch1);
       __ Ret(ne, v0, Operand(zero));
+      __ move(v0, t3);
       // We need -0 if we were multiplying a negative number with 0 to get 0.
       // We know one of them was zero.
       __ Addu(scratch2, right, left);

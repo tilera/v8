@@ -2230,6 +2230,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
 
   Register scratch1 = a2;
   Register scratch2 = a3;
+  Register scratch3 = r4;
 
   // Get the arguments.
   Register left = a1;
@@ -2303,6 +2304,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ move(v0, zero);
       break;
 #else
+      __ move(scratch3, right);
       __ mul_hs_hs(scratch1, left, right);
       __ sra(scratch2, scratch1, 32);
       __ sra(at, scratch1, 30);
@@ -2310,6 +2312,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ sll(scratch1, scratch1, 32); // Convert to Smi
       __ move(v0, scratch1);
       __ Branch(&done, ne, v0, Operand(zero));
+      __ move(right, scratch3);
       __ Addu(scratch2, right, left);
       __ Branch(&stub_call, lt, scratch2, Operand(zero));
       ASSERT(Smi::FromInt(0) == 0);
