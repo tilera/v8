@@ -2266,8 +2266,6 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ SmiUntag(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ sll(scratch1, scratch1, scratch2);
-      __ Addu(scratch2, scratch1, Operand(0x40000000));
-      __ Branch(&stub_call, lt, scratch2, Operand(zero));
       __ SmiTag(v0, scratch1);
       break;
     }
@@ -2276,18 +2274,18 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ SmiUntag(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ srl(scratch1, scratch1, scratch2);
-      __ And(scratch2, scratch1, 0xC0000000);
-      __ Branch(&stub_call, ne, scratch2, Operand(zero));
       __ SmiTag(v0, scratch1);
       break;
     }
     case Token::ADD:
-      __ AdduAndCheckForOverflow(v0, left, right, scratch1);
+      __ AdduAndCheckForOverflow(scratch2, left, right, scratch1);
       __ BranchOnOverflow(&stub_call, scratch1);
+      __ move(v0, scratch2);
       break;
     case Token::SUB:
-      __ SubuAndCheckForOverflow(v0, left, right, scratch1);
+      __ SubuAndCheckForOverflow(scratch2, left, right, scratch1);
       __ BranchOnOverflow(&stub_call, scratch1);
+      __ move(v0, scratch2);
       break;
     case Token::MUL: {
 #if 0

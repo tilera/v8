@@ -2163,12 +2163,6 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ SmiUntag32(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ srl(v0, scratch1, scratch2);
-      // Unsigned shift is not allowed to produce a negative number, so
-      // check the sign bit and the sign bit after Smi tagging.
-      // For 64bit platform like TileGX, our Smi is Int32.
-      __ And(scratch1, v0, Operand(0x80000000));
-      __ Branch(&not_smi_result, ne, scratch1, Operand(zero));
-      // Smi tag result.
       __ SmiTag(v0);
       __ Ret();
       break;
@@ -2177,10 +2171,6 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ SmiUntag32(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ sll(scratch1, scratch1, scratch2);
-      // Check that the signed result fits in a Smi.
-      // For 64bit platform like TileGX, our Smi is Int32.
-      __ Addu(scratch2, scratch1, Operand(0x80000000));
-      __ Branch(&not_smi_result, lt, scratch2, Operand(zero));
       __ SmiTag(v0, scratch1);
       __ Ret();
       break;
@@ -2349,9 +2339,6 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
         default:
           UNREACHABLE();
       }
-      // Check that the *signed* result fits in a smi.
-      __ Addu(a3, a2, Operand(0x40000000));
-      __ Branch(&result_not_a_smi, lt, a3, Operand(zero));
       __ SmiTag(v0, a2);
       __ Ret();
 
@@ -2652,11 +2639,6 @@ void BinaryOpStub::GenerateInt32Stub(MacroAssembler* masm) {
           UNREACHABLE();
       }
 
-      // Check if the result fits in a smi.
-      __ Addu(scratch1, a2, Operand(0x40000000));
-      // If not try to return a heap number. (We know the result is an int32.)
-      __ Branch(&return_heap_number, lt, scratch1, Operand(zero));
-      // Tag the result and return.
       __ SmiTag(v0, a2);
       __ Ret();
 
