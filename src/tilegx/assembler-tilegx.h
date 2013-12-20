@@ -922,6 +922,7 @@ class Assembler : public AssemblerBase {
   void bltz(const Register& rs, int32_t offset, int line = 0);
 
   void bfextu(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line = 0);
+  void bfexts(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line = 0);
   void bfins(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line = 0);
 
   void cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);

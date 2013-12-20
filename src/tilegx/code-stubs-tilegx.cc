@@ -2163,8 +2163,10 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       // because then the 0s get shifted into bit 30 instead of bit 31.
       __ SmiUntag32(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
-      __ srl(v0, scratch1, scratch2);
-      __ SmiTag(v0);
+      __ srl(scratch1, scratch1, scratch2);
+      __ bfexts(at2, scratch1, 0, 31);
+      __ Branch(&not_smi_result, lt, at2, Operand(zero));
+      __ SmiTag(v0, scratch1);
       __ Ret();
       break;
     case Token::SHL:
@@ -2326,11 +2328,10 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
           // Use only the 5 least significant bits of the shift count.
           __ GetLeastBitsFromInt32(a2, a2, 5);
           __ srl(a2, a3, a2);
-          // SHR is special because it is required to produce a positive answer.
-          // The code below for writing into heap numbers isn't capable of
-          // writing the register as an unsigned int so we go to slow case if we
-          // hit this case.
-          __ Branch(&result_not_a_smi, lt, a2, Operand(zero));
+          // Check if result is negative. This can only happen for a shift
+          // by zero.
+          __ bfexts(at2, a2, 0, 31);
+          __ Branch(&result_not_a_smi, lt, at2, Operand(zero));
           break;
         case Token::SHL:
           // Use only the 5 least significant bits of the shift count.

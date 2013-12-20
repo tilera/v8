@@ -1364,6 +1364,12 @@ void Assembler::bfextu(const Register& rd, const Register& rs, int32_t offset1, 
   emit(instr, line);
 }
 
+void Assembler::bfexts(const Register& rd, const Register& rs, int32_t offset1, int32_t offset2, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = BFEXTS_X0 | DEST_X0(rd.code()) | SRCA_X0(rs.code()) | BFSTART_X0(offset1) | BFEND_X0(offset2);
+  emit(instr, line);
+}
+
 void Assembler::cmpeq(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = CMPEQ_X1 | DEST_X1(rd.code()) | SRCA_X1(rsa.code()) | SRCB_X1(rsb.code());
