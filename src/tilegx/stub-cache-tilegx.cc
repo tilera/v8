@@ -2345,6 +2345,7 @@ Handle<Code> CallStubCompiler::CompileMathAbsCall(
   __ Branch(&slow, lt, v0, Operand(zero));
 
   // Smi case done.
+  __ SmiTag(v0, v0);
   __ Drop(argc + 1);
   __ Ret();
 
