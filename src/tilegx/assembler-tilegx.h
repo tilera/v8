@@ -152,6 +152,10 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
       create_Imm8OpcodeExtension_X1(ADDI_IMM8_OPCODE_X1) | FNOP_X0
 
+#define ADDXI_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+      create_Imm8OpcodeExtension_X1(ADDXI_IMM8_OPCODE_X1) | FNOP_X0
+
 #define V4INT_L_X1                                                             \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(V4INT_L_RRR_0_OPCODE_X1) | FNOP_X0
@@ -965,6 +969,7 @@ class Assembler : public AssemblerBase {
   void subx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void mulx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void addi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
+  void addxi(const Register& rd, const Register& rs, int8_t imm, int line = 0);
   void addli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void nor(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void srl(const Register& rd, const Register& rs, int16_t imm, int line = 0);

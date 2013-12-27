@@ -468,17 +468,20 @@ class ConvertToDoubleStub : public PlatformCodeStub {
   ConvertToDoubleStub(Register result_reg,
                       Register source_reg,
                       Register scratch_reg1,
-                      Register scratch_reg2)
+                      Register scratch_reg2,
+                      bool is_signed = true)
       : result_(result_reg),
         source_(source_reg),
         scratch1_(scratch_reg1),
-        scratch2_(scratch_reg2) { }
+        scratch2_(scratch_reg2),
+        is_signed_(is_signed) { }
 
  private:
   Register result_;
   Register source_;
   Register scratch1_;
   Register scratch2_;
+  bool is_signed_;
 
   Major MajorKey() { return ConvertToDouble; }
   int MinorKey() {
@@ -495,7 +498,11 @@ class ConvertToDoubleStub : public PlatformCodeStub {
 
 void ConvertToDoubleStub::Generate(MacroAssembler* masm) {
   // Convert from Smi to integer.
-  __ sra(source_, source_, kSmiTagSize + kSmiShiftSize);
+  if (is_signed_)
+    __ sra(source_, source_, kSmiTagSize + kSmiShiftSize);
+  else
+    __ srl(source_, source_, kSmiTagSize + kSmiShiftSize);
+
   // {
   __ cmpltsi(result_, source_, 0);
   __ sub(scratch1_, zero, source_);
@@ -886,79 +893,6 @@ void FloatingPointHelper::CallCCodeForDoubleOperation(
   __ move(v0, heap_number_result);
   __ Ret();
 }
-
-bool WriteInt32ToHeapNumberStub::IsPregenerated() {
-  // These variants are compiled ahead of time.  See next method.
-  if (the_int_.is(r1) &&
-      the_heap_number_.is(r0) &&
-      scratch_.is(r2) &&
-      sign_.is(r3)) {
-    return true;
-  }
-  if (the_int_.is(r2) &&
-      the_heap_number_.is(r0) &&
-      scratch_.is(r3) &&
-      sign_.is(r4)) {
-    return true;
-  }
-  // Other register combinations are generated as and when they are needed,
-  // so it is unsafe to call them from stubs (we can't generate a stub while
-  // we are generating a stub).
-  return false;
-}
-
-
-void WriteInt32ToHeapNumberStub::GenerateFixedRegStubsAheadOfTime(
-    Isolate* isolate) {
-  WriteInt32ToHeapNumberStub stub1(r1, r0, r2, r3);
-  WriteInt32ToHeapNumberStub stub2(r2, r0, r3, r4);
-  stub1.GetCode(isolate)->set_is_pregenerated(true);
-  stub2.GetCode(isolate)->set_is_pregenerated(true);
-}
-
-// See comment for class, this does NOT work for int32's that are in Smi range.
-void WriteInt32ToHeapNumberStub::Generate(MacroAssembler* masm) {
-  Label max_negative_int;
-  // the_int_ has the answer which is a signed int32 but not a Smi.
-  // We test for the special value that has a different exponent.
-  STATIC_ASSERT(HeapNumber::kSignMask == 0x80000000u);
-  // Test sign, and save for later conditionals.
-  __ And(sign_, the_int_, Operand(0x80000000L));
-  __ Branch(&max_negative_int, eq, the_int_, Operand(0x80000000u));
-
-  // Set up the correct exponent in scratch_.  All non-Smi int32s have the same.
-  // A non-Smi integer is 1.xxx * 2^30 so the exponent is 30 (biased).
-  uint64_t non_smi_exponent = 1053L << 52;
-  __ li(scratch_, Operand(non_smi_exponent));
-  // Set the sign bit in scratch_ if the value was negative.
-  __ sll(sign_, sign_, 32);
-  __ or_(scratch_, scratch_, sign_);
-  // Subtract from 0 if the value was negative.
-  __ sub(at, zero, the_int_);
-  __ movn(the_int_, at, sign_);
-  // We should be masking the implict first digit of the mantissa away here,
-  // but it just ends up combining harmlessly with the last digit of the
-  // exponent that happens to be 1.  The sign bit is 0 so we shift 10 to get
-  // the most significant 1 to hit the last bit of the 12 bit sign and exponent.
-  ASSERT(((1L << 52) & non_smi_exponent) != 0);
-  __ sll(at, at, 22);
-  __ or_(scratch_, scratch_, at);
-  __ st(scratch_, FieldMemOperand(the_heap_number_,
-                                   HeapNumber::kValueOffset));
-  __ Ret();
-
-  __ bind(&max_negative_int);
-  // The max negative int32 is stored as a positive number in the mantissa of
-  // a double because it uses a sign bit instead of using two's complement.
-  // The actual mantissa bits stored are all 0 because the implicit most
-  // significant 1 bit is not stored.
-  non_smi_exponent += 1L << 52;
-  __ li(scratch_, Operand(0x8000000000000000L | non_smi_exponent));
-  __ st(scratch_,
-        FieldMemOperand(the_heap_number_, HeapNumber::kValueOffset));
-  __ Ret();
-}
-
 
 // Handle the case where the lhs and rhs are the same object.
 // Equality is almost reflexive (everything but NaN), so this is a test
@@ -1961,45 +1895,6 @@ void UnaryOpStub::GenerateHeapNumberCodeBitNot( MacroAssembler* masm,
   // Tag the result as a smi and we're done.
   __ SmiTag(v0, a1);
   __ Ret();
-
-#if 0
-  // Try to store the result in a heap number.
-  __ bind(&try_float);
-  if (mode_ == UNARY_NO_OVERWRITE) {
-    Label slow_allocate_heapnumber, heapnumber_allocated;
-    // Allocate a new heap number without zapping v0, which we need if it fails.
-    __ AllocateHeapNumber(a2, a3, t0, t2, &slow_allocate_heapnumber);
-    __ jmp(&heapnumber_allocated);
-
-    __ bind(&slow_allocate_heapnumber);
-    {
-      FrameScope scope(masm, StackFrame::INTERNAL);
-      __ push(v0);  // Push the heap number, not the untagged int32.
-      __ CallRuntime(Runtime::kNumberAlloc, 0);
-      __ move(a2, v0);  // Move the new heap number into a2.
-      // Get the heap number into v0, now that the new heap number is in a2.
-      __ pop(v0);
-    }
-
-    // Convert the heap number in v0 to an untagged integer in a1.
-    // This can't go slow-case because it's the same number we already
-    // converted once again.
-    __ ConvertToInt32(v0, a1, a3, t0, f0, &impossible);
-    // Negate the result.
-    __ Xor(a1, a1, -1);
-
-    __ bind(&heapnumber_allocated);
-    __ move(v0, a2);  // Move newly allocated heap number to v0.
-  }
-
-  WriteInt32ToHeapNumberStub stub(a1, v0, a2, a3);
-  __ Jump(stub.GetCode(masm->isolate()), RelocInfo::CODE_TARGET);
-
-  __ bind(&impossible);
-  if (FLAG_debug_code) {
-    __ stop("Incorrect assumption in bit-not stub");
-  }
-#endif
 }
 
 
@@ -2151,7 +2046,6 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ Ret();
       break;
     case Token::SAR:
-      // Remove tags from right operand.
       __ GetLeastBitsFromSmi(scratch1, right, 5);
       __ sra(scratch1, left, scratch1);
       // Smi tag result.
@@ -2159,8 +2053,6 @@ void BinaryOpStub_GenerateSmiSmiOperation(MacroAssembler* masm,
       __ Ret();
       break;
     case Token::SHR:
-      // Remove tags from operands. We can't do this on a 31 bit number
-      // because then the 0s get shifted into bit 30 instead of bit 31.
       __ SmiUntag32(scratch1, left);
       __ GetLeastBitsFromSmi(scratch2, right, 5);
       __ srl(scratch1, scratch1, scratch2);
@@ -2208,6 +2100,7 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
   Register scratch1 = t3;
   Register scratch2 = t5;
   Register scratch3 = t0;
+  Register scratch4 = t1;
 
   ASSERT(smi_operands || (not_numbers != NULL));
   if (smi_operands) {
@@ -2330,8 +2223,8 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
           __ srl(a2, a3, a2);
           // Check if result is negative. This can only happen for a shift
           // by zero.
-          __ bfexts(at2, a2, 0, 31);
-          __ Branch(&result_not_a_smi, lt, at2, Operand(zero));
+          __ bfexts(a2, a2, 0, 31);
+          __ Branch(&result_not_a_smi, lt, a2, Operand(zero));
           break;
         case Token::SHL:
           // Use only the 5 least significant bits of the shift count.
@@ -2346,7 +2239,7 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
 
       // Allocate new heap number for result.
       __ bind(&result_not_a_smi);
-      Register result = t1;
+      Register result = scratch4;
       if (smi_operands) {
         __ AllocateHeapNumber(
             result, scratch1, scratch2, heap_number_map, gc_required);
@@ -2357,17 +2250,17 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
       }
 
       // a2: Answer as signed int32.
-      // t1: Heap number to write answer into.
+      // scratch4: Heap number to write answer into.
 
-      // Nothing can go wrong now, so move the heap number to v0, which is the
-      // result.
-      __ move(v0, t1);
+      __ move(v0, scratch4);
 
-      // Tail call that writes the int32 in a2 to the heap number in v0, using
-      // a3 and a0 as scratch. v0 is preserved and returned.
-     
-      WriteInt32ToHeapNumberStub stub(a2, v0, a3, r4);
-      __ TailCallStub(&stub);
+      __ sll(a2, a2, 32);
+      ConvertToDoubleStub i2d(at2, a2, a3, r4, false);
+      __ push(lr);
+      __ Call(i2d.GetCode(masm->isolate()));
+      __ pop(lr);
+      __ st(at2, FieldMemOperand(v0, HeapNumber::kValueOffset));
+      __ Ret();
 
       break;
     }
@@ -2786,7 +2679,6 @@ bool CEntryStub::IsPregenerated() {
 
 void CodeStub::GenerateStubsAheadOfTime(Isolate* isolate) {
   CEntryStub::GenerateAheadOfTime(isolate);
-  WriteInt32ToHeapNumberStub::GenerateFixedRegStubsAheadOfTime(isolate);
   StoreBufferOverflowStub::GenerateFixedRegStubsAheadOfTime(isolate);
   StubFailureTrampolineStub::GenerateAheadOfTime(isolate);
   RecordWriteStub::GenerateFixedRegStubsAheadOfTime(isolate);

@@ -597,6 +597,13 @@ void Assembler::addi(const Register& rd, const Register& rs, int8_t imm, int lin
   emit(instr, line);
 }
 
+void Assembler::addxi(const Register& rd, const Register& rs, int8_t imm, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid() && is_int8(imm));
+  Instr instr = ADDXI_X1 | DEST_X1(rd.code())
+	                 | SRCA_X1(rs.code()) | IMM8_X1(imm);
+  emit(instr, line);
+}
+
 void Assembler::and_(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = AND_X1 | DEST_X1(rd.code())

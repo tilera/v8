@@ -8356,7 +8356,7 @@ static inline bool CompareRawStringContents(const Char* const a,
   // If this architecture isn't comfortable reading unaligned ints
   // then we have to check that the strings are aligned before
   // comparing them blockwise.
-  const int kAlignmentMask = sizeof(uint32_t) - 1;  // NOLINT
+  const uint64_t kAlignmentMask = sizeof(uint64_t) - 1;  // NOLINT
   uint64_t pa_addr = reinterpret_cast<uint64_t>(a);
   uint64_t pb_addr = reinterpret_cast<uint64_t>(b);
   if (((pa_addr & kAlignmentMask) | (pb_addr & kAlignmentMask)) == 0) {
