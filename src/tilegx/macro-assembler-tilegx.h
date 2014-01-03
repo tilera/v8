@@ -620,7 +620,9 @@ class MacroAssembler: public Assembler {
                       Register dest,
                       Register scratch,
                       Register scratch2,
-                      Label *not_int32);
+                      Register scratch3,
+                      Register scratch4,
+		      Label *not_int32);
 
   // Helper for EmitECMATruncate.
   // This will truncate a floating-point value outside of the singed 32bit

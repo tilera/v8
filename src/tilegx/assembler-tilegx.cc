@@ -312,6 +312,33 @@ void Assembler::st(const Register& rd, const Register& rs, int line) {
   emit(instr, line);
 }
 
+void Assembler::st(const DoubleRegister& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid());
+  if (rs.offset_ != 0) {
+    if (is_int16(rs.offset_)) {
+      Instr instr = ADDLI_X1 | DEST_X1(at.code())
+                             | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+      emit(instr, line);
+      instr = ST_X1 | SRCA_X1(at.code()) | SRCB_X1(rd.code());
+      emit(instr, line);
+    } else {
+      moveli(at, (rs.offset_ >> 48) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 32) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 16) & 0xFFFF, line);
+      shl16insli(at, at, rs.offset_ & 0xFFFF, line);
+      add(at, rs.rm(), at, line);
+      st(rd, at, line);
+    }
+  } else
+    st(rd, rs.rm(), line);
+}
+
+void Assembler::st(const DoubleRegister& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = ST_X1 | SRCA_X1(rs.code()) | SRCB_X1(rd.code());
+  emit(instr, line);
+}
+
 void Assembler::st1(const Register& rd, const MemOperand& rs, int line) {
   ASSERT(rd.is_valid() && rs.rm().is_valid() && is_int16(rs.offset_));
   if (rs.offset_ != 0) {
@@ -397,6 +424,33 @@ void Assembler::ld(const Register& rd, const MemOperand& rs, int line) {
 }
 
 void Assembler::ld(const Register& rd, const Register& rs, int line) {
+  ASSERT(rd.is_valid() && rs.is_valid());
+  Instr instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
+  emit(instr, line);
+}
+
+void Assembler::ld(const DoubleRegister& rd, const MemOperand& rs, int line) {
+  ASSERT(rd.is_valid() && rs.rm().is_valid());
+  if (rs.offset_ != 0) {
+    if (is_int16(rs.offset_)) {
+    Instr instr = ADDLI_X1 | DEST_X1(at.code())
+                           | SRCA_X1(rs.rm().code()) | IMM16_X1(rs.offset_);
+    emit(instr, line);
+    instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(at.code());
+    emit(instr, line);
+    } else {
+      moveli(at, (rs.offset_ >> 48) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 32) & 0xFFFF, line);
+      shl16insli(at, at, (rs.offset_ >> 16) & 0xFFFF, line);
+      shl16insli(at, at, rs.offset_ & 0xFFFF, line);
+      add(at, rs.rm(), at, line);
+      ld(rd, at, line);
+    }
+  } else
+    ld(rd, rs.rm(), line);
+}
+
+void Assembler::ld(const DoubleRegister& rd, const Register& rs, int line) {
   ASSERT(rd.is_valid() && rs.is_valid());
   Instr instr = LD_X1 | DEST_X1(rd.code()) | SRCA_X1(rs.code());
   emit(instr, line);

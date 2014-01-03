@@ -358,6 +358,7 @@ class FloatingPointHelper : public AllStatic {
                                    Register scratch1,
                                    Register scratch2,
                                    Register scratch3,
+                                   Register scratch4,
                                    Label* not_int32);
 
   static void DoubleIs32BitInteger(MacroAssembler* masm,

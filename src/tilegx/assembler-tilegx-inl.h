@@ -50,6 +50,10 @@ int Register::NumAllocatableRegisters() {
     return kMaxNumAllocatableRegisters;
 }
 
+int DoubleRegister::NumAllocatableRegisters() {
+    return kMaxNumAllocatableRegisters;
+}
+
 // -----------------------------------------------------------------------------
 // RelocInfo.
 

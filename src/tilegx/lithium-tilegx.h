@@ -2681,6 +2681,7 @@ class LChunkBuilder BASE_EMBEDDED {
 
   // Methods for getting operands for Use / Define / Temp.
   LUnallocated* ToUnallocated(Register reg);
+  LUnallocated* ToUnallocated(DoubleRegister reg);
 
   // Methods for setting up define-use relationships.
   MUST_USE_RESULT LOperand* Use(HValue* value, LUnallocated* operand);

@@ -407,7 +407,7 @@ struct Register {
   static const int kNumRegisters = 64;
   // For Float Register
   static const int kMaxNumRegisters = 64;
-  static const int kMaxNumAllocatableRegisters = 50;
+  static const int kMaxNumAllocatableRegisters = 15;
   static const int kSizeInBytes = 8;
 
   inline static int NumAllocatableRegisters();
@@ -701,8 +701,75 @@ class Operand BASE_EMBEDDED {
   friend class MacroAssembler;
 };
 
-// TileGX reuse Integer reg as float reg.
-typedef Register DoubleRegister;
+struct DoubleRegister {
+  static const int kNumRegisters = 64;
+  // For Float Register
+  static const int kMaxNumRegisters = 64;
+  static const int kMaxNumAllocatableRegisters = 15;
+  static const int kSizeInBytes = 8;
+  static const int kDoubleRegStart = 15;
+  static const int kDoubleRegEnd = 29;
+
+  inline static int NumAllocatableRegisters();
+
+  static int ToAllocationIndex(DoubleRegister reg) {
+    ASSERT(reg.code() > kDoubleRegStart && reg.code() < kDoubleRegEnd);
+    return reg.code();
+  }
+
+  static DoubleRegister FromAllocationIndex(int index) {
+    ASSERT(index >= 0 && index < kMaxNumAllocatableRegisters);
+    return from_code(index);
+  }
+
+  static const char* AllocationIndexToString(int index) {
+    ASSERT(index >= 0 && index < kMaxNumAllocatableRegisters);
+    const char* const names[] = {
+      "r15",
+      "r16",
+      "r17",
+      "r18",
+      "r19",
+      "r20",
+      "r21",
+      "r22",
+      "r23",
+      "r24",
+      "r25",
+      "r26",
+      "r27",
+      "r28",
+      "r29",
+    };
+    return names[index];
+  }
+
+  static DoubleRegister from_code(int code) {
+    DoubleRegister r = { code + kDoubleRegStart };
+    return r;
+  }
+
+  bool is_valid() const { return 0 <= code_ && code_ < kNumRegisters; }
+  bool is(DoubleRegister reg) const { return code_ == reg.code_; }
+
+  int code() const {
+    ASSERT(is_valid());
+    return code_;
+  }
+
+  uint64_t bit() const {
+    ASSERT(is_valid());
+    return 1L << code_;
+  }
+
+  void set_code(int code) {
+    code_ = code;
+    ASSERT(is_valid());
+  }
+
+  // Unfortunately we can't make this private in a struct.
+  int code_;
+};
 
 class MemOperand : public Operand {
  public:
@@ -944,14 +1011,18 @@ class Assembler : public AssemblerBase {
   void lnk(const Register& rd, int line = 0);
   void st(const Register& rd, const MemOperand& rs, int line = 0);
   void st(const Register& rd, const Register& rs, int line = 0);
+  void st(const DoubleRegister& rd, const MemOperand& rs, int line = 0);
+  void st(const DoubleRegister& rd, const Register& rs, int line = 0);
   void st1(const Register& rd, const MemOperand& rs, int line = 0);
   void st1(const Register& rd, const Register& rs, int line = 0);
   void st2(const Register& rd, const MemOperand& rs, int line = 0);
   void st2(const Register& rd, const Register& rs, int line = 0);
   void st4(const Register& rd, const MemOperand& rs, int line = 0);
   void st4(const Register& rd, const Register& rs, int line = 0);
-  void ld(const Register& rd, const MemOperand& rs, int line = 0);
   void ld(const Register& rd, const Register& rs, int line = 0);
+  void ld(const Register& rd, const MemOperand& rs, int line = 0);
+  void ld(const DoubleRegister& rd, const Register& rs, int line = 0);
+  void ld(const DoubleRegister& rd, const MemOperand& rs, int line = 0);
   void ld1s(const Register& rd, const MemOperand& rs, int line = 0);
   void ld1s(const Register& rd, const Register& rs, int line = 0);
   void ld1u(const Register& rd, const MemOperand& rs, int line = 0);

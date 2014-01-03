@@ -4130,14 +4130,68 @@ void MacroAssembler::GetRelocatedValue(Register li_location,
 // reasons.
 void MacroAssembler::ConvertToInt32(Register source,
                                     Register dest,
-                                    Register scratch,
+                                    Register scratch1,
                                     Register scratch2,
-                                    Label *not_int32) {
+                                    Register scratch3,
+                                    Register scratch4,
+				    Label *not_int32) {
+#if 0 // with gcc compatiable truncation.
+  Label done, cont, cont_1, cont_2;
+  ld(dest, FieldMemOperand(source, HeapNumber::kValueOffset));
+
+  And(scratch2, scratch1, Operand(0x7FFL << 52));
+  const uint64_t non_smi_exponent = 1053L << 52;
+  Branch(not_int32, gt, scratch2, Operand(non_smi_exponent));
+
+  bfextu(scratch1, dest, 52, 62);
+  moveli(scratch4, 1054);
+  cmples(scratch3, scratch1, scratch4);
+  srl(scratch2, dest, 63);
+  bfextu(scratch4, dest, 0, 51);
+  Branch(&cont, ne, scratch3, Operand(zero));
+
+  moveli(dest, 2047);
+  cmpne(scratch4, scratch4, zero);
+  cmpeq(scratch1, scratch1, dest);
+  and_(scratch1, scratch1, scratch4);
+  Branch(&cont_2, eq, scratch1, Operand(zero));
+
+  bind(&cont_1);
+  moveli(dest, 32767);
+  shl16insli(dest, dest, -1);
+  Branch(&done);
+
+  bind(&cont);
+  moveli(dest, 1022);
+  cmples(scratch3, scratch1, dest);
+  move(dest, zero);
+  Branch(&done, ne, scratch3, Operand(zero));
+  moveli(dest, 1);
+  moveli(scratch3, 1075);
+  sll(dest, dest, 52);
+  subx(scratch1, scratch3, scratch1);
+  or_(dest, scratch4, dest);
+  srl(dest, dest, scratch1);
+  addxi(dest, dest, 0);
+  subx(scratch1, zero, dest);
+  movn(dest, scratch1, scratch2);
+  srlx(scratch1, dest, 31);
+  cmpeq(scratch1, scratch1, scratch2);
+  Branch(&done, ne, scratch1, Operand(zero));
+
+  bind(&cont_2);
+  moveli(dest, -1);
+  sll(dest, dest, 31);
+  Branch(&cont_1, eq, scratch2, Operand(zero));
+
+  bind(&done);
+
+#else
   Label right_exponent, done;
   // Get exponent word (ENDIAN issues).
-  ld(scratch, FieldMemOperand(source, HeapNumber::kValueOffset));
+  ld(scratch1, FieldMemOperand(source, HeapNumber::kValueOffset));
   // Get exponent alone in scratch2.
-  And(scratch2, scratch, Operand(0x7FFL << 52));
+  And(scratch2, scratch1, Operand(0x7FFL << 52));
   // Load dest with zero.  We use this either for the final shift or
   // for the answer.
   move(dest, zero);
@@ -4171,33 +4225,34 @@ void MacroAssembler::ConvertToInt32(Register source,
 
   // On entry, dest has final downshift, scratch has original sign/exp/mant.
   // Save sign bit in top bit of dest.
-  And(scratch2, scratch, Operand(0x8000000000000000L));
+  And(scratch2, scratch1, Operand(0x8000000000000000L));
   Or(dest, dest, Operand(scratch2));
   // Put back the implicit 1, just above mantissa field.
-  Or(scratch, scratch, Operand(1L << 52));
+  Or(scratch1, scratch1, Operand(1L << 52));
 
   // Shift up the mantissa bits to take up the space the exponent used to
   // take. We just orred in the implicit bit so that took care of one and
   // we want to leave the sign bit 0 so we subtract 2 bits from the shift
   // distance. But we want to clear the sign-bit so shift one more bit
   // left, then shift right one bit.
-  const int shift_distance = HeapNumber::kNonMantissaBitsInTopWord - 2;
-  sll(scratch, scratch, shift_distance + 1);
-  srl(scratch, scratch, 32 + 1);
+  //const int shift_distance = HeapNumber::kNonMantissaBitsInTopWord - 2;
+  //sll(scratch1, scratch1, shift_distance + 1);
+  //srl(scratch1, scratch1, 32 + 1);
+  bfextu(scratch1, scratch1, 22, 52);
 
-  //srl(scratch, scratch, 32);
 
   // Move down according to the exponent.
-  srl(scratch, scratch, dest);
+  srl(scratch1, scratch1, dest);
   // Prepare the negative version of our integer.
-  sub(scratch2, zero, scratch);
+  sub(scratch2, zero, scratch1);
   // Trick to check sign bit (msb) held in dest, count leading zero.
   // 0 indicates negative, save negative version with conditional move.
   clz(dest, dest);
-  movz(scratch, scratch2, dest);
-  move(dest, scratch);
+  movz(scratch1, scratch2, dest);
+  move(dest, scratch1);
 
   bind(&done);
+#endif
 }
 
 void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,

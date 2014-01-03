@@ -473,6 +473,10 @@ LUnallocated* LChunkBuilder::ToUnallocated(Register reg) {
                                   Register::ToAllocationIndex(reg));
 }
 
+LUnallocated* LChunkBuilder::ToUnallocated(DoubleRegister reg) {
+  return new(zone()) LUnallocated(LUnallocated::FIXED_DOUBLE_REGISTER,
+                                  DoubleRegister::ToAllocationIndex(reg));
+}
 
 LOperand* LChunkBuilder::UseFixed(HValue* value, Register fixed_register) {
   return Use(value, ToUnallocated(fixed_register));
@@ -1829,19 +1833,16 @@ LInstruction* LChunkBuilder::DoChange(HChange* instr) {
         value = UseRegisterAtStart(instr->value());
         res = DefineAsRegister(new(zone()) LSmiUntag(value, false));
       } else {
-        UNREACHABLE();
-#if 0
         value = UseRegister(instr->value());
         LOperand* temp1 = TempRegister();
         LOperand* temp2 = instr->CanTruncateToInt32() ? TempRegister()
                                                       : NULL;
-        LOperand* temp3 = FixedTemp(f22);
+        LOperand* temp3 = TempRegister();
         res = DefineSameAsFirst(new(zone()) LTaggedToI(value,
                                                        temp1,
                                                        temp2,
                                                        temp3));
         res = AssignEnvironment(res);
-#endif
       }
       return res;
     }

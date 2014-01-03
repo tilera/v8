@@ -590,6 +590,7 @@ void FloatingPointHelper::ConvertNumberToInt32(MacroAssembler* masm,
                                                Register scratch1,
                                                Register scratch2,
                                                Register scratch3,
+                                               Register scratch4,
                                                Label* not_number) {
   __ AssertRootValue(heap_number_map,
                      Heap::kHeapNumberMapRootIndex,
@@ -604,7 +605,10 @@ void FloatingPointHelper::ConvertNumberToInt32(MacroAssembler* masm,
                     dst,
                     scratch1,
                     scratch2,
-                    &not_in_int32_range);
+                    scratch3,
+                    scratch4,
+		    &not_in_int32_range);
+
   __ jmp(&done);
 
   __ bind(&not_in_int32_range);
@@ -613,7 +617,6 @@ void FloatingPointHelper::ConvertNumberToInt32(MacroAssembler* masm,
   __ EmitOutOfInt32RangeTruncate(dst,
                                  scratch1,
                                  scratch2);
-
   __ bind(&done);
 }
 
@@ -1888,7 +1891,7 @@ void UnaryOpStub::GenerateHeapNumberCodeBitNot( MacroAssembler* masm,
 
   EmitCheckForHeapNumber(masm, a0, a1, t2, slow);
   // Convert the heap number in a0 to an untagged integer in a1.
-  __ ConvertToInt32(a0, a1, a2, a3, slow);
+  __ ConvertToInt32(a0, a1, a2, a3, r4, r5, slow);
 
   __ Neg(a1, a1);
 
@@ -2191,6 +2194,7 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
                                                   scratch1,
                                                   scratch2,
                                                   scratch3,
+                                                  scratch4,
                                                   not_numbers);
         FloatingPointHelper::ConvertNumberToInt32(masm,
                                                   right,
@@ -2199,6 +2203,7 @@ void BinaryOpStub_GenerateFPOperation(MacroAssembler* masm,
                                                   scratch1,
                                                   scratch2,
                                                   scratch3,
+                                                  scratch4,
                                                   not_numbers);
       }
       Label result_not_a_smi;

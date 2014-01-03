@@ -1365,6 +1365,16 @@ ExternalReference ExternalReference::address_of_regexp_stack_memory_size(
 #endif  // V8_INTERPRETED_REGEXP
 
 
+static double cvt_f2d(float x)
+{
+	return (double)x;
+}
+
+static float cvt_d2f(double x)
+{
+	return (float)x;
+}
+
 static double add_two_doubles(double x, double y) {
   return x + y;
 }
@@ -1409,6 +1419,19 @@ static double math_log_double(double x) {
   return log(x);
 }
 
+ExternalReference ExternalReference::cvt_float_to_double(
+    Isolate* isolate) {
+  return ExternalReference(Redirect(isolate,
+                                    FUNCTION_ADDR(cvt_f2d),
+                                    BUILTIN_SFP_CALL));
+}
+
+ExternalReference ExternalReference::cvt_double_to_float(
+    Isolate* isolate) {
+  return ExternalReference(Redirect(isolate,
+                                    FUNCTION_ADDR(cvt_d2f),
+                                    BUILTIN_SFP_CALL));
+}
 
 ExternalReference ExternalReference::math_sin_double_function(
     Isolate* isolate) {
