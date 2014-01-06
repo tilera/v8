@@ -417,7 +417,7 @@ Register LCodeGen::ToRegister(int index) const {
 }
 
 
-DoubleRegister LCodeGen::ToDoubleRegister(int index) const {  UNREACHABLE();
+DoubleRegister LCodeGen::ToDoubleRegister(int index) const {
   return DoubleRegister::FromAllocationIndex(index);
 }
 
@@ -460,7 +460,8 @@ Register LCodeGen::EmitLoadRegister(LOperand* op, Register scratch) {
 
 
 DoubleRegister LCodeGen::ToDoubleRegister(LOperand* op) const {
-  return DoubleRegister::FromAllocationIndex(0);
+  ASSERT(op->IsDoubleRegister());
+  return ToDoubleRegister(op->index());
 }
 
 Handle<Object> LCodeGen::ToHandle(LConstantOperand* op) const {
@@ -2392,13 +2393,15 @@ void LCodeGen::DoLoadKeyedExternalArray(LLoadKeyed* instr) {
     if (key_is_constant) {
       __ Addu(scratch0(), external_pointer, constant_key << element_size_shift);
     } else {
-      __ srl(scratch0(), key, 32);
-      __ sll(scratch0(), scratch0(), 3);
+      __ sra(scratch0(), key, 32);
+      __ sll(scratch0(), scratch0(), element_size_shift);
       __ Addu(scratch0(), scratch0(), external_pointer);
     }
     if (elements_kind == EXTERNAL_FLOAT_ELEMENTS) {
       __ ld4s(Register::from_code(result.code()), MemOperand(scratch0(), additional_offset));
-      RegList saved_regs = a0.bit() | a1.bit() | a2.bit() | a3.bit() | r4.bit() | lr.bit();
+      //RegList saved_regs = a0.bit() | a1.bit() | a2.bit() | a3.bit() | r4.bit() | lr.bit();
+      RegList saved_regs = a0.bit() | a1.bit() | a2.bit() | a3.bit() | r4.bit() | r5.bit() | r6.bit()
+	                   | r27.bit() | r28.bit() | r29.bit() | lr.bit();
       __ MultiPush(saved_regs);
       __ PrepareCallCFunction(1, scratch1());
       __ move(a0, Register::from_code(result.code()));
@@ -2517,7 +2520,6 @@ void LCodeGen::DoLoadKeyedFixedArray(LLoadKeyed* instr) {
     }
     offset = FixedArray::OffsetOfElementAt(instr->additional_index());
   }
-  __ info(__LINE__);
   __ ld(result, FieldMemOperand(store_base, offset));
 
   // Check for the hole value.
@@ -2985,7 +2987,8 @@ void LCodeGen::DoStoreKeyedExternalArray(LStoreKeyed* instr) {
 
     if (elements_kind == EXTERNAL_FLOAT_ELEMENTS) {
       //__ cvt_s_d(double_scratch0(), value);
-      RegList saved_regs = a0.bit() | a1.bit() | a2.bit() | a3.bit() | r4.bit() | lr.bit();
+      RegList saved_regs = a0.bit() | a1.bit() | a2.bit() | a3.bit() | r4.bit() | r5.bit() | r6.bit()
+	                   | r27.bit() | r28.bit() | r29.bit() | lr.bit();
       __ MultiPush(saved_regs);
       __ PrepareCallCFunction(1, scratch1());
       __ move(a0, Register::from_code(value.code()));
@@ -3356,9 +3359,8 @@ void LCodeGen::EmitNumberUntagD(Register input_reg,
   __ bind(&load_smi);
   // scratch: untagged value of input_reg
   FloatingPointHelper::ConvertIntToDouble(masm(),
-					  Register::from_code(result_reg.code()), 
-					  FloatingPointHelper::kCoreRegisters, at, scratch, scratch1());
-  __ move(Register::from_code(result_reg.code()), at);
+					  scratch, FloatingPointHelper::kCoreRegisters,
+					  Register::from_code(result_reg.code()), at, scratch1());
   __ bind(&done);
 }
 
