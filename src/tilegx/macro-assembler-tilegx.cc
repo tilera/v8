@@ -4134,14 +4134,11 @@ void MacroAssembler::ConvertToInt32(Register source,
                                     Register scratch2,
                                     Register scratch3,
                                     Register scratch4,
-				    Label *not_int32) {
-#if 0 // with gcc compatiable truncation.
+				    Label *not_int32,
+				    bool gcc_mode) {
+  if (gcc_mode) {
   Label done, cont, cont_1, cont_2;
   ld(dest, FieldMemOperand(source, HeapNumber::kValueOffset));
-
-  And(scratch2, scratch1, Operand(0x7FFL << 52));
-  const uint64_t non_smi_exponent = 1053L << 52;
-  Branch(not_int32, gt, scratch2, Operand(non_smi_exponent));
 
   bfextu(scratch1, dest, 52, 62);
   moveli(scratch4, 1054);
@@ -4185,8 +4182,8 @@ void MacroAssembler::ConvertToInt32(Register source,
   Branch(&cont_1, eq, scratch2, Operand(zero));
 
   bind(&done);
+  } else {
 
-#else
   Label right_exponent, done;
   // Get exponent word (ENDIAN issues).
   ld(scratch1, FieldMemOperand(source, HeapNumber::kValueOffset));
@@ -4252,7 +4249,7 @@ void MacroAssembler::ConvertToInt32(Register source,
   move(dest, scratch1);
 
   bind(&done);
-#endif
+  }
 }
 
 void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,

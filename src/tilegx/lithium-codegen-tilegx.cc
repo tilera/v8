@@ -2186,12 +2186,9 @@ void LCodeGen::DoLoadNamedField(LLoadNamedField* instr) {
   int offset = access.offset();
   Register object = ToRegister(instr->object());
   if (instr->hydrogen()->representation().IsDouble()) {
-    UNREACHABLE();
-#if 0
     DoubleRegister result = ToDoubleRegister(instr->result());
-    __ ldc1(result, FieldMemOperand(object, offset));
+    __ ld(Register::from_code(result.code()), FieldMemOperand(object, offset));
     return;
-#endif
   }
 
   Register result = ToRegister(instr->result());
@@ -2481,7 +2478,7 @@ void LCodeGen::DoLoadKeyedFixedDoubleArray(LLoadKeyed* instr) {
       ((constant_key + instr->additional_index()) << element_size_shift);
   if (!key_is_constant) {
     __ sra(scratch, key, 32);
-    __ sll(scratch, key, element_size_shift);
+    __ sll(scratch, scratch, element_size_shift);
     __ Addu(elements, elements, scratch);
   }
   __ Addu(elements, elements, Operand(base_offset));
@@ -3044,7 +3041,6 @@ void LCodeGen::DoStoreKeyedFixedDoubleArray(LStoreKeyed* instr) {
   Register scratch = scratch0();
   bool key_is_constant = instr->key()->IsConstantOperand();
   int constant_key = 0;
-  Label not_nan;
 
   // Calculate the effective address of the slot in the array to store the
   // double value.
@@ -3068,25 +3064,21 @@ void LCodeGen::DoStoreKeyedFixedDoubleArray(LStoreKeyed* instr) {
             Operand(FixedDoubleArray::kHeaderSize - kHeapObjectTag));
   }
 
+#if 0 // FIXME, we should handle NaN case although it rarely happened.
+  Label not_nan;
   if (instr->NeedsCanonicalization()) {
     Label is_nan;
-// FIXME:
-#if 0 
     // Check for NaN. All NaNs must be canonicalized.
     __ BranchF(NULL, &is_nan, eq, value, value);
-#endif
     __ Branch(&not_nan);
 
     // Only load canonical NaN if the comparison above set the overflow.
     __ bind(&is_nan);
-#if 0
     __ Move(value, FixedDoubleArray::canonical_not_the_hole_nan_as_double());
-#else
-    UNREACHABLE();
-#endif
   }
-
   __ bind(&not_nan);
+#endif
+
   __ st(value, MemOperand(scratch, instr->additional_index() <<
       element_size_shift));
 }
@@ -3234,11 +3226,10 @@ void LCodeGen::DoNumberTagD(LNumberTagD* instr) {
     convert_hole = load->UsesMustHandleHole();
   }
 
-  Label no_special_nan_handling;
   Label done;
+#if 0 // FIXME, we will complete softfloat NaN check later, as it's rarely happend.
+  Label no_special_nan_handling;
   if (convert_hole) {
-	  UNREACHABLE();
-#if 0
     DoubleRegister input_reg = ToDoubleRegister(instr->value());
     __ BranchF(&no_special_nan_handling, NULL, eq, input_reg, input_reg);
     __ Move(reg, scratch0(), input_reg);
@@ -3249,10 +3240,10 @@ void LCodeGen::DoNumberTagD(LNumberTagD* instr) {
     __ bind(&canonicalize);
     __ Move(input_reg,
             FixedDoubleArray::canonical_not_the_hole_nan_as_double());
-#endif
   }
-
   __ bind(&no_special_nan_handling);
+#endif
+
   DeferredNumberTagD* deferred = new(zone()) DeferredNumberTagD(this, instr);
   if (FLAG_inline_new) {
     __ LoadRoot(scratch, Heap::kHeapNumberMapRootIndex);
@@ -3364,88 +3355,107 @@ void LCodeGen::EmitNumberUntagD(Register input_reg,
   __ bind(&done);
 }
 
-void LCodeGen::DoDeferredTaggedToI(LTaggedToI* instr) { UNREACHABLE(); }
-#if 0
+void LCodeGen::DoDeferredTaggedToI(LTaggedToI* instr) {
   Register input_reg = ToRegister(instr->value());
-  Register scratch1 = scratch0();
-  Register scratch2 = ToRegister(instr->temp());
-  DoubleRegister double_scratch = double_scratch0();
-  DoubleRegister double_scratch2 = ToDoubleRegister(instr->temp3());
+  Register scratch1_ = scratch0();
+  Register scratch2 = scratch1();
+  Register scratch3 = ToRegister(instr->temp());
+  Register scratch4 = ToRegister(instr->temp2());
+  Register scratch5 = ToRegister(instr->temp3());
 
-  ASSERT(!scratch1.is(input_reg) && !scratch1.is(scratch2));
-  ASSERT(!scratch2.is(input_reg) && !scratch2.is(scratch1));
+  ASSERT(!scratch1_.is(input_reg) && !scratch1_.is(scratch2));
+  ASSERT(!scratch2.is(input_reg) && !scratch2.is(scratch1_));
 
   Label done;
 
   // The input is a tagged HeapObject.
   // Heap number map check.
-  __ ld(scratch1, FieldMemOperand(input_reg, HeapObject::kMapOffset));
+  __ ld(scratch1_, FieldMemOperand(input_reg, HeapObject::kMapOffset));
   __ LoadRoot(at, Heap::kHeapNumberMapRootIndex);
-  // This 'at' value and scratch1 map value are used for tests in both clauses
+  // This 'at' value and scratch1_ map value are used for tests in both clauses
   // of the if.
 
   if (instr->truncating()) {
     Register scratch3 = ToRegister(instr->temp2());
-    FPURegister single_scratch = double_scratch.low();
     ASSERT(!scratch3.is(input_reg) &&
-           !scratch3.is(scratch1) &&
+           !scratch3.is(scratch1_) &&
            !scratch3.is(scratch2));
     // Performs a truncating conversion of a floating point number as used by
     // the JS bitwise operations.
     Label heap_number;
-    __ Branch(&heap_number, eq, scratch1, Operand(at));  // HeapNumber map?
+    Label not_in_int32_range;
+    __ Branch(&heap_number, eq, scratch1_, Operand(at));  // HeapNumber map?
     // Check for undefined. Undefined is converted to zero for truncating
     // conversions.
     __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
     DeoptimizeIf(ne, instr->environment(), input_reg, Operand(at));
     ASSERT(ToRegister(instr->result()).is(input_reg));
-    __ mov(input_reg, zero_reg);
+    __ move(input_reg, zero);
     __ Branch(&done);
 
     __ bind(&heap_number);
-    __ ldc1(double_scratch2,
-            FieldMemOperand(input_reg, HeapNumber::kValueOffset));
+#if 0
+    __ ld(double_scratch2,
+          FieldMemOperand(input_reg, HeapNumber::kValueOffset));
     __ EmitECMATruncate(input_reg,
                         double_scratch2,
                         single_scratch,
-                        scratch1,
+                        scratch1_,
                         scratch2,
                         scratch3);
+#else
+  __ move(scratch5, input_reg);
+  __ ConvertToInt32(input_reg,
+                    input_reg,
+                    scratch1_,
+                    scratch2,
+                    scratch3,
+                    scratch4,
+		    &not_in_int32_range);
+
+  __ jmp(&done);
+
+  __ bind(&not_in_int32_range);
+  __ ld(scratch1_, FieldMemOperand(scratch5, HeapNumber::kValueOffset));
+
+  __ EmitOutOfInt32RangeTruncate(input_reg,
+                                 scratch1_,
+                                 scratch2);
+#endif
   } else {
     // Deoptimize if we don't have a heap number.
-    DeoptimizeIf(ne, instr->environment(), scratch1, Operand(at));
+    DeoptimizeIf(ne, instr->environment(), scratch1_, Operand(at));
 
     // Load the double value.
-    __ ldc1(double_scratch,
-            FieldMemOperand(input_reg, HeapNumber::kValueOffset));
-
+    __ ld(at2,
+          FieldMemOperand(input_reg, HeapNumber::kValueOffset));
+#if 0
     Register except_flag = scratch2;
     __ EmitFPUTruncate(kRoundToZero,
                        input_reg,
                        double_scratch,
-                       scratch1,
+                       scratch1_,
                        double_scratch2,
                        except_flag,
                        kCheckForInexactConversion);
 
     // Deopt if the operation did not succeed.
-    DeoptimizeIf(ne, instr->environment(), except_flag, Operand(zero_reg));
+    DeoptimizeIf(ne, instr->environment(), except_flag, Operand(zero));
+#else
+    __ ConvertToInt32(input_reg, input_reg, scratch1_, scratch2, scratch3, scratch4, NULL, true);
+#endif
 
     if (instr->hydrogen()->CheckFlag(HValue::kBailoutOnMinusZero)) {
-      __ Branch(&done, ne, input_reg, Operand(zero_reg));
+      __ Branch(&done, ne, input_reg, Operand(zero));
 
-      __ mfc1(scratch1, double_scratch.high());
-      __ And(scratch1, scratch1, Operand(HeapNumber::kSignMask));
-      DeoptimizeIf(ne, instr->environment(), scratch1, Operand(zero_reg));
+      __ And(at2, at2, Operand(0x8000000000000000L));
+      DeoptimizeIf(ne, instr->environment(), at2, Operand(zero));
     }
   }
   __ bind(&done);
 }
-#endif
 
-
-void LCodeGen::DoTaggedToI(LTaggedToI* instr) { UNREACHABLE(); }
-#if 0
+void LCodeGen::DoTaggedToI(LTaggedToI* instr) {
   class DeferredTaggedToI: public LDeferredCode {
    public:
     DeferredTaggedToI(LCodeGen* codegen, LTaggedToI* instr)
@@ -3471,7 +3481,6 @@ void LCodeGen::DoTaggedToI(LTaggedToI* instr) { UNREACHABLE(); }
   __ SmiUntag(input_reg);
   __ bind(deferred->exit());
 }
-#endif
 
 
 void LCodeGen::DoNumberUntagD(LNumberUntagD* instr) {

@@ -1835,8 +1835,7 @@ LInstruction* LChunkBuilder::DoChange(HChange* instr) {
       } else {
         value = UseRegister(instr->value());
         LOperand* temp1 = TempRegister();
-        LOperand* temp2 = instr->CanTruncateToInt32() ? TempRegister()
-                                                      : NULL;
+        LOperand* temp2 = TempRegister();
         LOperand* temp3 = TempRegister();
         res = DefineSameAsFirst(new(zone()) LTaggedToI(value,
                                                        temp1,
