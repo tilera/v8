@@ -3955,13 +3955,52 @@ void MacroAssembler::CheckEnumCache(Register null_value, Label* call_runtime) {
 }
 
 
-void MacroAssembler::ClampUint8(Register output_reg, Register input_reg) { UNREACHABLE(); }
-
+void MacroAssembler::ClampUint8(Register output_reg, Register input_reg) {
+  ASSERT(!output_reg.is(input_reg));
+  Label done;
+  li(output_reg, Operand(255));
+  // Normal branch: nop in delay slot.
+  Branch(&done, gt, input_reg, Operand(output_reg));
+  // Use delay slot in this branch.
+  move(output_reg, zero);  // In delay slot.
+  Branch(&done, lt, input_reg, Operand(zero));
+  move(output_reg, input_reg);  // Value is in range 0..255.
+  bind(&done);
+}
 
 void MacroAssembler::ClampDoubleToUint8(Register result_reg,
-                                        DoubleRegister input_reg,
-                                        DoubleRegister temp_double_reg) { UNREACHABLE(); }
+                                        Register input_reg,
+                                        Register temp_reg,
+                                        Register temp_reg1,
+                                        Register temp_reg2) {
+  Label above_zero;
+  Label done;
+  Label in_bounds;
 
+  fdouble_add_flags(temp_reg, input_reg, zero);
+  bfextu(temp_reg, temp_reg, 28, 28); // gt
+  Branch(&above_zero, ne, temp_reg, Operand(zero));
+
+  // Double value is less than zero, NaN or Inf, return 0.
+  move(result_reg, zero);
+  Branch(&done);
+
+  // Double value is >= 255, return 255.
+  bind(&above_zero);
+  li(temp_reg, Operand(0x406fe00000000000L));
+  fdouble_add_flags(temp_reg, input_reg, temp_reg);
+  bfextu(temp_reg, temp_reg, 27, 27); // le
+  Branch(&in_bounds, ne, temp_reg, Operand(zero));
+  li(result_reg, Operand(255));
+  Branch(&done);
+
+  // In 0-255 range, round and truncate.
+  bind(&in_bounds);
+  //cvt_w_d(temp_reg, input_reg);
+  move(result_reg, input_reg);
+  ConvertToInt32(zero, result_reg, input_reg, temp_reg, temp_reg1, temp_reg2, NULL, true, false);
+  bind(&done);
+}
 
 void MacroAssembler::TestJSArrayForAllocationSiteInfo(
     Register receiver_reg,
@@ -4135,10 +4174,12 @@ void MacroAssembler::ConvertToInt32(Register source,
                                     Register scratch3,
                                     Register scratch4,
 				    Label *not_int32,
-				    bool gcc_mode) {
+				    bool gcc_mode,
+				    bool need_load) {
   if (gcc_mode) {
   Label done, cont, cont_1, cont_2;
-  ld(dest, FieldMemOperand(source, HeapNumber::kValueOffset));
+  if (need_load)
+    ld(dest, FieldMemOperand(source, HeapNumber::kValueOffset));
 
   bfextu(scratch1, dest, 52, 62);
   moveli(scratch4, 1054);

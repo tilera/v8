@@ -1948,26 +1948,16 @@ LInstruction* LChunkBuilder::DoClampToUint8(HClampToUint8* instr) {
   Representation input_rep = value->representation();
   LOperand* reg = UseRegister(value);
   if (input_rep.IsDouble()) {
-#if 0
     // Revisit this decision, here and 8 lines below.
-    return DefineAsRegister(new(zone()) LClampDToUint8(reg, FixedTemp(f22)));
-#else
-    UNREACHABLE();
-    return NULL;
-#endif
+    return DefineAsRegister(new(zone()) LClampDToUint8(reg, TempRegister(), TempRegister(), TempRegister()));
   } else if (input_rep.IsInteger32()) {
     return DefineAsRegister(new(zone()) LClampIToUint8(reg));
   } else {
-#if 0
     ASSERT(input_rep.IsTagged());
     // Register allocator doesn't (yet) support allocation of double
     // temps. Reserve f22 explicitly.
-    LClampTToUint8* result = new(zone()) LClampTToUint8(reg, FixedTemp(f22));
+    LClampTToUint8* result = new(zone()) LClampTToUint8(reg, TempRegister(), TempRegister(), TempRegister());
     return AssignEnvironment(DefineAsRegister(result));
-#else
-    UNREACHABLE();
-    return NULL;
-#endif
   }
 }
 

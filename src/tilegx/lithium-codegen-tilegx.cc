@@ -3615,15 +3615,59 @@ void LCodeGen::DoCheckMaps(LCheckMaps* instr) {
   __ bind(&success);
 }
 
-void LCodeGen::DoClampDToUint8(LClampDToUint8* instr) {  UNREACHABLE();  }
+void LCodeGen::DoClampDToUint8(LClampDToUint8* instr) {
+  DoubleRegister value_reg = ToDoubleRegister(instr->unclamped());
+  Register result_reg = ToRegister(instr->result());
+  Register temp_reg = ToRegister(instr->temp());
+  Register temp_reg1 = ToRegister(instr->temp1());
+  Register temp_reg2 = ToRegister(instr->temp2());
+  __ ClampDoubleToUint8(result_reg, Register::from_code(value_reg.code()), temp_reg, temp_reg1 ,temp_reg2);
+}
 
 
 
-void LCodeGen::DoClampIToUint8(LClampIToUint8* instr) {  UNREACHABLE();  }
+void LCodeGen::DoClampIToUint8(LClampIToUint8* instr) {
+  Register unclamped_reg = ToRegister(instr->unclamped());
+  Register result_reg = ToRegister(instr->result());
+  __ ClampUint8(result_reg, unclamped_reg);
+}
 
 
-void LCodeGen::DoClampTToUint8(LClampTToUint8* instr) {  UNREACHABLE();  }
+void LCodeGen::DoClampTToUint8(LClampTToUint8* instr) {
+  Register scratch = scratch0();
+  Register input_reg = ToRegister(instr->unclamped());
+  Register result_reg = ToRegister(instr->result());
+  Register temp_reg = ToRegister(instr->temp());
+  Register temp_reg1 = ToRegister(instr->temp1());
+  Register temp_reg2 = ToRegister(instr->temp2());
+  Label is_smi, done, heap_number;
 
+  // Both smi and heap number cases are handled.
+  __ UntagAndJumpIfSmi(scratch, input_reg, &is_smi);
+
+  // Check for heap number
+  __ ld(scratch, FieldMemOperand(input_reg, HeapObject::kMapOffset));
+  __ Branch(&heap_number, eq, scratch, Operand(factory()->heap_number_map()));
+
+  // Check for undefined. Undefined is converted to zero for clamping
+  // conversions.
+  DeoptimizeIf(ne, instr->environment(), input_reg,
+               Operand(factory()->undefined_value()));
+  __ move(result_reg, zero);
+  __ jmp(&done);
+
+  // Heap number
+  __ bind(&heap_number);
+  __ ld(scratch1(), FieldMemOperand(input_reg,
+                                             HeapNumber::kValueOffset));
+  __ ClampDoubleToUint8(result_reg, scratch1(), temp_reg, temp_reg1, temp_reg2);
+  __ jmp(&done);
+
+  __ bind(&is_smi);
+  __ ClampUint8(result_reg, scratch);
+
+  __ bind(&done);
+}
 
 void LCodeGen::DoCheckPrototypeMaps(LCheckPrototypeMaps* instr) {
   Register prototype_reg = ToRegister(instr->temp());

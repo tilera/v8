@@ -170,8 +170,10 @@ class MacroAssembler: public Assembler {
   void ClampUint8(Register output_reg, Register input_reg);
 
   void ClampDoubleToUint8(Register result_reg,
-                          DoubleRegister input_reg,
-                          DoubleRegister temp_double_reg);
+                          Register input_reg,
+                          Register temp_reg,
+                          Register temp_reg1,
+                          Register temp_reg2);
 
   void LoadInstanceDescriptors(Register map, Register descriptors);
   void EnumLength(Register dst, Register map);
@@ -623,7 +625,8 @@ class MacroAssembler: public Assembler {
                       Register scratch3,
                       Register scratch4,
 		      Label *not_int32,
-		      bool gcc_mode = false);
+		      bool gcc_mode = false,
+		      bool need_load = true);
 
   // Helper for EmitECMATruncate.
   // This will truncate a floating-point value outside of the singed 32bit

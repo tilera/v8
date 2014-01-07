@@ -609,6 +609,13 @@ void Assembler::fdouble_pack2(const Register& rd, const Register& rsa, const Reg
   emit(instr, line);
 }
 
+void Assembler::fdouble_add_flags(const Register& rd, const Register& rsa, const Register& rsb, int line) {
+  ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
+  Instr instr = FDOUBLE_ADD_FLAGS_X0 | DEST_X0(rd.code())
+	               | SRCA_X0(rsa.code()) | SRCB_X0(rsb.code());
+  emit(instr, line);
+}
+
 void Assembler::add(const Register& rd, const Register& rsa, const Register& rsb, int line) {
   ASSERT(rd.is_valid() && rsa.is_valid() && rsb.is_valid());
   Instr instr = ADD_X1 | DEST_X1(rd.code())

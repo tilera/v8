@@ -101,6 +101,10 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
       create_RRROpcodeExtension_X0(FDOUBLE_PACK2_RRR_0_OPCODE_X0) | FNOP_X1
 
+#define FDOUBLE_ADD_FLAGS_X0                                                   \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+      create_RRROpcodeExtension_X0(FDOUBLE_ADD_FLAGS_RRR_0_OPCODE_X0) | FNOP_X1
+
 #define ADD_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(ADD_RRR_0_OPCODE_X1) | FNOP_X0
@@ -1078,6 +1082,8 @@ class Assembler : public AssemblerBase {
   void fsingle_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void fdouble_add_flags(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+
 
   void break_(uint32_t code, bool break_as_stop = false);
   void stop(const char* msg, uint32_t code = kMaxStopCode);
