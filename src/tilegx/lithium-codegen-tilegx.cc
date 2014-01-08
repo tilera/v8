@@ -1338,8 +1338,13 @@ void LCodeGen::DoConstantI(LConstantI* instr) {
   __ li(ToRegister(instr->result()), Operand(instr->value()));
 }
 
-void LCodeGen::DoConstantD(LConstantD* instr) {  UNREACHABLE();  }
-
+void LCodeGen::DoConstantD(LConstantD* instr) {
+  ASSERT(instr->result()->IsDoubleRegister());
+  Register result = Register::from_code(ToDoubleRegister(instr->result()).code());
+  double v = instr->value();
+  int64_t vi = *(int64_t *)&v;
+  __ li(result, Operand(vi));
+}
 
 void LCodeGen::DoConstantT(LConstantT* instr) {
   Handle<Object> value = instr->value();
@@ -3188,19 +3193,89 @@ void LCodeGen::DoInteger32ToSmi(LInteger32ToSmi* instr) {
   }
 }
 
-void LCodeGen::DoUint32ToDouble(LUint32ToDouble* instr) {  UNREACHABLE();  }
+void LCodeGen::DoUint32ToDouble(LUint32ToDouble* instr) {
+  LOperand* input = instr->value();
+  LOperand* output = instr->result();
 
+  FloatingPointHelper::ConvertUIntToDouble(masm(), ToRegister(input),
+    FloatingPointHelper::kCoreRegisters, Register::from_code(ToDoubleRegister(output).code()), scratch0());
+}
 
-void LCodeGen::DoNumberTagI(LNumberTagI* instr) {  UNREACHABLE();  }
+void LCodeGen::DoNumberTagI(LNumberTagI* instr) {
+  Register src = ToRegister(instr->value());
+  Register dst = ToRegister(instr->result());
+  //Register overflow = scratch0();
 
+  //DeferredNumberTagI* deferred = new(zone()) DeferredNumberTagI(this, instr);
+  //__ SmiTagCheckOverflow(dst, src, overflow);
+  //__ BranchOnOverflow(deferred->entry(), overflow);
+  //__ bind(deferred->exit());
+  __ SmiTag(dst, src);
+}
 
-void LCodeGen::DoNumberTagU(LNumberTagU* instr) {  UNREACHABLE();  }
+void LCodeGen::DoNumberTagU(LNumberTagU* instr) {
+  class DeferredNumberTagU: public LDeferredCode {
+   public:
+    DeferredNumberTagU(LCodeGen* codegen, LNumberTagU* instr)
+        : LDeferredCode(codegen), instr_(instr) { }
+    virtual void Generate() {
+      codegen()->DoDeferredNumberTagU(instr_, instr_->value());
+    }
+    virtual LInstruction* instr() { return instr_; }
+   private:
+    LNumberTagU* instr_;
+  };
 
+  LOperand* input = instr->value();
+  ASSERT(input->IsRegister() && input->Equals(instr->result()));
+  Register reg = ToRegister(input);
 
-void LCodeGen::DoDeferredNumberTagI(LInstruction* instr,
-                                    LOperand* value,
-                                    IntegerSignedness signedness) {  UNREACHABLE();  }
+  DeferredNumberTagU* deferred = new(zone()) DeferredNumberTagU(this, instr);
+  __ Branch(deferred->entry(), hi, reg, Operand(Smi::kMaxValue));
+  __ SmiTag(reg, reg);
+  __ bind(deferred->exit());
+}
 
+void LCodeGen::DoDeferredNumberTagU(LInstruction* instr,
+                                    LOperand* value) {
+  Label slow;
+  Register src = ToRegister(value);
+  Register dst = ToRegister(instr->result());
+  Register scratch0_ = scratch0();
+  Register scratch1_ = scratch1();
+
+  // Preserve the value of all registers.
+  PushSafepointRegistersScope scope(this, Safepoint::kWithRegisters);
+
+  Label done;
+  FloatingPointHelper::ConvertUIntToDouble(masm(), src,
+					   FloatingPointHelper::kCoreRegisters, scratch0_, scratch1_);
+
+  if (FLAG_inline_new) {
+    __ LoadRoot(scratch0(), Heap::kHeapNumberMapRootIndex);
+    __ AllocateHeapNumber(t1, a3, t0, scratch0(), &slow, DONT_TAG_RESULT);
+    __ Move(dst, t1);
+    __ Branch(&done);
+  }
+
+  // Slow case: Call the runtime system to do the number allocation.
+  __ bind(&slow);
+
+  // TODO(3095996): Put a valid pointer value in the stack slot where the result
+  // register is stored, as this register is in the pointer map, but contains an
+  // integer value.
+  __ StoreToSafepointRegisterSlot(zero, dst);
+  CallRuntimeFromDeferred(Runtime::kAllocateHeapNumber, 0, instr);
+  __ Move(dst, v0);
+  __ Subu(dst, dst, kHeapObjectTag);
+
+  // Done. Put the value in dbl_scratch into the value of the allocated heap
+  // number.
+  __ bind(&done);
+  __ st(scratch0_, MemOperand(dst, HeapNumber::kValueOffset));
+  __ Addu(dst, dst, kHeapObjectTag);
+  __ StoreToSafepointRegisterSlot(dst, dst);
+}
 
 void LCodeGen::DoNumberTagD(LNumberTagD* instr) {
   class DeferredNumberTagD: public LDeferredCode {

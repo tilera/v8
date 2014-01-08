@@ -136,10 +136,8 @@ class LCodeGen BASE_EMBEDDED {
 
   void DoDeferredNumberTagD(LNumberTagD* instr);
 
-  enum IntegerSignedness { SIGNED_INT32, UNSIGNED_INT32 };
-  void DoDeferredNumberTagI(LInstruction* instr,
-                            LOperand* value,
-                            IntegerSignedness signedness);
+  void DoDeferredNumberTagU(LInstruction* instr,
+                            LOperand* value);
 
   void DoDeferredTaggedToI(LTaggedToI* instr);
   void DoDeferredMathAbsTaggedHeapNumber(LMathAbs* instr);

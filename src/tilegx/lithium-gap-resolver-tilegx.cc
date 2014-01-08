@@ -288,17 +288,14 @@ void LGapResolver::EmitMove(int index) {
     }
 
   } else if (source->IsDoubleRegister()) {
-    UNREACHABLE();
-#if 0
     DoubleRegister source_register = cgen_->ToDoubleRegister(source);
     if (destination->IsDoubleRegister()) {
-      __ mov_d(cgen_->ToDoubleRegister(destination), source_register);
+      __ move(Register::from_code(cgen_->ToDoubleRegister(destination).code()), Register::from_code(source_register.code()));
     } else {
       ASSERT(destination->IsDoubleStackSlot());
       MemOperand destination_operand = cgen_->ToMemOperand(destination);
-      __ sdc1(source_register, destination_operand);
+      __ st(Register::from_code(source_register.code()), destination_operand);
     }
-#endif
   } else if (source->IsDoubleStackSlot()) {
     UNREACHABLE();
 #if 0

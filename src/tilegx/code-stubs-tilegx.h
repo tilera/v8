@@ -378,6 +378,12 @@ class FloatingPointHelper : public AllStatic {
                                  Register scratch2,
                                  Register scratch3);
 
+  static void ConvertUIntToDouble(MacroAssembler* masm,
+                                  Register int_scratch,
+                                  Destination destination,
+                                  Register dst,
+                                  Register scratch);
+
   // Load the number from object into double_dst in the double format.
   // Control will jump to not_int32 if the value cannot be exactly represented
   // by a 32-bit integer.

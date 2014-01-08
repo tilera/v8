@@ -648,6 +648,25 @@ void FloatingPointHelper::ConvertIntToDouble(MacroAssembler* masm,
   __ fdouble_pack2(dst, scratch2, zero);
 }
 
+void FloatingPointHelper::ConvertUIntToDouble(MacroAssembler* masm,
+                                             Register input,
+                                             Destination destination,
+                                             Register dst,
+                                             Register scratch) {
+  ASSERT(!input.is(scratch));
+  ASSERT(!input.is(dst));
+
+  // {
+  __ moveli(dst, 539);
+  __ moveli(scratch, 0);
+  // }
+  // {
+  __ bfins(scratch, input, 4, 35);
+  __ sll(input, dst, 8);
+  // }
+  __ fdouble_pack1(dst, scratch, input);
+  __ fdouble_pack2(dst, scratch, zero);
+}
 
 void FloatingPointHelper::LoadNumberAsInt32Double(MacroAssembler* masm,
                                                   Register object,
