@@ -3252,8 +3252,8 @@ void LCodeGen::DoDeferredNumberTagU(LInstruction* instr,
 					   FloatingPointHelper::kCoreRegisters, scratch0_, scratch1_);
 
   if (FLAG_inline_new) {
-    __ LoadRoot(scratch0(), Heap::kHeapNumberMapRootIndex);
-    __ AllocateHeapNumber(t1, a3, t0, scratch0(), &slow, DONT_TAG_RESULT);
+    __ LoadRoot(scratch1_, Heap::kHeapNumberMapRootIndex);
+    __ AllocateHeapNumber(t1, a3, t0, scratch1_, &slow, DONT_TAG_RESULT);
     __ Move(dst, t1);
     __ Branch(&done);
   }
