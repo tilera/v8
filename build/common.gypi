@@ -29,6 +29,7 @@
 
 {
   'variables': {
+    'use_system_v8%': 0,
     'msvs_use_common_release': 0,
     'gcc_version%': 'unknown',
     'CXX%': '${CXX:-$(which g++)}',  # Used to assemble a shell command.
@@ -103,7 +104,7 @@
 
     # Interpreted regexp engine exists as platform-independent alternative
     # based where the regular expression is compiled to a bytecode.
-    'v8_interpreted_regexp%': 0,
+    'v8_interpreted_regexp%': 1,
   },
   'target_defaults': {
     'conditions': [

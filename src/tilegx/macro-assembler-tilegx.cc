@@ -212,6 +212,8 @@ void MacroAssembler::RecordWrite(Register object,
                                  SaveFPRegsMode fp_mode,
                                  RememberedSetAction remembered_set_action,
                                  SmiCheck smi_check) {
+  Move(object, object);
+
   ASSERT(!AreAliased(object, address, value, t8));
   ASSERT(!AreAliased(object, address, value, t9));
   // The compiled code assumes that record write doesn't change the
@@ -268,16 +270,17 @@ void MacroAssembler::RememberedSetHelper(Register object,  // For debug tests.
                                          Register scratch,
                                          SaveFPRegsMode fp_mode,
                                          RememberedSetFinalAction and_then) {
-  Label done;
+  Label done, retry;
   if (emit_debug_code()) {
     Label ok;
     JumpIfNotInNewSpace(object, scratch, &ok);
     stop("Remembered set pointer is in new space");
     bind(&ok);
   }
+
   // Load store buffer top.
   ExternalReference store_buffer =
-      ExternalReference::store_buffer_top(isolate());
+    ExternalReference::store_buffer_top(isolate());
   li(t8, Operand(store_buffer));
   ld(scratch, MemOperand(t8));
   // Store pointer to buffer and increment buffer top.
@@ -294,6 +297,7 @@ void MacroAssembler::RememberedSetHelper(Register object,  // For debug tests.
     ASSERT(and_then == kReturnAtEnd);
     Ret(eq, t8, Operand(zero));
   }
+
   push(lr);
   StoreBufferOverflowStub store_buffer_overflow =
       StoreBufferOverflowStub(fp_mode);
@@ -396,7 +400,7 @@ void MacroAssembler::GetNumberHash(Register reg0, Register scratch) {
   // hash = ~hash + (hash << 15);
   nor(scratch, reg0, zero);
   sllx(at, reg0, 15);
-  add(reg0, scratch, at);
+  addx(reg0, scratch, at);
 
   // hash = hash ^ (hash >> 12);
   srlx(at, reg0, 12);
@@ -404,7 +408,7 @@ void MacroAssembler::GetNumberHash(Register reg0, Register scratch) {
 
   // hash = hash + (hash << 2);
   sllx(at, reg0, 2);
-  add(reg0, reg0, at);
+  addx(reg0, reg0, at);
 
   // hash = hash ^ (hash >> 4);
   srlx(at, reg0, 4);
@@ -413,8 +417,8 @@ void MacroAssembler::GetNumberHash(Register reg0, Register scratch) {
   // hash = hash * 2057;
   sllx(scratch, reg0, 11);
   sllx(at, reg0, 3);
-  add(reg0, reg0, at);
-  add(reg0, reg0, scratch);
+  addx(reg0, reg0, at);
+  addx(reg0, reg0, scratch);
 
   // hash = hash ^ (hash >> 16);
   srlx(at, reg0, 16);
@@ -2058,34 +2062,8 @@ void MacroAssembler::AllocateAsciiConsString(Register result,
                                              Register scratch1,
                                              Register scratch2,
                                              Label* gc_required) {
-  Label allocate_new_space, install_map;
-  AllocationFlags flags = TAG_OBJECT;
-
-  ExternalReference high_promotion_mode = ExternalReference::
-      new_space_high_promotion_mode_active_address(isolate());
-  li(scratch1, Operand(high_promotion_mode));
-  ld(scratch1, MemOperand(scratch1, 0));
-  Branch(&allocate_new_space, eq, scratch1, Operand(zero));
-
-  Allocate(ConsString::kSize,
-           result,
-           scratch1,
-           scratch2,
-           gc_required,
-           static_cast<AllocationFlags>(flags | PRETENURE_OLD_POINTER_SPACE));
-
-  jmp(&install_map);
-
-  bind(&allocate_new_space);
-  Allocate(ConsString::kSize,
-           result,
-           scratch1,
-           scratch2,
-           gc_required,
-           flags);
-
-  bind(&install_map);
-
+  Allocate(ConsString::kSize, result, scratch1, scratch2, gc_required,
+           TAG_OBJECT);
   InitializeNewString(result,
                       length,
                       Heap::kConsAsciiStringMapRootIndex,
@@ -2465,32 +2443,53 @@ void MacroAssembler::CompareMapAndBranch(Register obj,
                                          Handle<Map> map,
                                          Label* early_success,
                                          Condition cond,
-                                         Label* branch_to) {
+                                         Label* branch_to,
+					 CompareMapMode mode) {
   ld(scratch, FieldMemOperand(obj, HeapObject::kMapOffset));
-  CompareMapAndBranch(scratch, map, early_success, cond, branch_to);
+  CompareMapAndBranch(scratch, map, early_success, cond, branch_to, mode);
 }
 
 
 void MacroAssembler::CompareMapAndBranch(Register obj_map,
-                                         Handle<Map> map,
-                                         Label* early_success,
-                                         Condition cond,
-                                         Label* branch_to) {
-  Branch(branch_to, cond, obj_map, Operand(map));
+					 Handle<Map> map,
+					 Label* early_success,
+					 Condition cond,
+					 Label* branch_to,
+					 CompareMapMode mode) {
+  Operand right = Operand(map);
+  if (mode == ALLOW_ELEMENT_TRANSITION_MAPS) {
+    ElementsKind kind = map->elements_kind();
+    if (IsFastElementsKind(kind)) {
+      bool packed = IsFastPackedElementsKind(kind);
+      Map* current_map = *map;
+      while (CanTransitionToMoreGeneralFastElementsKind(kind, packed)) {
+	kind = GetNextMoreGeneralFastElementsKind(kind, packed);
+	current_map = current_map->LookupElementsTransitionMap(kind);
+	if (!current_map) break;
+	Branch(early_success, eq, obj_map, right);
+	right = Operand(Handle<Map>(current_map));
+      }
+    }
+  }
+
+  Branch(branch_to, cond, obj_map, right);
 }
 
+
 void MacroAssembler::CheckMap(Register obj,
-                              Register scratch,
-                              Handle<Map> map,
-                              Label* fail,
-                              SmiCheckType smi_check_type) {
+			      Register scratch,
+			      Handle<Map> map,
+			      Label* fail,
+			      SmiCheckType smi_check_type,
+			      CompareMapMode mode) {
   if (smi_check_type == DO_SMI_CHECK) {
     JumpIfSmi(obj, fail);
   }
   Label success;
-  CompareMapAndBranch(obj, scratch, map, &success, ne, fail);
+  CompareMapAndBranch(obj, scratch, map, &success, ne, fail, mode);
   bind(&success);
 }
+
 
 void MacroAssembler::DispatchMap(Register obj,
                                  Register scratch,
@@ -2811,9 +2810,7 @@ static unsigned long AddressOffset(ExternalReference ref0, ExternalReference ref
 }
 
 void MacroAssembler::CallApiFunctionAndReturn(ExternalReference function,
-                                              int stack_space,
-                                              bool returns_handle,
-                                              int return_value_offset_from_fp) {
+                                              int stack_space) {
   ExternalReference next_address =
       ExternalReference::handle_scope_next_address(isolate());
   const int kNextOffset = 0;
@@ -2846,9 +2843,7 @@ void MacroAssembler::CallApiFunctionAndReturn(ExternalReference function,
   // (4 bytes) will be placed. This is also built into the Simulator.
   // Set up the pointer to the returned value (a0). It was allocated in
   // EnterExitFrame.
-  if (returns_handle) {
-    addli(a0, fp, ExitFrameConstants::kStackSpaceOffset);
-  }
+  addiu(a0, fp, ExitFrameConstants::kStackSpaceOffset);
 #endif
 
   // Native call returns to the DirectCEntry stub which redirects to the
@@ -2870,18 +2865,15 @@ void MacroAssembler::CallApiFunctionAndReturn(ExternalReference function,
   Label delete_allocated_handles;
   Label leave_exit_frame;
   Label return_value_loaded;
+  Label skip;
 
-  if (returns_handle) {
-    Label load_return_value;
-
-    Branch(&load_return_value, eq, v0, Operand(zero));
-    // Dereference returned value.
-    ld(v0, MemOperand(v0));
-    Branch(&return_value_loaded);
-    bind(&load_return_value);
-  }
-  // Load value from ReturnValue.
-  ld(v0, MemOperand(fp, return_value_offset_from_fp*kPointerSize));
+  // If result is non-zero, dereference to get the result value
+  // otherwise set it to undefined.
+  Branch(&skip, eq, v0, Operand(zero));
+  ld(v0, MemOperand(v0)); 
+  Branch(&return_value_loaded);
+  bind(&skip);
+  LoadRoot(v0, Heap::kUndefinedValueRootIndex);
   bind(&return_value_loaded);
 
   // No more valid handles (the result handle was the last one). Restore
@@ -2984,7 +2976,7 @@ void MacroAssembler::CallRuntime(Runtime::FunctionId fid, int num_arguments) {
 
 void MacroAssembler::CallExternalReference(const ExternalReference& ext,
                                            int num_arguments) {
-  PrepareCEntryArgs(num_arguments);
+   PrepareCEntryArgs(num_arguments);
   PrepareCEntryFunction(ext);
 
   CEntryStub stub(1);
@@ -3733,22 +3725,24 @@ void MacroAssembler::HasColor(Register object,
                               int second_bit) {
   ASSERT(!AreAliased(object, bitmap_scratch, mask_scratch, t8));
   ASSERT(!AreAliased(object, bitmap_scratch, mask_scratch, t9));
+  ASSERT(Bitmap::kBytesPerCell == 4);  // in ld4u, etc.
 
   GetMarkBits(object, bitmap_scratch, mask_scratch);
 
   Label other_color, word_boundary;
-  ld(t9, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
+  ld4u(t9, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
   And(t8, t9, Operand(mask_scratch));
   Branch(&other_color, first_bit == 1 ? eq : ne, t8, Operand(zero));
   // Shift left 1 by adding.
-  Addu(mask_scratch, mask_scratch, Operand(mask_scratch));
+  addx(mask_scratch, mask_scratch, mask_scratch);
   Branch(&word_boundary, eq, mask_scratch, Operand(zero));
   And(t8, t9, Operand(mask_scratch));
   Branch(has_color, second_bit == 1 ? ne : eq, t8, Operand(zero));
   jmp(&other_color);
 
   bind(&word_boundary);
-  ld(t9, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize + kPointerSize));
+  ld4u(t9, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize + 
+		      Bitmap::kBytesPerCell));
   And(t9, t9, Operand(1));
   Branch(has_color, second_bit == 1 ? ne : eq, t9, Operand(zero));
   bind(&other_color);
@@ -3779,15 +3773,17 @@ void MacroAssembler::JumpIfDataObject(Register value,
 void MacroAssembler::GetMarkBits(Register addr_reg,
                                  Register bitmap_reg,
                                  Register mask_reg) {
-  ASSERT(!AreAliased(addr_reg, bitmap_reg, mask_reg, no_reg));
-  And(bitmap_reg, addr_reg, Operand(~Page::kPageAlignmentMask));
-  bfextu(mask_reg, addr_reg, kPointerSizeLog2, kPointerSizeLog2 + Bitmap::kBitsPerCellLog2 - 1);
-  const int kLowBits = kPointerSizeLog2 + Bitmap::kBitsPerCellLog2;
-  bfextu(t8, addr_reg, kLowBits, kLowBits + kPageSizeBits - kLowBits - 1);
-  sll(t8, t8, kPointerSizeLog2);
-  Addu(bitmap_reg, bitmap_reg, t8);
-  li(t8, Operand(1));
+  ASSERT(!AreAliased(addr_reg, bitmap_reg, mask_reg, t8));
+  ASSERT(!AreAliased(addr_reg, bitmap_reg, mask_reg, t7));
+  bfextu(bitmap_reg, addr_reg, 0, kPageSizeBits - 1);
+  Subu(t7, addr_reg, bitmap_reg);
+  srl(bitmap_reg, bitmap_reg, kPointerSizeLog2);
+  andi(mask_reg, bitmap_reg, Bitmap::kBitIndexMask);
+  addi(t8, zero, 1);
   sll(mask_reg, t8, mask_reg);
+  srl(bitmap_reg, bitmap_reg, Bitmap::kBitsPerCellLog2);
+  sll(bitmap_reg, bitmap_reg, Bitmap::kBytesPerCellLog2);
+  Addu(bitmap_reg, t7, bitmap_reg);
 }
 
 
@@ -3798,6 +3794,7 @@ void MacroAssembler::EnsureNotWhite(
     Register load_scratch,
     Label* value_is_white_and_not_data) {
   ASSERT(!AreAliased(value, bitmap_scratch, mask_scratch, t8));
+  ASSERT(!AreAliased(value, bitmap_scratch, mask_scratch, load_scratch));
   GetMarkBits(value, bitmap_scratch, mask_scratch);
 
   // If the value is black or grey we don't need to do anything.
@@ -3810,7 +3807,8 @@ void MacroAssembler::EnsureNotWhite(
 
   // Since both black and grey have a 1 in the first position and white does
   // not have a 1 there we only need to check one bit.
-  ld(load_scratch, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
+  ASSERT(Bitmap::kBytesPerCell == 4);
+  ld4u(load_scratch, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
   And(t8, mask_scratch, load_scratch);
   Branch(&done, ne, t8, Operand(zero));
 
@@ -3890,9 +3888,9 @@ void MacroAssembler::EnsureNotWhite(
   bind(&is_data_object);
   // Value is a data object, and it is white.  Mark it black.  Since we know
   // that the object is white we can make it black by flipping one bit.
-  ld(t8, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
+  ld4u(t8, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
   Or(t8, t8, Operand(mask_scratch));
-  st(t8, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
+  st4(t8, MemOperand(bitmap_scratch, MemoryChunk::kHeaderSize));
 
   And(bitmap_scratch, bitmap_scratch, Operand(~Page::kPageAlignmentMask));
   ld4u(t8, MemOperand(bitmap_scratch, MemoryChunk::kLiveBytesOffset));
@@ -3972,10 +3970,12 @@ void MacroAssembler::ClampDoubleToUint8(Register result_reg,
                                         Register input_reg,
                                         Register temp_reg,
                                         Register temp_reg1,
-                                        Register temp_reg2) {
+                                        Register temp_reg2,
+					Register temp_reg3) {
   Label above_zero;
   Label done;
   Label in_bounds;
+  Label do_round;
 
   fdouble_add_flags(temp_reg, input_reg, zero);
   bfextu(temp_reg, temp_reg, 28, 28); // gt
@@ -3996,9 +3996,31 @@ void MacroAssembler::ClampDoubleToUint8(Register result_reg,
 
   // In 0-255 range, round and truncate.
   bind(&in_bounds);
+  move(temp_reg3, input_reg);
   //cvt_w_d(temp_reg, input_reg);
-  move(result_reg, input_reg);
+  li(temp_reg, Operand(0x3fe0000000000000L)); // Add 0.5 
+  bind(&do_round);
+  fdouble_unpack_min(temp_reg1, input_reg, temp_reg);
+  fdouble_unpack_max(temp_reg2, input_reg, temp_reg);
+  fdouble_add_flags (temp_reg, input_reg, temp_reg);
+  fdouble_addsub    (temp_reg2, temp_reg1, temp_reg);
+  fdouble_pack1     (result_reg, temp_reg2, temp_reg);
+  fdouble_pack2     (result_reg, temp_reg2, zero);
+
   ConvertToInt32(zero, result_reg, input_reg, temp_reg, temp_reg1, temp_reg2, NULL, true, false);
+
+  // If the Uint8 is odd, we have to re-try, adding .499 rather than .5.
+  // This is to implement unbiased ("Round half to even") rounding.  No
+  // doubt there's a more efficient way to do this, but this has almost
+  // no impact on v8 benchmarks.
+  andi(temp_reg, result_reg, 1);
+  Branch(&done, eq, temp_reg, Operand(zero));
+  Branch(&done, eq, temp_reg3, Operand(zero));
+  li(temp_reg, Operand(0x3fdfef9db22d0e56L)); // Add 0.499
+  move(input_reg, temp_reg3);
+  move(temp_reg3, zero);
+  Branch(&do_round);
+
   bind(&done);
 }
 
@@ -4324,13 +4346,21 @@ void MacroAssembler::EmitOutOfInt32RangeTruncate(Register result,
   // Save the sign.
   Register sign = result;
   result = no_reg;
-  And(sign, input, Operand(0x8000000000000000L));
+  bfextu(sign, input, 63, 63);
 
   // Set the implicit 1 before the mantissa part in input.
   Or(input, input, Operand(1L << 52));
 
   sll(scratch, input, scratch);
+
   srl(input, scratch, 32);
+  bfexts(scratch, input, 31, 31);
+  Label no_negate;
+  Branch(&no_negate, eq, scratch, Operand(zero));
+  subx(input, zero, input);
+  bfextu(input, input, 0, 31);
+  xori(sign, sign, 1);
+  bind(&no_negate);
 
   // Restore sign if necessary.
   move(scratch, sign);

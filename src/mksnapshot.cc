@@ -32,10 +32,6 @@
 #endif
 #include <signal.h>
 
-// TODO(dcarney): remove
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_ARROW
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_IMPLICIT
-
 #include "v8.h"
 
 #include "bootstrapper.h"
@@ -328,18 +324,13 @@ int main(int argc, char** argv) {
   }
 #endif
   i::Serializer::Enable();
-  Isolate* isolate = Isolate::GetCurrent();
-  Persistent<Context> context;
-  {
-    HandleScope handle_scope(isolate);
-    context.Reset(isolate, Context::New(isolate));
-  }
-
+  Persistent<Context> context = v8::Context::New();
   if (context.IsEmpty()) {
     fprintf(stderr,
             "\nException thrown while compiling natives - see above.\n\n");
     exit(1);
   }
+  Isolate* isolate = context->GetIsolate();
   if (i::FLAG_extra_code != NULL) {
     context->Enter();
     // Capture 100 frames if anything happens.

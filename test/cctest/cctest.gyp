@@ -53,7 +53,6 @@
         'test-bignum.cc',
         'test-bignum-dtoa.cc',
         'test-circular-queue.cc',
-        'test-compare-nil-ic-stub.cc',
         'test-compiler.cc',
         'test-conversions.cc',
         'test-cpu-profiler.cc',

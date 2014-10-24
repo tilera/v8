@@ -61,27 +61,24 @@ void LOperand::PrintTo(StringStream* stream) {
     case UNALLOCATED:
       unalloc = LUnallocated::cast(this);
       stream->Add("v%d", unalloc->virtual_register());
-      if (unalloc->basic_policy() == LUnallocated::FIXED_SLOT) {
-        stream->Add("(=%dS)", unalloc->fixed_slot_index());
-        break;
-      }
-      switch (unalloc->extended_policy()) {
+      switch (unalloc->policy()) {
         case LUnallocated::NONE:
           break;
         case LUnallocated::FIXED_REGISTER: {
-          int reg_index = unalloc->fixed_register_index();
           const char* register_name =
-              Register::AllocationIndexToString(reg_index);
+              Register::AllocationIndexToString(unalloc->fixed_index());
           stream->Add("(=%s)", register_name);
           break;
         }
         case LUnallocated::FIXED_DOUBLE_REGISTER: {
-          int reg_index = unalloc->fixed_register_index();
           const char* double_register_name =
-              DoubleRegister::AllocationIndexToString(reg_index);
+              DoubleRegister::AllocationIndexToString(unalloc->fixed_index());
           stream->Add("(=%s)", double_register_name);
           break;
         }
+        case LUnallocated::FIXED_SLOT:
+          stream->Add("(=%dS)", unalloc->fixed_index());
+          break;
         case LUnallocated::MUST_HAVE_REGISTER:
           stream->Add("(R)");
           break;
@@ -458,7 +455,10 @@ Handle<Code> LChunk::Codegen() {
   MarkEmptyBlocks();
 
   if (generator.GenerateCode()) {
-    CodeGenerator::MakeCodePrologue(info(), "optimized");
+    if (FLAG_trace_codegen) {
+      PrintF("Crankshaft Compiler - ");
+    }
+    CodeGenerator::MakeCodePrologue(info());
     Code::Flags flags = info()->flags();
     Handle<Code> code =
         CodeGenerator::MakeCodeEpilogue(&assembler, flags, info());

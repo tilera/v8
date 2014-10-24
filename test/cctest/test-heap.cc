@@ -392,10 +392,10 @@ TEST(GlobalHandles) {
 static bool WeakPointerCleared = false;
 
 static void TestWeakGlobalHandleCallback(v8::Isolate* isolate,
-                                         v8::Persistent<v8::Value>* handle,
+                                         v8::Persistent<v8::Value> handle,
                                          void* id) {
   if (1234 == reinterpret_cast<intptr_t>(id)) WeakPointerCleared = true;
-  handle->Dispose(isolate);
+  handle.Dispose(isolate);
 }
 
 
@@ -423,8 +423,8 @@ TEST(WeakGlobalHandlesScavenge) {
 
   global_handles->MakeWeak(h2.location(),
                            reinterpret_cast<void*>(1234),
-                           &TestWeakGlobalHandleCallback,
-                           NULL);
+                           NULL,
+                           &TestWeakGlobalHandleCallback);
 
   // Scavenge treats weak pointers as normal roots.
   heap->PerformScavenge();
@@ -470,8 +470,8 @@ TEST(WeakGlobalHandlesMark) {
 
   global_handles->MakeWeak(h2.location(),
                            reinterpret_cast<void*>(1234),
-                           &TestWeakGlobalHandleCallback,
-                           NULL);
+                           NULL,
+                           &TestWeakGlobalHandleCallback);
   CHECK(!GlobalHandles::IsNearDeath(h1.location()));
   CHECK(!GlobalHandles::IsNearDeath(h2.location()));
 
@@ -507,8 +507,8 @@ TEST(DeleteWeakGlobalHandle) {
 
   global_handles->MakeWeak(h.location(),
                            reinterpret_cast<void*>(1234),
-                           &TestWeakGlobalHandleCallback,
-                           NULL);
+                           NULL,
+                           &TestWeakGlobalHandleCallback);
 
   // Scanvenge does not recognize weak reference.
   heap->PerformScavenge();
@@ -1293,13 +1293,13 @@ TEST(TestInternalWeakLists) {
   Isolate* isolate = Isolate::Current();
   Heap* heap = isolate->heap();
   HandleScope scope(isolate);
-  v8::Handle<v8::Context> ctx[kNumTestContexts];
+  v8::Persistent<v8::Context> ctx[kNumTestContexts];
 
   CHECK_EQ(0, CountNativeContexts());
 
   // Create a number of global contests which gets linked together.
   for (int i = 0; i < kNumTestContexts; i++) {
-    ctx[i] = v8::Context::New(v8::Isolate::GetCurrent());
+    ctx[i] = v8::Context::New();
 
     bool opt = (FLAG_always_opt && i::V8::UseCrankshaft());
 
@@ -1366,9 +1366,7 @@ TEST(TestInternalWeakLists) {
 
   // Dispose the native contexts one by one.
   for (int i = 0; i < kNumTestContexts; i++) {
-    // TODO(dcarney): is there a better way to do this?
-    i::Object** unsafe = reinterpret_cast<i::Object**>(*ctx[i]);
-    *unsafe = HEAP->undefined_value();
+    ctx[i].Dispose(ctx[i]->GetIsolate());
     ctx[i].Clear();
 
     // Scavenge treats these references as strong.
@@ -1432,14 +1430,14 @@ TEST(TestInternalWeakListsTraverseWithGC) {
   static const int kNumTestContexts = 10;
 
   HandleScope scope(isolate);
-  v8::Handle<v8::Context> ctx[kNumTestContexts];
+  v8::Persistent<v8::Context> ctx[kNumTestContexts];
 
   CHECK_EQ(0, CountNativeContexts());
 
   // Create an number of contexts and check the length of the weak list both
   // with and without GCs while iterating the list.
   for (int i = 0; i < kNumTestContexts; i++) {
-    ctx[i] = v8::Context::New(v8::Isolate::GetCurrent());
+    ctx[i] = v8::Context::New();
     CHECK_EQ(i + 1, CountNativeContexts());
     CHECK_EQ(i + 1, CountNativeContextsWithGC(isolate, i / 2 + 1));
   }
@@ -1657,25 +1655,17 @@ static int NumberOfGlobalObjects() {
 // optimized code.
 TEST(LeakNativeContextViaMap) {
   i::FLAG_allow_natives_syntax = true;
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope outer_scope(isolate);
-  v8::Persistent<v8::Context> ctx1p;
-  v8::Persistent<v8::Context> ctx2p;
-  {
-    v8::HandleScope scope(isolate);
-    ctx1p.Reset(isolate, v8::Context::New(isolate));
-    ctx2p.Reset(isolate, v8::Context::New(isolate));
-    v8::Local<v8::Context>::New(isolate, ctx1p)->Enter();
-  }
+  v8::HandleScope outer_scope(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> ctx1 = v8::Context::New();
+  v8::Persistent<v8::Context> ctx2 = v8::Context::New();
+  ctx1->Enter();
 
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(4, NumberOfGlobalObjects());
 
   {
-    v8::HandleScope inner_scope(isolate);
+    v8::HandleScope inner_scope(v8::Isolate::GetCurrent());
     CompileRun("var v = {x: 42}");
-    v8::Local<v8::Context> ctx1 = v8::Local<v8::Context>::New(isolate, ctx1p);
-    v8::Local<v8::Context> ctx2 = v8::Local<v8::Context>::New(isolate, ctx2p);
     v8::Local<v8::Value> v = ctx1->Global()->Get(v8_str("v"));
     ctx2->Enter();
     ctx2->Global()->Set(v8_str("o"), v);
@@ -1687,13 +1677,13 @@ TEST(LeakNativeContextViaMap) {
     CHECK_EQ(42, res->Int32Value());
     ctx2->Global()->Set(v8_str("o"), v8::Int32::New(0));
     ctx2->Exit();
-    v8::Local<v8::Context>::New(isolate, ctx1)->Exit();
-    ctx1p.Dispose(isolate);
+    ctx1->Exit();
+    ctx1.Dispose(ctx1->GetIsolate());
     v8::V8::ContextDisposedNotification();
   }
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(2, NumberOfGlobalObjects());
-  ctx2p.Dispose(isolate);
+  ctx2.Dispose(ctx2->GetIsolate());
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(0, NumberOfGlobalObjects());
 }
@@ -1703,25 +1693,17 @@ TEST(LeakNativeContextViaMap) {
 // optimized code.
 TEST(LeakNativeContextViaFunction) {
   i::FLAG_allow_natives_syntax = true;
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope outer_scope(isolate);
-  v8::Persistent<v8::Context> ctx1p;
-  v8::Persistent<v8::Context> ctx2p;
-  {
-    v8::HandleScope scope(isolate);
-    ctx1p.Reset(isolate, v8::Context::New(isolate));
-    ctx2p.Reset(isolate, v8::Context::New(isolate));
-    v8::Local<v8::Context>::New(isolate, ctx1p)->Enter();
-  }
+  v8::HandleScope outer_scope(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> ctx1 = v8::Context::New();
+  v8::Persistent<v8::Context> ctx2 = v8::Context::New();
+  ctx1->Enter();
 
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(4, NumberOfGlobalObjects());
 
   {
-    v8::HandleScope inner_scope(isolate);
+    v8::HandleScope inner_scope(v8::Isolate::GetCurrent());
     CompileRun("var v = function() { return 42; }");
-    v8::Local<v8::Context> ctx1 = v8::Local<v8::Context>::New(isolate, ctx1p);
-    v8::Local<v8::Context> ctx2 = v8::Local<v8::Context>::New(isolate, ctx2p);
     v8::Local<v8::Value> v = ctx1->Global()->Get(v8_str("v"));
     ctx2->Enter();
     ctx2->Global()->Set(v8_str("o"), v);
@@ -1734,12 +1716,12 @@ TEST(LeakNativeContextViaFunction) {
     ctx2->Global()->Set(v8_str("o"), v8::Int32::New(0));
     ctx2->Exit();
     ctx1->Exit();
-    ctx1p.Dispose(ctx1->GetIsolate());
+    ctx1.Dispose(ctx1->GetIsolate());
     v8::V8::ContextDisposedNotification();
   }
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(2, NumberOfGlobalObjects());
-  ctx2p.Dispose(isolate);
+  ctx2.Dispose(ctx2->GetIsolate());
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(0, NumberOfGlobalObjects());
 }
@@ -1747,25 +1729,17 @@ TEST(LeakNativeContextViaFunction) {
 
 TEST(LeakNativeContextViaMapKeyed) {
   i::FLAG_allow_natives_syntax = true;
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope outer_scope(isolate);
-  v8::Persistent<v8::Context> ctx1p;
-  v8::Persistent<v8::Context> ctx2p;
-  {
-    v8::HandleScope scope(isolate);
-    ctx1p.Reset(isolate, v8::Context::New(isolate));
-    ctx2p.Reset(isolate, v8::Context::New(isolate));
-    v8::Local<v8::Context>::New(isolate, ctx1p)->Enter();
-  }
+  v8::HandleScope outer_scope(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> ctx1 = v8::Context::New();
+  v8::Persistent<v8::Context> ctx2 = v8::Context::New();
+  ctx1->Enter();
 
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(4, NumberOfGlobalObjects());
 
   {
-    v8::HandleScope inner_scope(isolate);
+    v8::HandleScope inner_scope(v8::Isolate::GetCurrent());
     CompileRun("var v = [42, 43]");
-    v8::Local<v8::Context> ctx1 = v8::Local<v8::Context>::New(isolate, ctx1p);
-    v8::Local<v8::Context> ctx2 = v8::Local<v8::Context>::New(isolate, ctx2p);
     v8::Local<v8::Value> v = ctx1->Global()->Get(v8_str("v"));
     ctx2->Enter();
     ctx2->Global()->Set(v8_str("o"), v);
@@ -1778,12 +1752,12 @@ TEST(LeakNativeContextViaMapKeyed) {
     ctx2->Global()->Set(v8_str("o"), v8::Int32::New(0));
     ctx2->Exit();
     ctx1->Exit();
-    ctx1p.Dispose(ctx1->GetIsolate());
+    ctx1.Dispose(ctx1->GetIsolate());
     v8::V8::ContextDisposedNotification();
   }
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(2, NumberOfGlobalObjects());
-  ctx2p.Dispose(isolate);
+  ctx2.Dispose(ctx2->GetIsolate());
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(0, NumberOfGlobalObjects());
 }
@@ -1791,25 +1765,17 @@ TEST(LeakNativeContextViaMapKeyed) {
 
 TEST(LeakNativeContextViaMapProto) {
   i::FLAG_allow_natives_syntax = true;
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope outer_scope(isolate);
-  v8::Persistent<v8::Context> ctx1p;
-  v8::Persistent<v8::Context> ctx2p;
-  {
-    v8::HandleScope scope(isolate);
-    ctx1p.Reset(isolate, v8::Context::New(isolate));
-    ctx2p.Reset(isolate, v8::Context::New(isolate));
-    v8::Local<v8::Context>::New(isolate, ctx1p)->Enter();
-  }
+  v8::HandleScope outer_scope(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> ctx1 = v8::Context::New();
+  v8::Persistent<v8::Context> ctx2 = v8::Context::New();
+  ctx1->Enter();
 
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(4, NumberOfGlobalObjects());
 
   {
-    v8::HandleScope inner_scope(isolate);
+    v8::HandleScope inner_scope(v8::Isolate::GetCurrent());
     CompileRun("var v = { y: 42}");
-    v8::Local<v8::Context> ctx1 = v8::Local<v8::Context>::New(isolate, ctx1p);
-    v8::Local<v8::Context> ctx2 = v8::Local<v8::Context>::New(isolate, ctx2p);
     v8::Local<v8::Value> v = ctx1->Global()->Get(v8_str("v"));
     ctx2->Enter();
     ctx2->Global()->Set(v8_str("o"), v);
@@ -1826,12 +1792,12 @@ TEST(LeakNativeContextViaMapProto) {
     ctx2->Global()->Set(v8_str("o"), v8::Int32::New(0));
     ctx2->Exit();
     ctx1->Exit();
-    ctx1p.Dispose(isolate);
+    ctx1.Dispose(ctx1->GetIsolate());
     v8::V8::ContextDisposedNotification();
   }
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(2, NumberOfGlobalObjects());
-  ctx2p.Dispose(isolate);
+  ctx2.Dispose(ctx2->GetIsolate());
   HEAP->CollectAllAvailableGarbage();
   CHECK_EQ(0, NumberOfGlobalObjects());
 }
@@ -2082,11 +2048,11 @@ TEST(OptimizedAllocationAlwaysInNewSpace) {
 // Test pretenuring of array literals allocated with HAllocate.
 TEST(OptimizedPretenuringArrayLiterals) {
   i::FLAG_allow_natives_syntax = true;
+  i::FLAG_pretenure_literals = true;
   CcTest::InitializeVM();
   if (!i::V8::UseCrankshaft() || i::FLAG_always_opt) return;
   if (i::FLAG_gc_global || i::FLAG_stress_compaction) return;
   v8::HandleScope scope(CcTest::isolate());
-  HEAP->SetNewSpaceHighPromotionModeActive(true);
 
   AlwaysAllocateScope always_allocate;
   v8::Local<v8::Value> res = CompileRun(
@@ -2108,7 +2074,7 @@ TEST(OptimizedPretenuringArrayLiterals) {
 
 TEST(OptimizedPretenuringSimpleArrayLiterals) {
   i::FLAG_allow_natives_syntax = true;
-  i::FLAG_pretenuring = false;
+  i::FLAG_pretenure_literals = false;
   CcTest::InitializeVM();
   if (!i::V8::UseCrankshaft() || i::FLAG_always_opt) return;
   if (i::FLAG_gc_global || i::FLAG_stress_compaction) return;
@@ -2271,7 +2237,7 @@ TEST(Regress2143b) {
              "%DeoptimizeFunction(f);");
 
   // This bug only triggers with aggressive IC clearing.
-  HEAP->AgeInlineCaches();
+  //   HEAP->AgeInlineCaches();
 
   // Explicitly request GC to perform final marking step and sweeping.
   HEAP->CollectAllGarbage(Heap::kNoGCFlags);
@@ -2407,7 +2373,7 @@ TEST(Regress2211) {
     // Check size.
     DescriptorArray* descriptors = internal_obj->map()->instance_descriptors();
     ObjectHashTable* hashtable = ObjectHashTable::cast(
-        internal_obj->RawFastPropertyAt(descriptors->GetFieldIndex(0)));
+        internal_obj->FastPropertyAt(descriptors->GetFieldIndex(0)));
     // HashTable header (5) and 4 initial entries (8).
     CHECK_LE(hashtable->SizeFor(hashtable->length()), 13 * kPointerSize);
   }
@@ -2809,13 +2775,6 @@ TEST(Regress169209) {
   i::FLAG_stress_compaction = false;
   i::FLAG_allow_natives_syntax = true;
   i::FLAG_flush_code_incrementally = true;
-
-  // Experimental natives are compiled during snapshot deserialization.
-  // This test breaks because heap layout changes in a way that closure
-  // is visited before shared function info.
-  i::FLAG_harmony_typed_arrays = false;
-  i::FLAG_harmony_array_buffer = false;
-
   CcTest::InitializeVM();
   Isolate* isolate = Isolate::Current();
   Heap* heap = isolate->heap();

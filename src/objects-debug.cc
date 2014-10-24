@@ -306,17 +306,6 @@ void JSObject::JSObjectVerify() {
     CHECK_EQ(map()->unused_property_fields(),
              (map()->inobject_properties() + properties()->length() -
               map()->NextFreePropertyIndex()));
-    DescriptorArray* descriptors = map()->instance_descriptors();
-    for (int i = 0; i < map()->NumberOfOwnDescriptors(); i++) {
-      if (descriptors->GetDetails(i).type() == FIELD) {
-        Representation r = descriptors->GetDetails(i).representation();
-        int field = descriptors->GetFieldIndex(i);
-        Object* value = RawFastPropertyAt(field);
-        if (r.IsSmi()) ASSERT(value->IsSmi());
-        if (r.IsDouble()) ASSERT(value->IsHeapNumber());
-        if (r.IsHeapObject()) ASSERT(value->IsHeapObject());
-      }
-    }
   }
   CHECK_EQ((map()->has_fast_smi_or_object_elements() ||
              (elements() == GetHeap()->empty_fixed_array())),
@@ -334,6 +323,10 @@ void Map::MapVerify() {
           instance_size() < HEAP->Capacity()));
   VerifyHeapPointer(prototype());
   VerifyHeapPointer(instance_descriptors());
+  DescriptorArray* descriptors = instance_descriptors();
+  for (int i = 0; i < NumberOfOwnDescriptors(); ++i) {
+    CHECK_EQ(i, descriptors->GetDetails(i).descriptor_index() - 1);
+  }
   SLOW_ASSERT(instance_descriptors()->IsSortedNoDuplicates());
   if (HasTransitionArray()) {
     SLOW_ASSERT(transitions()->IsSortedNoDuplicates());
@@ -426,7 +419,6 @@ void JSGeneratorObject::JSGeneratorObjectVerify() {
   VerifyObjectField(kReceiverOffset);
   VerifyObjectField(kOperandStackOffset);
   VerifyObjectField(kContinuationOffset);
-  VerifyObjectField(kStackHandlerIndexOffset);
 }
 
 

@@ -95,8 +95,8 @@ static Handle<Object> Test() {
 
 
 TEST(StressHandles) {
-  v8::HandleScope scope(v8::Isolate::GetCurrent());
-  v8::Handle<v8::Context> env = v8::Context::New(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> env = v8::Context::New();
+  v8::HandleScope scope(env->GetIsolate());
   env->Enter();
   Handle<Object> o = Test();
   CHECK(o->IsSmi() && Smi::cast(*o)->value() == 42);
@@ -117,8 +117,8 @@ const AccessorDescriptor kDescriptor = {
 
 
 TEST(StressJS) {
-  v8::HandleScope scope(v8::Isolate::GetCurrent());
-  v8::Handle<v8::Context> env = v8::Context::New(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> env = v8::Context::New();
+  v8::HandleScope scope(env->GetIsolate());
   env->Enter();
   Handle<JSFunction> function =
       FACTORY->NewFunction(FACTORY->function_string(), FACTORY->null_value());
@@ -142,7 +142,8 @@ TEST(StressJS) {
 
   CallbacksDescriptor d(*name,
                         *foreign,
-                        static_cast<PropertyAttributes>(0));
+                        static_cast<PropertyAttributes>(0),
+                        v8::internal::PropertyDetails::kInitialIndex);
   map->AppendDescriptor(&d, witness);
 
   // Add the Foo constructor the global object.

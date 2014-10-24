@@ -64,6 +64,11 @@ class Descriptor BASE_EMBEDDED {
   void Print(FILE* out);
 #endif
 
+  void SetEnumerationIndex(int index) {
+    details_ = PropertyDetails(details_.attributes(), details_.type(),
+                               details_.representation(), index);
+  }
+
   void SetSortedKeyIndex(int index) { details_ = details_.set_pointer(index); }
 
  private:
@@ -89,10 +94,11 @@ class Descriptor BASE_EMBEDDED {
              Object* value,
              PropertyAttributes attributes,
              PropertyType type,
-             Representation representation)
+             Representation representation,
+             int index)
       : key_(key),
         value_(value),
-        details_(attributes, type, representation) { }
+        details_(attributes, type, representation, index) { }
 
   friend class DescriptorArray;
 };
@@ -103,9 +109,10 @@ class FieldDescriptor: public Descriptor {
   FieldDescriptor(Name* key,
                   int field_index,
                   PropertyAttributes attributes,
-                  Representation representation)
+                  Representation representation,
+                  int index = 0)
       : Descriptor(key, Smi::FromInt(field_index), attributes,
-                   FIELD, representation) {}
+                   FIELD, representation, index) {}
 };
 
 
@@ -113,9 +120,10 @@ class ConstantFunctionDescriptor: public Descriptor {
  public:
   ConstantFunctionDescriptor(Name* key,
                              JSFunction* function,
-                             PropertyAttributes attributes)
-      : Descriptor(key, function, attributes, CONSTANT_FUNCTION,
-                   Representation::Tagged()) {}
+                             PropertyAttributes attributes,
+                             int index)
+      : Descriptor(key, function, attributes,
+                   CONSTANT_FUNCTION, Representation::Tagged(), index) {}
 };
 
 
@@ -123,9 +131,10 @@ class CallbacksDescriptor:  public Descriptor {
  public:
   CallbacksDescriptor(Name* key,
                       Object* foreign,
-                      PropertyAttributes attributes)
+                      PropertyAttributes attributes,
+                      int index = 0)
       : Descriptor(key, foreign, attributes, CALLBACKS,
-                   Representation::Tagged()) {}
+                   Representation::Tagged(), index) {}
 };
 
 
@@ -259,8 +268,6 @@ class LookupResult BASE_EMBEDDED {
 
   Representation representation() {
     ASSERT(IsFound());
-    ASSERT(!IsTransition());
-    ASSERT(details_.type() != NONEXISTENT);
     return details_.representation();
   }
 
@@ -348,7 +355,7 @@ class LookupResult BASE_EMBEDDED {
   Object* GetLazyValue() {
     switch (type()) {
       case FIELD:
-        return holder()->RawFastPropertyAt(GetFieldIndex().field_index());
+        return holder()->FastPropertyAt(GetFieldIndex().field_index());
       case NORMAL: {
         Object* value;
         value = holder()->property_dictionary()->ValueAt(GetDictionaryEntry());

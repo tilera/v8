@@ -38,6 +38,8 @@ ANDROID_TOOLCHAIN ?=
 ANDROID_V8 ?= /data/local/v8
 NACL_SDK_ROOT ?=
 
+GYPFLAGS += -Dv8_interpreted_regexp=1
+
 # Special build flags. Use them like this: "make library=shared"
 
 # library=shared || component=shared_library
@@ -113,9 +115,10 @@ ifeq ($(strictaliasing), off)
   GYPFLAGS += -Dv8_no_strict_aliasing=1
 endif
 # regexp=interpreted
-ifeq ($(regexp), interpreted)
+# FIXME: Tile: Force interpreted regexp in node.js build:
+#ifeq ($(regexp), interpreted)
   GYPFLAGS += -Dv8_interpreted_regexp=1
-endif
+#endif
 # arm specific flags.
 # armv7=false/true
 ifeq ($(armv7), false)

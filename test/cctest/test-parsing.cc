@@ -173,9 +173,8 @@ class ScriptResource : public v8::String::ExternalAsciiStringResource {
 
 
 TEST(Preparsing) {
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope handles(isolate);
-  v8::Local<v8::Context> context = v8::Context::New(isolate);
+  v8::HandleScope handles(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> context = v8::Context::New();
   v8::Context::Scope context_scope(context);
   int marker;
   i::Isolate::Current()->stack_guard()->SetStackLimit(
@@ -385,7 +384,8 @@ TEST(PreParseOverflow) {
       reinterpret_cast<uintptr_t>(&marker) - 128 * 1024);
 
   size_t kProgramSize = 1024 * 1024;
-  i::SmartArrayPointer<char> program(i::NewArray<char>(kProgramSize + 1));
+  i::SmartArrayPointer<char> program(
+      reinterpret_cast<char*>(malloc(kProgramSize + 1)));
   memset(*program, '(', kProgramSize);
   program[kProgramSize] = '\0';
 
@@ -539,9 +539,8 @@ void TestCharacterStream(const char* ascii_source,
 
 
 TEST(CharacterStreams) {
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope handles(isolate);
-  v8::Local<v8::Context> context = v8::Context::New(isolate);
+  v8::HandleScope handles(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> context = v8::Context::New();
   v8::Context::Scope context_scope(context);
 
   TestCharacterStream("abc\0\n\r\x7f", 7);
@@ -985,7 +984,7 @@ TEST(ScopePositions) {
   };
 
   v8::HandleScope handles(v8::Isolate::GetCurrent());
-  v8::Handle<v8::Context> context = v8::Context::New(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> context = v8::Context::New();
   v8::Context::Scope context_scope(context);
 
   int marker;
@@ -1244,7 +1243,7 @@ TEST(ParserSync) {
   if (i::FLAG_stress_compaction) return;
 
   v8::HandleScope handles(v8::Isolate::GetCurrent());
-  v8::Handle<v8::Context> context = v8::Context::New(v8::Isolate::GetCurrent());
+  v8::Persistent<v8::Context> context = v8::Context::New();
   v8::Context::Scope context_scope(context);
 
   int marker;
@@ -1285,8 +1284,7 @@ TEST(PreparserStrictOctal) {
   v8::internal::FLAG_min_preparse_length = 1;  // Force preparsing.
   v8::V8::Initialize();
   v8::HandleScope scope(v8::Isolate::GetCurrent());
-  v8::Context::Scope context_scope(
-      v8::Context::New(v8::Isolate::GetCurrent()));
+  v8::Context::Scope context_scope(v8::Context::New());
   v8::TryCatch try_catch;
   const char* script =
       "\"use strict\";       \n"

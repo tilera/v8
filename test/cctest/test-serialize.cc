@@ -28,7 +28,6 @@
 #include <signal.h>
 
 #include "sys/stat.h"
-
 #include "v8.h"
 
 #include "debug.h"
@@ -247,11 +246,8 @@ static void Serialize() {
   // can be loaded from v8natives.js and their addresses can be processed.  This
   // will clear the pending fixups array, which would otherwise contain GC roots
   // that would confuse the serialization/deserialization process.
-  {
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::HandleScope scope(isolate);
-    v8::Context::New(isolate);
-  }
+  v8::Persistent<v8::Context> env = v8::Context::New();
+  env.Dispose(env->GetIsolate());
   WriteToFile(FLAG_testing_serialization_file);
 }
 
@@ -303,11 +299,10 @@ DEPENDENT_TEST(Deserialize, Serialize) {
   // serialization.  That doesn't matter.  We don't need to be able to
   // serialize a snapshot in a VM that is booted from a snapshot.
   if (!Snapshot::HaveASnapshotToStartFrom()) {
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::HandleScope scope(isolate);
+    v8::HandleScope scope(v8::Isolate::GetCurrent());
     Deserialize();
 
-    v8::Local<v8::Context> env = v8::Context::New(isolate);
+    v8::Persistent<v8::Context> env = v8::Context::New();
     env->Enter();
 
     SanityCheck();
@@ -317,11 +312,10 @@ DEPENDENT_TEST(Deserialize, Serialize) {
 
 DEPENDENT_TEST(DeserializeFromSecondSerialization, SerializeTwice) {
   if (!Snapshot::HaveASnapshotToStartFrom()) {
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::HandleScope scope(isolate);
+    v8::HandleScope scope(v8::Isolate::GetCurrent());
     Deserialize();
 
-    v8::Local<v8::Context> env = v8::Context::New(isolate);
+    v8::Persistent<v8::Context> env = v8::Context::New();
     env->Enter();
 
     SanityCheck();
@@ -331,11 +325,10 @@ DEPENDENT_TEST(DeserializeFromSecondSerialization, SerializeTwice) {
 
 DEPENDENT_TEST(DeserializeAndRunScript2, Serialize) {
   if (!Snapshot::HaveASnapshotToStartFrom()) {
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::HandleScope scope(isolate);
+    v8::HandleScope scope(v8::Isolate::GetCurrent());
     Deserialize();
 
-    v8::Local<v8::Context> env = v8::Context::New(isolate);
+    v8::Persistent<v8::Context> env = v8::Context::New();
     env->Enter();
 
     const char* c_source = "\"1234\".length";
@@ -349,11 +342,10 @@ DEPENDENT_TEST(DeserializeAndRunScript2, Serialize) {
 DEPENDENT_TEST(DeserializeFromSecondSerializationAndRunScript2,
                SerializeTwice) {
   if (!Snapshot::HaveASnapshotToStartFrom()) {
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::HandleScope scope(isolate);
+    v8::HandleScope scope(v8::Isolate::GetCurrent());
     Deserialize();
 
-    v8::Local<v8::Context> env = v8::Context::New(isolate);
+    v8::Persistent<v8::Context> env = v8::Context::New();
     env->Enter();
 
     const char* c_source = "\"1234\".length";
@@ -369,19 +361,11 @@ TEST(PartialSerialization) {
     Serializer::Enable();
     v8::V8::Initialize();
     Isolate* isolate = Isolate::Current();
-    v8::Isolate* v8_isolate = reinterpret_cast<v8::Isolate*>(isolate);
     Heap* heap = isolate->heap();
 
-    v8::Persistent<v8::Context> env;
-    {
-      HandleScope scope(isolate);
-      env.Reset(v8_isolate, v8::Context::New(v8_isolate));
-    }
+    v8::Persistent<v8::Context> env = v8::Context::New();
     ASSERT(!env.IsEmpty());
-    {
-      v8::HandleScope handle_scope(v8_isolate);
-      v8::Local<v8::Context>::New(v8_isolate, env)->Enter();
-    }
+    env->Enter();
     // Make sure all builtin scripts are cached.
     { HandleScope scope(isolate);
       for (int i = 0; i < Natives::GetBuiltinsCount(); i++) {
@@ -393,7 +377,7 @@ TEST(PartialSerialization) {
 
     Object* raw_foo;
     {
-      v8::HandleScope handle_scope(v8_isolate);
+      v8::HandleScope handle_scope(env->GetIsolate());
       v8::Local<v8::String> foo = v8::String::New("foo");
       ASSERT(!foo.IsEmpty());
       raw_foo = *(v8::Utils::OpenHandle(*foo));
@@ -403,11 +387,8 @@ TEST(PartialSerialization) {
     Vector<char> startup_name = Vector<char>::New(file_name_length + 1);
     OS::SNPrintF(startup_name, "%s.startup", FLAG_testing_serialization_file);
 
-    {
-      v8::HandleScope handle_scope(v8_isolate);
-      v8::Local<v8::Context>::New(v8_isolate, env)->Exit();
-    }
-    env.Dispose(v8_isolate);
+    env->Exit();
+    env.Dispose(env->GetIsolate());
 
     FileByteSink startup_sink(startup_name.start());
     StartupSerializer startup_serializer(&startup_sink);
@@ -514,19 +495,11 @@ TEST(ContextSerialization) {
     Serializer::Enable();
     v8::V8::Initialize();
     Isolate* isolate = Isolate::Current();
-    v8::Isolate* v8_isolate = reinterpret_cast<v8::Isolate*>(isolate);
     Heap* heap = isolate->heap();
 
-    v8::Persistent<v8::Context> env;
-    {
-      HandleScope scope(isolate);
-      env.Reset(v8_isolate, v8::Context::New(v8_isolate));
-    }
+    v8::Persistent<v8::Context> env = v8::Context::New();
     ASSERT(!env.IsEmpty());
-    {
-      v8::HandleScope handle_scope(v8_isolate);
-      v8::Local<v8::Context>::New(v8_isolate, env)->Enter();
-    }
+    env->Enter();
     // Make sure all builtin scripts are cached.
     { HandleScope scope(isolate);
       for (int i = 0; i < Natives::GetBuiltinsCount(); i++) {
@@ -541,14 +514,11 @@ TEST(ContextSerialization) {
     Vector<char> startup_name = Vector<char>::New(file_name_length + 1);
     OS::SNPrintF(startup_name, "%s.startup", FLAG_testing_serialization_file);
 
-    {
-      v8::HandleScope handle_scope(v8_isolate);
-      v8::Local<v8::Context>::New(v8_isolate, env)->Exit();
-    }
+    env->Exit();
 
     Object* raw_context = *(v8::Utils::OpenHandle(*env));
 
-    env.Dispose(v8_isolate);
+    env.Dispose(env->GetIsolate());
 
     FileByteSink startup_sink(startup_name.start());
     StartupSerializer startup_serializer(&startup_sink);

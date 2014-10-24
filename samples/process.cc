@@ -25,11 +25,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// TODO(dcarney): remove this
-#define V8_ALLOW_ACCESS_TO_RAW_HANDLE_CONSTRUCTOR
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_IMPLICIT
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_ARROW
-
 #include <v8.h>
 
 #include <string>
@@ -168,12 +163,11 @@ bool JsHttpRequestProcessor::Initialize(map<string, string>* opts,
   // is what we need for the reference to remain after we return from
   // this method. That persistent handle has to be disposed in the
   // destructor.
-  v8::Handle<v8::Context> context = Context::New(GetIsolate(), NULL, global);
-  context_.Reset(GetIsolate(), context);
+  context_ = Context::New(NULL, global);
 
   // Enter the new context so all the following operations take place
   // within it.
-  Context::Scope context_scope(context);
+  Context::Scope context_scope(context_);
 
   // Make the options mapping available within the context
   if (!InstallMaps(opts, output))
@@ -254,12 +248,9 @@ bool JsHttpRequestProcessor::Process(HttpRequest* request) {
   // Create a handle scope to keep the temporary object references.
   HandleScope handle_scope(GetIsolate());
 
-  v8::Local<v8::Context> context =
-      v8::Local<v8::Context>::New(GetIsolate(), context_);
-
   // Enter this processor's context so all the remaining operations
   // take place there
-  Context::Scope context_scope(context);
+  Context::Scope context_scope(context_);
 
   // Wrap the C++ request object in a JavaScript wrapper
   Handle<Object> request_obj = WrapRequest(request);
@@ -312,8 +303,7 @@ Handle<Object> JsHttpRequestProcessor::WrapMap(map<string, string>* obj) {
     Handle<ObjectTemplate> raw_template = MakeMapTemplate(GetIsolate());
     map_template_ = Persistent<ObjectTemplate>::New(GetIsolate(), raw_template);
   }
-  Handle<ObjectTemplate> templ =
-      Local<ObjectTemplate>::New(GetIsolate(), map_template_);
+  Handle<ObjectTemplate> templ = map_template_;
 
   // Create an empty map wrapper.
   Handle<Object> result = templ->NewInstance();
@@ -420,8 +410,7 @@ Handle<Object> JsHttpRequestProcessor::WrapRequest(HttpRequest* request) {
     request_template_ =
         Persistent<ObjectTemplate>::New(GetIsolate(), raw_template);
   }
-  Handle<ObjectTemplate> templ =
-      Local<ObjectTemplate>::New(GetIsolate(), request_template_);
+  Handle<ObjectTemplate> templ = request_template_;
 
   // Create an empty http request wrapper.
   Handle<Object> result = templ->NewInstance();

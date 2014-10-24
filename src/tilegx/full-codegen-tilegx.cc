@@ -171,7 +171,6 @@ void FullCodeGenerator::Generate() {
   __ LoadRoot(at, Heap::kUndefinedValueRootIndex);
   // Adjust fp to point to caller's fp.
   __ Addu(fp, sp, Operand(2 * kPointerSize));
-  info->AddNoFrameRange(0, masm_->pc_offset());
 
   { Comment cmnt(masm_, "[ Allocate locals");
     int locals_count = info->scope()->num_stack_slots();
@@ -431,11 +430,9 @@ void FullCodeGenerator::EmitReturnSequence() {
       CodeGenerator::RecordPositions(masm_, function()->end_position() - 1);
       __ RecordJSReturn();
       masm_->move(sp, fp);
-      int no_frame_start = masm_->pc_offset();
       masm_->MultiPop(static_cast<RegList>(fp.bit() | ra.bit()));
       masm_->Addu(sp, sp, Operand(sp_delta));
       masm_->Jump(ra);
-      info_->AddNoFrameRange(no_frame_start, masm_->pc_offset());
     }
 
 #ifdef DEBUG
@@ -1584,8 +1581,7 @@ void FullCodeGenerator::VisitObjectLiteral(ObjectLiteral* expr) {
       : ObjectLiteral::kNoFlags;
   __ li(a0, Operand(Smi::FromInt(flags)));
   int properties_count = constant_properties->length() / 2;
-  if ((FLAG_track_double_fields && expr->may_store_doubles()) ||
-      expr->depth() > 1) {
+  if (expr->depth() > 1) {
     __ Push(a3, a2, a1, a0);
     __ CallRuntime(Runtime::kCreateObjectLiteral, 4);
   } else if (Serializer::enabled() || flags != ObjectLiteral::kFastElements ||
@@ -1973,7 +1969,7 @@ void FullCodeGenerator::VisitYield(Yield* expr) {
       __ ld(a3, MemOperand(sp, 1 * kPointerSize));       // iter
       __ push(a3);                                       // iter
       __ push(a0);                                       // exception
-      __ move(a0, a3);                                    // iter
+      __ move(a0, a3);                                   // iter
       __ push(a0);                                       // push LoadIC state
       __ LoadRoot(a2, Heap::kthrow_stringRootIndex);     // "throw"
       Handle<Code> throw_ic = isolate()->builtins()->LoadIC_Initialize();
@@ -2006,7 +2002,7 @@ void FullCodeGenerator::VisitYield(Yield* expr) {
       __ ld(a3, MemOperand(sp, 1 * kPointerSize));       // iter
       __ push(a3);                                       // iter
       __ push(a0);                                       // received
-      __ move(a0, a3);                                    // iter
+      __ move(a0, a3);                                   // iter
       __ push(a0);                                       // push LoadIC state
       __ LoadRoot(a2, Heap::ksend_stringRootIndex);      // "send"
       Handle<Code> send_ic = isolate()->builtins()->LoadIC_Initialize();
@@ -2058,6 +2054,7 @@ void FullCodeGenerator::VisitYield(Yield* expr) {
     }
   }
 }
+
 
 void FullCodeGenerator::EmitGeneratorResume(Expression *generator,
     Expression *value,
@@ -2154,6 +2151,7 @@ void FullCodeGenerator::EmitGeneratorResume(Expression *generator,
   context()->Plug(result_register());
 }
 
+
 void FullCodeGenerator::EmitReturnIteratorResult(bool done) {
   Label gc_required;
   Label allocated;
@@ -2172,14 +2170,14 @@ void FullCodeGenerator::EmitReturnIteratorResult(bool done) {
   __ st(t0, FieldMemOperand(a0, JSObject::kPropertiesOffset));
   __ st(t0, FieldMemOperand(a0, JSObject::kElementsOffset));
   __ st(a2,
-        FieldMemOperand(a0, JSGeneratorObject::kResultValuePropertyOffset));
+	FieldMemOperand(a0, JSGeneratorObject::kResultValuePropertyOffset));
   __ st(a3,
-        FieldMemOperand(a0, JSGeneratorObject::kResultDonePropertyOffset));
+	FieldMemOperand(a0, JSGeneratorObject::kResultDonePropertyOffset));
 
   // Only the value field needs a write barrier, as the other values are in the
   // root set.
   __ RecordWriteField(a0, JSGeneratorObject::kResultValuePropertyOffset,
-                      a2, a3, kRAHasBeenSaved, kDontSaveFPRegs);
+		      a2, a3, kRAHasBeenSaved, kDontSaveFPRegs);
 
   if (done) {
     // Exit all nested statements.
@@ -2199,9 +2197,10 @@ void FullCodeGenerator::EmitReturnIteratorResult(bool done) {
   __ Push(Smi::FromInt(map->instance_size()));
   __ CallRuntime(Runtime::kAllocateInNewSpace, 1);
   __ ld(context_register(),
-        MemOperand(fp, StandardFrameConstants::kContextOffset));
+	MemOperand(fp, StandardFrameConstants::kContextOffset));
   __ jmp(&allocated);
 }
+
 
 void FullCodeGenerator::EmitNamedPropertyLoad(Property* prop) {
   SetSourcePosition(prop->position());
@@ -2291,25 +2290,10 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ move(v0, scratch2);
       break;
     case Token::MUL: {
-#if 0
-      __ SmiUntag(scratch1, right);
-      __ Mult(left, scratch1);
-      __ mflo(scratch1);
-      __ mfhi(scratch2);
-      __ sra(scratch1, scratch1, 31);
-      __ Branch(&stub_call, ne, scratch1, Operand(scratch2));
-      __ mflo(v0);
-      __ Branch(&done, ne, v0, Operand(zero));
-      __ Addu(scratch2, right, left);
-      __ Branch(&stub_call, lt, scratch2, Operand(zero));
-      ASSERT(Smi::FromInt(0) == 0);
-      __ move(v0, zero);
-      break;
-#else
       __ move(scratch3, right);
       __ mul_hs_hs(scratch1, left, right);
       __ sra(scratch2, scratch1, 32);
-      __ sra(at, scratch1, 30);
+      __ bfexts(at, scratch1, 31, 31); // now 0 or -1
       __ Branch(&stub_call, ne, scratch2, Operand(at));
       __ sll(scratch1, scratch1, 32); // Convert to Smi
       __ move(v0, scratch1);
@@ -2319,7 +2303,7 @@ void FullCodeGenerator::EmitInlineSmiBinaryOp(BinaryOperation* expr,
       __ Branch(&stub_call, lt, scratch2, Operand(zero));
       ASSERT(Smi::FromInt(0) == 0);
       __ move(v0, zero);
-#endif
+      break;
     }
     case Token::BIT_OR:
       __ Or(v0, left, Operand(right));
@@ -3402,87 +3386,38 @@ void FullCodeGenerator::EmitDateField(CallRuntime* expr) {
   context()->Plug(v0);
 }
 
-void FullCodeGenerator::EmitSeqStringSetCharCheck(Register string,
-                                                  Register index,
-                                                  Register value,
-                                                  uint32_t encoding_mask) {
-  __ And(at, index, Operand(kSmiTagMask));
-  __ Check(eq, "Non-smi index", at, Operand(zero));
-  __ And(at, value, Operand(kSmiTagMask));
-  __ Check(eq, "Non-smi value", at, Operand(zero));
-
-  __ ld(at, FieldMemOperand(string, String::kLengthOffset));
-  __ Check(lt, "Index is too large", index, Operand(at));
-
-  __ Check(ge, "Index is negative", index, Operand(zero));
-
-  __ ld(at, FieldMemOperand(string, HeapObject::kMapOffset));
-  __ ld1u(at2, FieldMemOperand(at, Map::kInstanceTypeOffset));
-
-  __ And(at2, at2, Operand(kStringRepresentationMask | kStringEncodingMask));
-  __ Subu(at, at2, Operand(encoding_mask));
-  __ Check(eq, "Unexpected string type", at, Operand(zero));
-}
 
 void FullCodeGenerator::EmitOneByteSeqStringSetChar(CallRuntime* expr) {
   ZoneList<Expression*>* args = expr->arguments();
   ASSERT_EQ(3, args->length());
 
-  Register string = v0;
-  Register index = a1;
-  Register value = a2;
-
   VisitForStackValue(args->at(1));  // index
   VisitForStackValue(args->at(2));  // value
-  __ pop(value);
-  __ pop(index);
+  __ pop(a2);
+  __ pop(a1);
   VisitForAccumulatorValue(args->at(0));  // string
 
-  if (FLAG_debug_code) {
-    static const uint32_t one_byte_seq_type = kSeqStringTag | kOneByteStringTag;
-    EmitSeqStringSetCharCheck(string, index, value, one_byte_seq_type);
-  }
-
-  __ SmiUntag(value, value);
-  __ Addu(at,
-          string,
-          Operand(SeqOneByteString::kHeaderSize - kHeapObjectTag));
-  __ SmiUntag(index);
-  __ Addu(at, at, index);
-  __ st1(value, MemOperand(at));
-  context()->Plug(string);
+  static const String::Encoding encoding = String::ONE_BYTE_ENCODING;
+  SeqStringSetCharGenerator::Generate(masm_, encoding, v0, a1, a2);
+  context()->Plug(v0);
 }
+
 
 void FullCodeGenerator::EmitTwoByteSeqStringSetChar(CallRuntime* expr) {
   ZoneList<Expression*>* args = expr->arguments();
   ASSERT_EQ(3, args->length());
 
-  Register string = v0;
-  Register index = a1;
-  Register value = a2;
-
   VisitForStackValue(args->at(1));  // index
   VisitForStackValue(args->at(2));  // value
-  __ pop(value);
-  __ pop(index);
+  __ pop(a2);
+  __ pop(a1);
   VisitForAccumulatorValue(args->at(0));  // string
 
-  if (FLAG_debug_code) {
-    static const uint32_t two_byte_seq_type = kSeqStringTag | kTwoByteStringTag;
-    EmitSeqStringSetCharCheck(string, index, value, two_byte_seq_type);
-  }
-
-  __ SmiUntag(value, value);
-  __ SmiUntag(index, index);
-  __ Addu(at,
-          string,
-          Operand(SeqTwoByteString::kHeaderSize - kHeapObjectTag));
-  __ sll(index, index, 1);
-  __ Addu(at, at, index);
-  STATIC_ASSERT(kSmiTagSize == 1 && kSmiTag == 0);
-  __ st2(value, MemOperand(at));
-    context()->Plug(string);
+  static const String::Encoding encoding = String::TWO_BYTE_ENCODING;
+  SeqStringSetCharGenerator::Generate(masm_, encoding, v0, a1, a2);
+  context()->Plug(v0);
 }
+
 
 void FullCodeGenerator::EmitMathPow(CallRuntime* expr) {
   // Load the arguments on the stack and call the runtime function.
@@ -4009,7 +3944,7 @@ void FullCodeGenerator::EmitFastAsciiArrayJoin(CallRuntime* expr) {
   __ Branch(&bailout, ne, scratch3, Operand(zero));
 #else
   __ mul_hs_ls(scratch2, scratch1, array_length);
-  __ sra(scratch3, scratch2, 30);
+  __ sra(scratch3, scratch2, 31);
   __ Branch(&bailout, ne, scratch3, Operand(zero));
   __ sll(scratch2, scratch2, 32);
 #endif

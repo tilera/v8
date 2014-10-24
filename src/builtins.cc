@@ -194,58 +194,55 @@ BUILTIN(EmptyFunction) {
 }
 
 
-RUNTIME_FUNCTION(MaybeObject*, ArrayConstructor_StubFailure) {
-  // If we get 2 arguments then they are the stub parameters (constructor, type
-  // info).  If we get 3, then the first one is a pointer to the arguments
-  // passed by the caller.
-  Arguments empty_args(0, NULL);
-  bool no_caller_args = args.length() == 2;
-  ASSERT(no_caller_args || args.length() == 3);
-  int parameters_start = no_caller_args ? 0 : 1;
-  Arguments* caller_args = no_caller_args
-      ? &empty_args
-      : reinterpret_cast<Arguments*>(args[0]);
-  Handle<JSFunction> constructor = args.at<JSFunction>(parameters_start);
-  Handle<Object> type_info = args.at<Object>(parameters_start + 1);
+#define CONVERT_ARG_STUB_CALLER_ARGS(name)                           \
+  Arguments* name = reinterpret_cast<Arguments*>(args[0]);
 
+
+RUNTIME_FUNCTION(MaybeObject*, ArrayConstructor_StubFailure) {
+  CONVERT_ARG_STUB_CALLER_ARGS(caller_args);
+  ASSERT(args.length() == 2);
+  Handle<Object> type_info = args.at<Object>(1);
+
+  JSArray* array = NULL;
   bool holey = false;
   if (caller_args->length() == 1 && (*caller_args)[0]->IsSmi()) {
     int value = Smi::cast((*caller_args)[0])->value();
     holey = (value > 0 && value < JSObject::kInitialMaxFastElementArray);
   }
 
-  JSArray* array;
   MaybeObject* maybe_array;
-  if (*type_info != isolate->heap()->undefined_value() &&
-      JSGlobalPropertyCell::cast(*type_info)->value()->IsSmi()) {
+  if (*type_info != isolate->heap()->undefined_value()) {
     JSGlobalPropertyCell* cell = JSGlobalPropertyCell::cast(*type_info);
-    Smi* smi = Smi::cast(cell->value());
-    ElementsKind to_kind = static_cast<ElementsKind>(smi->value());
-    if (holey && !IsFastHoleyElementsKind(to_kind)) {
-      to_kind = GetHoleyElementsKind(to_kind);
-      // Update the allocation site info to reflect the advice alteration.
-      cell->set_value(Smi::FromInt(to_kind));
-    }
+    if (cell->value()->IsSmi()) {
+      Smi* smi = Smi::cast(cell->value());
+      ElementsKind to_kind = static_cast<ElementsKind>(smi->value());
+      if (holey && !IsFastHoleyElementsKind(to_kind)) {
+        to_kind = GetHoleyElementsKind(to_kind);
+        // Update the allocation site info to reflect the advice alteration.
+        cell->set_value(Smi::FromInt(to_kind));
+      }
 
-    maybe_array = isolate->heap()->AllocateJSObjectWithAllocationSite(
-        *constructor, type_info);
-    if (!maybe_array->To(&array)) return maybe_array;
-  } else {
-    ElementsKind kind = constructor->initial_map()->elements_kind();
-    ASSERT(kind == GetInitialFastElementsKind());
-    maybe_array = isolate->heap()->AllocateJSObject(*constructor);
-    if (!maybe_array->To(&array)) return maybe_array;
-    // We might need to transition to holey
-    if (holey) {
-      kind = GetHoleyElementsKind(kind);
-      maybe_array = array->TransitionElementsKind(kind);
-      if (maybe_array->IsFailure()) return maybe_array;
+      AllocationSiteMode mode = AllocationSiteInfo::GetMode(to_kind);
+      if (mode == TRACK_ALLOCATION_SITE) {
+        maybe_array = isolate->heap()->AllocateEmptyJSArrayWithAllocationSite(
+            to_kind, type_info);
+      } else {
+        maybe_array = isolate->heap()->AllocateEmptyJSArray(to_kind);
+      }
+      if (!maybe_array->To(&array)) return maybe_array;
     }
   }
 
-  maybe_array = isolate->heap()->AllocateJSArrayStorage(array, 0, 0,
-      DONT_INITIALIZE_ARRAY_ELEMENTS);
-  if (maybe_array->IsFailure()) return maybe_array;
+  ElementsKind kind = GetInitialFastElementsKind();
+  if (holey) {
+    kind = GetHoleyElementsKind(kind);
+  }
+
+  if (array == NULL) {
+    maybe_array = isolate->heap()->AllocateEmptyJSArray(kind);
+    if (!maybe_array->To(&array)) return maybe_array;
+  }
+
   maybe_array = ArrayConstructInitializeElements(array, caller_args);
   if (maybe_array->IsFailure()) return maybe_array;
   return array;
@@ -1317,13 +1314,15 @@ MUST_USE_RESULT static MaybeObject* HandleApiCallHelper(
     LOG(isolate, ApiObjectAccess("call", JSObject::cast(*args.receiver())));
     ASSERT(raw_holder->IsJSObject());
 
-    FunctionCallbackArguments custom(isolate,
-                                     data_obj,
-                                     *function,
-                                     raw_holder,
-                                     &args[0] - 1,
-                                     args.length() - 1,
-                                     is_construct);
+    CustomArguments custom(isolate);
+    v8::ImplementationUtilities::PrepareArgumentsData(custom.end(),
+        isolate, data_obj, *function, raw_holder);
+
+    v8::Arguments new_args = v8::ImplementationUtilities::NewArguments(
+        custom.end(),
+        &args[0] - 1,
+        args.length() - 1,
+        is_construct);
 
     v8::Handle<v8::Value> value;
     {
@@ -1331,7 +1330,7 @@ MUST_USE_RESULT static MaybeObject* HandleApiCallHelper(
       VMState<EXTERNAL> state(isolate);
       ExternalCallbackScope call_scope(isolate,
                                        v8::ToCData<Address>(callback_obj));
-      value = custom.Call(callback);
+      value = callback(new_args);
     }
     if (value.IsEmpty()) {
       result = heap->undefined_value();
@@ -1394,20 +1393,21 @@ MUST_USE_RESULT static MaybeObject* HandleApiCallAsFunctionOrConstructor(
     HandleScope scope(isolate);
     LOG(isolate, ApiObjectAccess("call non-function", obj));
 
-    FunctionCallbackArguments custom(isolate,
-                                     call_data->data(),
-                                     constructor,
-                                     obj,
-                                     &args[0] - 1,
-                                     args.length() - 1,
-                                     is_construct_call);
+    CustomArguments custom(isolate);
+    v8::ImplementationUtilities::PrepareArgumentsData(custom.end(),
+        isolate, call_data->data(), constructor, obj);
+    v8::Arguments new_args = v8::ImplementationUtilities::NewArguments(
+        custom.end(),
+        &args[0] - 1,
+        args.length() - 1,
+        is_construct_call);
     v8::Handle<v8::Value> value;
     {
       // Leaving JavaScript.
       VMState<EXTERNAL> state(isolate);
       ExternalCallbackScope call_scope(isolate,
                                        v8::ToCData<Address>(callback_obj));
-      value = custom.Call(callback);
+      value = callback(new_args);
     }
     if (value.IsEmpty()) {
       result = heap->undefined_value();
@@ -1507,11 +1507,6 @@ static void Generate_KeyedLoadIC_IndexedInterceptor(MacroAssembler* masm) {
 static void Generate_KeyedLoadIC_NonStrictArguments(MacroAssembler* masm) {
   KeyedLoadIC::GenerateNonStrictArguments(masm);
 }
-
-static void Generate_StoreIC_Slow(MacroAssembler* masm) {
-  StoreIC::GenerateSlow(masm);
-}
-
 
 static void Generate_StoreIC_Initialize(MacroAssembler* masm) {
   StoreIC::GenerateInitialize(masm);

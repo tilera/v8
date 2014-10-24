@@ -45,7 +45,6 @@ namespace internal {
   ICU(KeyedCallIC_Miss)                               \
   ICU(StoreIC_Miss)                                   \
   ICU(StoreIC_ArrayLength)                            \
-  ICU(StoreIC_Slow)                                   \
   ICU(SharedStoreIC_ExtendStorage)                    \
   ICU(KeyedStoreIC_Miss)                              \
   ICU(KeyedStoreIC_MissForceGeneric)                  \
@@ -185,7 +184,7 @@ class IC {
                   Handle<JSObject> receiver,
                   Handle<String> name,
                   Handle<Code> code);
-  virtual void UpdateMegamorphicCache(Map* map, Name* name, Code* code);
+  virtual void UpdateMegamorphicCache(Map* map, String* name, Code* code);
   virtual Handle<Code> megamorphic_stub() {
     UNREACHABLE();
     return Handle<Code>::null();
@@ -472,7 +471,7 @@ class KeyedLoadIC: public LoadIC {
   virtual Handle<Code> ComputeLoadHandler(LookupResult* lookup,
                                           Handle<JSObject> receiver,
                                           Handle<String> name);
-  virtual void UpdateMegamorphicCache(Map* map, Name* name, Code* code) { }
+  virtual void UpdateMegamorphicCache(Map* map, String* name, Code* code) { }
 
  private:
   // Stub accessors.
@@ -505,7 +504,6 @@ class StoreIC: public IC {
   }
 
   // Code generators for stub routines. Only called once at startup.
-  static void GenerateSlow(MacroAssembler* masm);
   static void GenerateInitialize(MacroAssembler* masm) { GenerateMiss(masm); }
   static void GenerateMiss(MacroAssembler* masm);
   static void GenerateMegamorphic(MacroAssembler* masm,
@@ -622,7 +620,7 @@ class KeyedStoreIC: public StoreIC {
                                                StrictModeFlag strict_mode,
                                                Handle<JSObject> receiver,
                                                Handle<String> name);
-  virtual void UpdateMegamorphicCache(Map* map, Name* name, Code* code) { }
+  virtual void UpdateMegamorphicCache(Map* map, String* name, Code* code) { }
 
   virtual Handle<Code> megamorphic_stub() {
     return isolate()->builtins()->KeyedStoreIC_Generic();
@@ -786,6 +784,8 @@ class CompareNilIC: public IC {
   MUST_USE_RESULT MaybeObject* CompareNil(Handle<Object> object);
 
   static Handle<Code> GetUninitialized();
+
+  static Code* GetRawUninitialized(EqualityKind kind, NilValue nil);
 
   static void Clear(Address address, Code* target);
 

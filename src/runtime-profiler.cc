@@ -122,9 +122,10 @@ static void GetICCounts(JSFunction* function,
 void RuntimeProfiler::Optimize(JSFunction* function, const char* reason) {
   ASSERT(function->IsOptimizable());
 
-  if (FLAG_trace_opt && function->PassesHydrogenFilter()) {
+  if (FLAG_trace_opt) {
     PrintF("[marking ");
-    function->ShortPrint();
+    function->PrintName();
+    PrintF(" 0x%" V8PRIxPTR, reinterpret_cast<intptr_t>(function->address()));
     PrintF(" for recompilation, reason: %s", reason);
     if (FLAG_type_info_threshold > 0) {
       int typeinfo, total, percentage;

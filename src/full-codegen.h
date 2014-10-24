@@ -137,7 +137,8 @@ class FullCodeGenerator: public AstVisitor {
 #error Unsupported target architecture.
 #endif
 
-  static const int kBackEdgeEntrySize = 2 * kIntSize + kOneByteSize;
+  //  static const int kBackEdgeEntrySize = 2 * kIntSize + kOneByteSize;
+  static const int kBackEdgeEntrySize = 3 * kIntSize;
 
  private:
   class Breakable;
@@ -492,11 +493,6 @@ class FullCodeGenerator: public AstVisitor {
   INLINE_FUNCTION_LIST(EMIT_INLINE_RUNTIME_CALL)
   INLINE_RUNTIME_FUNCTION_LIST(EMIT_INLINE_RUNTIME_CALL)
 #undef EMIT_INLINE_RUNTIME_CALL
-
-  void EmitSeqStringSetCharCheck(Register string,
-                                 Register index,
-                                 Register value,
-                                 uint32_t encoding_mask);
 
   // Platform-specific code for resuming generators.
   void EmitGeneratorResume(Expression *generator,

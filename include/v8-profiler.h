@@ -184,21 +184,19 @@ class V8EXPORT CpuProfiler {
   V8_DEPRECATED(static const CpuProfile* GetProfile(
       int index,
       Handle<Value> security_token = Handle<Value>()));
-  /** Deprecated. Use GetCpuProfile with single parameter. */
-  V8_DEPRECATED(const CpuProfile* GetCpuProfile(
-      int index,
-      Handle<Value> security_token));
   /** Returns a profile by index. */
-  const CpuProfile* GetCpuProfile(int index);
+  const CpuProfile* GetCpuProfile(
+      int index,
+      Handle<Value> security_token = Handle<Value>());
 
   /** Deprecated. Use FindProfile instead. */
   V8_DEPRECATED(static const CpuProfile* FindProfile(
       unsigned uid,
       Handle<Value> security_token = Handle<Value>()));
   /** Returns a profile by uid. */
-  V8_DEPRECATED(const CpuProfile* FindCpuProfile(
+  const CpuProfile* FindCpuProfile(
       unsigned uid,
-      Handle<Value> security_token = Handle<Value>()));
+      Handle<Value> security_token = Handle<Value>());
 
   /** Deprecated. Use StartCpuProfiling instead. */
   V8_DEPRECATED(static void StartProfiling(Handle<String> title,
@@ -221,16 +219,12 @@ class V8EXPORT CpuProfiler {
       Handle<String> title,
       Handle<Value> security_token = Handle<Value>()));
   /**
-   * Deprecated. Use StopCpuProfiling with one parameter instead.
-   */
-  V8_DEPRECATED(const CpuProfile* StopCpuProfiling(
-      Handle<String> title,
-      Handle<Value> security_token));
-  /**
    * Stops collecting CPU profile with a given title and returns it.
    * If the title given is empty, finishes the last profile started.
    */
-  const CpuProfile* StopCpuProfiling(Handle<String> title);
+  const CpuProfile* StopCpuProfiling(
+      Handle<String> title,
+      Handle<Value> security_token = Handle<Value>());
 
   /** Deprecated. Use DeleteAllCpuProfiles instead. */
   V8_DEPRECATED(static void DeleteAllProfiles());
@@ -444,7 +438,7 @@ class V8EXPORT HeapProfiler {
   /** Deprecated. Use FindHeapSnapshot instead. */
   V8_DEPRECATED(static const HeapSnapshot* FindSnapshot(unsigned uid));
   /** Returns a profile by uid. */
-  V8_DEPRECATED(const HeapSnapshot* FindHeapSnapshot(unsigned uid));
+  const HeapSnapshot* FindHeapSnapshot(unsigned uid);
 
   /** Deprecated. Use GetObjectId instead. */
   V8_DEPRECATED(static SnapshotObjectId GetSnapshotObjectId(

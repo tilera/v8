@@ -112,7 +112,6 @@ enum BindingFlags {
   V(JSON_OBJECT_INDEX, JSObject, json_object) \
   V(REGEXP_FUNCTION_INDEX, JSFunction, regexp_function) \
   V(INITIAL_OBJECT_PROTOTYPE_INDEX, JSObject, initial_object_prototype) \
-  V(INITIAL_ARRAY_PROTOTYPE_INDEX, JSObject, initial_array_prototype) \
   V(CREATE_DATE_FUN_INDEX, JSFunction,  create_date_fun) \
   V(TO_NUMBER_FUN_INDEX, JSFunction, to_number_fun) \
   V(TO_STRING_FUN_INDEX, JSFunction, to_string_fun) \
@@ -133,12 +132,14 @@ enum BindingFlags {
   V(INT32_ARRAY_FUN_INDEX, JSFunction, int32_array_fun) \
   V(FLOAT_ARRAY_FUN_INDEX, JSFunction, float_array_fun) \
   V(DOUBLE_ARRAY_FUN_INDEX, JSFunction, double_array_fun) \
-  V(UINT8C_ARRAY_FUN_INDEX, JSFunction, uint8c_array_fun) \
   V(FUNCTION_MAP_INDEX, Map, function_map) \
   V(STRICT_MODE_FUNCTION_MAP_INDEX, Map, strict_mode_function_map) \
   V(FUNCTION_WITHOUT_PROTOTYPE_MAP_INDEX, Map, function_without_prototype_map) \
   V(STRICT_MODE_FUNCTION_WITHOUT_PROTOTYPE_MAP_INDEX, Map, \
     strict_mode_function_without_prototype_map) \
+  V(FUNCTION_INSTANCE_MAP_INDEX, Map, function_instance_map) \
+  V(STRICT_MODE_FUNCTION_INSTANCE_MAP_INDEX, Map, \
+    strict_mode_function_instance_map) \
   V(REGEXP_RESULT_MAP_INDEX, Map, regexp_result_map)\
   V(ARGUMENTS_BOILERPLATE_INDEX, JSObject, arguments_boilerplate) \
   V(ALIASED_ARGUMENTS_BOILERPLATE_INDEX, JSObject, \
@@ -178,7 +179,7 @@ enum BindingFlags {
     strict_mode_generator_function_map) \
   V(GENERATOR_OBJECT_PROTOTYPE_MAP_INDEX, Map, \
     generator_object_prototype_map) \
-  V(GENERATOR_RESULT_MAP_INDEX, Map, generator_result_map) \
+  V(GENERATOR_RESULT_MAP_INDEX, Map, generator_result_map)	\
   V(RANDOM_SEED_INDEX, ByteArray, random_seed)
 
 // JSFunctions are pairs (context, function code), sometimes also called
@@ -258,8 +259,9 @@ class Context: public FixedArray {
     STRICT_MODE_FUNCTION_MAP_INDEX,
     FUNCTION_WITHOUT_PROTOTYPE_MAP_INDEX,
     STRICT_MODE_FUNCTION_WITHOUT_PROTOTYPE_MAP_INDEX,
+    FUNCTION_INSTANCE_MAP_INDEX,
+    STRICT_MODE_FUNCTION_INSTANCE_MAP_INDEX,
     INITIAL_OBJECT_PROTOTYPE_INDEX,
-    INITIAL_ARRAY_PROTOTYPE_INDEX,
     BOOLEAN_FUNCTION_INDEX,
     NUMBER_FUNCTION_INDEX,
     STRING_FUNCTION_INDEX,
@@ -293,7 +295,6 @@ class Context: public FixedArray {
     INT32_ARRAY_FUN_INDEX,
     FLOAT_ARRAY_FUN_INDEX,
     DOUBLE_ARRAY_FUN_INDEX,
-    UINT8C_ARRAY_FUN_INDEX,
     MESSAGE_LISTENERS_INDEX,
     MAKE_MESSAGE_FUN_INDEX,
     GET_STACK_TRACE_LINE_INDEX,
@@ -430,10 +431,6 @@ class Context: public FixedArray {
   void  set_##name(type* value) {                         \
     ASSERT(IsNativeContext());                            \
     set(index, value);                                    \
-  }                                                       \
-  bool is_##name(type* value) {                           \
-    ASSERT(IsNativeContext());                            \
-    return type::cast(get(index)) == value;               \
   }                                                       \
   type* name() {                                          \
     ASSERT(IsNativeContext());                            \

@@ -100,9 +100,9 @@ namespace internal {
   F(GetOptimizationStatus, 1, 1) \
   F(GetOptimizationCount, 1, 1) \
   F(CompileForOnStackReplacement, 1, 1) \
+  F(SetNewFunctionAttributes, 1, 1) \
   F(AllocateInNewSpace, 1, 1) \
   F(AllocateInOldPointerSpace, 1, 1) \
-  F(AllocateInOldDataSpace, 1, 1) \
   F(SetNativeFlag, 1, 1) \
   F(StoreArrayLiteralElement, 5, 1) \
   F(DebugCallbackSupportsStepping, 1, 1) \
@@ -231,7 +231,6 @@ namespace internal {
   F(FunctionSetName, 2, 1) \
   F(FunctionNameShouldPrintAsAnonymous, 1, 1) \
   F(FunctionMarkNameShouldPrintAsAnonymous, 1, 1) \
-  F(FunctionIsGenerator, 1, 1) \
   F(FunctionBindArguments, 4, 1) \
   F(BoundFunctionGetBindings, 1, 1) \
   F(FunctionRemovePrototype, 1, 1) \
@@ -304,9 +303,6 @@ namespace internal {
   F(ResumeJSGeneratorObject, 3, 1) \
   F(ThrowGeneratorStateError, 1, 1) \
   \
-  /* ES5 */ \
-  F(ObjectFreeze, 1, 1) \
-  \
   /* Harmony modules */ \
   F(IsJSModule, 1, 1) \
   \
@@ -364,7 +360,6 @@ namespace internal {
   F(TypedArrayGetByteLength, 1, 1) \
   F(TypedArrayGetByteOffset, 1, 1) \
   F(TypedArrayGetLength, 1, 1) \
-  F(TypedArraySetFastCases, 3, 1) \
   \
   /* Statements */ \
   F(NewClosure, 3, 1) \
@@ -427,7 +422,6 @@ namespace internal {
   F(HasFastDoubleElements, 1, 1) \
   F(HasFastHoleyElements, 1, 1) \
   F(HasDictionaryElements, 1, 1) \
-  F(HasNonStrictArgumentsElements, 1, 1) \
   F(HasExternalPixelElements, 1, 1) \
   F(HasExternalArrayElements, 1, 1) \
   F(HasExternalByteElements, 1, 1) \
@@ -755,9 +749,8 @@ class Runtime : public AllStatic {
       Handle<Object> object,
       Handle<Object> key);
 
-  static void SetupArrayBuffer(Isolate* isolate,
+  static bool SetupArrayBuffer(Isolate* isolate,
                                Handle<JSArrayBuffer> array_buffer,
-                               bool is_external,
                                void* data,
                                size_t allocated_length);
 

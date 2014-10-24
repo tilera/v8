@@ -75,9 +75,7 @@ class IncrementalMarking {
 
   bool WorthActivating();
 
-  enum CompactionFlag { ALLOW_COMPACTION, PREVENT_COMPACTION };
-
-  void Start(CompactionFlag flag = ALLOW_COMPACTION);
+  void Start();
 
   void Stop();
 
@@ -112,7 +110,10 @@ class IncrementalMarking {
   static const intptr_t kMarkingSpeedAccelleration = 2;
   static const intptr_t kMaxMarkingSpeed = 1000;
 
-  void OldSpaceStep(intptr_t allocated);
+  void OldSpaceStep(intptr_t allocated) {
+    Step(allocated * kFastMarking / kInitialMarkingSpeed,
+         GC_VIA_STACK_GUARD);
+  }
 
   void Step(intptr_t allocated, CompletionAction action);
 
@@ -224,6 +225,8 @@ class IncrementalMarking {
   int64_t SpaceLeftInOldSpace();
 
   void ResetStepCounters();
+
+  enum CompactionFlag { ALLOW_COMPACTION, PREVENT_COMPACTION };
 
   void StartMarking(CompactionFlag flag);
 

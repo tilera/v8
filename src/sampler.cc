@@ -120,8 +120,6 @@ typedef struct ucontext {
 } ucontext_t;
 
 #elif defined(__tilegx__)
-// FIXME:
-// TILEGX version of sigcontext, for Android bionic.
 typedef struct {
   uint32_t regmask;
   uint32_t status;

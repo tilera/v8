@@ -58,7 +58,10 @@ PropertyDetails::PropertyDetails(Smi* smi) {
 
 
 Smi* PropertyDetails::AsSmi() {
-  return Smi::FromInt(value_);
+  // Ensure the upper 2 bits have the same value by sign extending it. This is
+  // necessary to be able to use the 31st bit of the property details.
+  int value = value_ << 1;
+  return Smi::FromInt(value >> 1);
 }
 
 
@@ -77,7 +80,7 @@ PropertyDetails PropertyDetails::AsDeleted() {
 
 #define CAST_ACCESSOR(type)                     \
   type* type::cast(Object* object) {            \
-    ASSERT(object->Is##type());                 \
+    /*  ASSERT(object->Is##type()); */		\
     return reinterpret_cast<type*>(object);     \
   }
 
@@ -282,16 +285,6 @@ bool Object::HasValidElements() {
   // Dictionary is covered under FixedArray.
   return IsFixedArray() || IsFixedDoubleArray() || IsExternalArray();
 }
-
-
-MaybeObject* Object::AllocateNewStorageFor(Heap* heap,
-                                           Representation representation,
-                                           PretenureFlag tenure) {
-  if (!FLAG_track_double_fields) return this;
-  if (!representation.IsDouble()) return this;
-  return heap->AllocateHeapNumber(Number(), tenure);
-}
-
 
 StringShape::StringShape(String* str)
   : type_(str->map()->instance_type()) {
@@ -1030,7 +1023,10 @@ int Smi::value() {
 
 Smi* Smi::FromInt(int value) {
   ASSERT(Smi::IsValid(value));
-  return reinterpret_cast<Smi*>(Internals::IntToSmi(value));
+  int smi_shift_bits = kSmiTagSize + kSmiShiftSize;
+  intptr_t tagged_value =
+      (static_cast<intptr_t>(value) << smi_shift_bits) | kSmiTag;
+  return reinterpret_cast<Smi*>(tagged_value);
 }
 
 
@@ -1108,8 +1104,28 @@ Failure* Failure::Construct(Type type, intptr_t value) {
 
 
 bool Smi::IsValid(intptr_t value) {
-  bool result = Internals::IsValidSmi(value);
-  ASSERT_EQ(result, value >= kMinValue && value <= kMaxValue);
+#ifdef DEBUG
+  bool in_range = (value >= kMinValue) && (value <= kMaxValue);
+#endif
+
+#if defined(V8_TARGET_ARCH_X64) || defined(V8_TARGET_ARCH_TILEGX)
+  // To be representable as a long smi, the value must be a 32-bit integer.
+  bool result = (value == static_cast<int32_t>(value));
+#else
+  // To be representable as an tagged small integer, the two
+  // most-significant bits of 'value' must be either 00 or 11 due to
+  // sign-extension. To check this we add 01 to the two
+  // most-significant bits, and check if the most-significant bit is 0
+  //
+  // CAUTION: The original code below:
+  // bool result = ((value + 0x40000000) & 0x80000000) == 0;
+  // may lead to incorrect results according to the C language spec, and
+  // in fact doesn't work correctly with gcc4.1.1 in some cases: The
+  // compiler may produce undefined results in case of signed integer
+  // overflow. The computation must be done w/ unsigned ints.
+  bool result = (static_cast<uintptr_t>(value + 0x40000000U) < 0x80000000U);
+#endif
+  ASSERT(result == in_range);
   return result;
 }
 
@@ -1162,7 +1178,11 @@ Heap* HeapObject::GetHeap() {
 
 
 Isolate* HeapObject::GetIsolate() {
-  return GetHeap()->isolate();
+  Isolate* isolate = GetHeap()->isolate();
+  // FIXME: Tile: If NULL, create/return a default
+  if (isolate == NULL)
+    isolate = (Isolate*)Isolate::GetDefaultIsolateForLocking();
+  return isolate;
 }
 
 
@@ -1461,17 +1481,10 @@ void JSObject::initialize_properties() {
 
 
 void JSObject::initialize_elements() {
-  if (map()->has_fast_smi_or_object_elements() ||
-      map()->has_fast_double_elements()) {
-    ASSERT(!GetHeap()->InNewSpace(GetHeap()->empty_fixed_array()));
-    WRITE_FIELD(this, kElementsOffset, GetHeap()->empty_fixed_array());
-  } else if (map()->has_external_array_elements()) {
-    ExternalArray* empty_array = GetHeap()->EmptyExternalArrayForMap(map());
-    ASSERT(!GetHeap()->InNewSpace(empty_array));
-    WRITE_FIELD(this, kElementsOffset, empty_array);
-  } else {
-    UNREACHABLE();
-  }
+  ASSERT(map()->has_fast_smi_or_object_elements() ||
+         map()->has_fast_double_elements());
+  ASSERT(!GetHeap()->InNewSpace(GetHeap()->empty_fixed_array()));
+  WRITE_FIELD(this, kElementsOffset, GetHeap()->empty_fixed_array());
 }
 
 
@@ -1503,7 +1516,7 @@ MaybeObject* JSObject::ResetElements() {
 }
 
 
-MaybeObject* JSObject::AllocateStorageForMap(Map* map) {
+MaybeObject* JSObject::TransitionToMap(Map* map) {
   ASSERT(this->map()->inobject_properties() == map->inobject_properties());
   ElementsKind obj_kind = this->map()->elements_kind();
   ElementsKind map_kind = map->elements_kind();
@@ -1539,13 +1552,6 @@ MaybeObject* JSObject::MigrateInstance() {
   // GeneralizeFieldRepresentation algorithm to create the most general existing
   // transition that matches the object. This achieves what is needed.
   return GeneralizeFieldRepresentation(0, Representation::Smi());
-}
-
-
-MaybeObject* JSObject::TryMigrateInstance() {
-  Map* new_map = map()->CurrentMapForDeprecated();
-  if (new_map == NULL) return Smi::FromInt(0);
-  return MigrateToMap(new_map);
 }
 
 
@@ -1710,17 +1716,10 @@ void JSObject::SetInternalField(int index, Smi* value) {
 }
 
 
-MaybeObject* JSObject::FastPropertyAt(Representation representation,
-                                      int index) {
-  Object* raw_value = RawFastPropertyAt(index);
-  return raw_value->AllocateNewStorageFor(GetHeap(), representation);
-}
-
-
 // Access fast-case object properties at index. The use of these routines
 // is needed to correctly distinguish between properties stored in-object and
 // properties stored in the properties array.
-Object* JSObject::RawFastPropertyAt(int index) {
+Object* JSObject::FastPropertyAt(int index) {
   // Adjust for the number of properties stored in the object.
   index -= map()->inobject_properties();
   if (index < 0) {
@@ -1733,7 +1732,7 @@ Object* JSObject::RawFastPropertyAt(int index) {
 }
 
 
-void JSObject::FastPropertyAtPut(int index, Object* value) {
+Object* JSObject::FastPropertyAtPut(int index, Object* value) {
   // Adjust for the number of properties stored in the object.
   index -= map()->inobject_properties();
   if (index < 0) {
@@ -1744,6 +1743,7 @@ void JSObject::FastPropertyAtPut(int index, Object* value) {
     ASSERT(index < properties()->length());
     properties()->set(index, value);
   }
+  return value;
 }
 
 
@@ -2361,6 +2361,9 @@ void DescriptorArray::Set(int descriptor_number,
                           const WhitenessWitness&) {
   // Range check.
   ASSERT(descriptor_number < number_of_descriptors());
+  ASSERT(desc->GetDetails().descriptor_index() <=
+         number_of_descriptors());
+  ASSERT(desc->GetDetails().descriptor_index() > 0);
 
   ASSERT(!desc->GetDetails().representation().IsNone());
   NoIncrementalWriteBarrierSet(this,
@@ -2378,6 +2381,9 @@ void DescriptorArray::Set(int descriptor_number,
 void DescriptorArray::Set(int descriptor_number, Descriptor* desc) {
   // Range check.
   ASSERT(descriptor_number < number_of_descriptors());
+  ASSERT(desc->GetDetails().descriptor_index() <=
+         number_of_descriptors());
+  ASSERT(desc->GetDetails().descriptor_index() > 0);
   ASSERT(!desc->GetDetails().representation().IsNone());
 
   set(ToKeyIndex(descriptor_number), desc->GetKey());
@@ -2389,7 +2395,9 @@ void DescriptorArray::Set(int descriptor_number, Descriptor* desc) {
 void DescriptorArray::Append(Descriptor* desc,
                              const WhitenessWitness& witness) {
   int descriptor_number = number_of_descriptors();
+  int enumeration_index = descriptor_number + 1;
   SetNumberOfDescriptors(descriptor_number + 1);
+  desc->SetEnumerationIndex(enumeration_index);
   Set(descriptor_number, desc, witness);
 
   uint32_t hash = desc->GetKey()->Hash();
@@ -2408,7 +2416,9 @@ void DescriptorArray::Append(Descriptor* desc,
 
 void DescriptorArray::Append(Descriptor* desc) {
   int descriptor_number = number_of_descriptors();
+  int enumeration_index = descriptor_number + 1;
   SetNumberOfDescriptors(descriptor_number + 1);
+  desc->SetEnumerationIndex(enumeration_index);
   Set(descriptor_number, desc);
 
   uint32_t hash = desc->GetKey()->Hash();
@@ -2881,6 +2891,11 @@ Object* ConsString::unchecked_second() {
 
 
 void ConsString::set_second(String* value, WriteBarrierMode mode) {
+  uint64_t vbits = (uint64_t) value;
+  if ((vbits & 0x2) != 0)  {
+    fprintf(stderr, "set_second called with %lx\n", (uint64_t)value);
+  }
+
   WRITE_FIELD(this, kSecondOffset, value);
   CONDITIONAL_WRITE_BARRIER(GetHeap(), this, kSecondOffset, value, mode);
 }
@@ -3599,16 +3614,6 @@ bool Map::is_deprecated() {
 }
 
 
-void Map::freeze() {
-  set_bit_field3(IsFrozen::update(bit_field3(), true));
-}
-
-
-bool Map::is_frozen() {
-  return IsFrozen::decode(bit_field3());
-}
-
-
 bool Map::CanBeDeprecated() {
   int descriptor = LastAdded();
   for (int i = 0; i <= descriptor; i++) {
@@ -3617,10 +3622,6 @@ bool Map::CanBeDeprecated() {
       return true;
     }
     if (FLAG_track_double_fields && details.representation().IsDouble()) {
-      return true;
-    }
-    if (FLAG_track_heap_object_fields &&
-        details.representation().IsHeapObject()) {
       return true;
     }
   }
@@ -4164,6 +4165,23 @@ static MaybeObject* EnsureHasTransitionArray(Map* map) {
 
 void Map::InitializeDescriptors(DescriptorArray* descriptors) {
   int len = descriptors->number_of_descriptors();
+#ifdef DEBUG
+  ASSERT(len <= DescriptorArray::kMaxNumberOfDescriptors);
+
+  bool used_indices[DescriptorArray::kMaxNumberOfDescriptors];
+  for (int i = 0; i < len; ++i) used_indices[i] = false;
+
+  // Ensure that all enumeration indexes between 1 and length occur uniquely in
+  // the descriptor array.
+  for (int i = 0; i < len; ++i) {
+    int enum_index = descriptors->GetDetails(i).descriptor_index() -
+                     PropertyDetails::kInitialIndex;
+    ASSERT(0 <= enum_index && enum_index < len);
+    ASSERT(!used_indices[enum_index]);
+    used_indices[enum_index] = true;
+  }
+#endif
+
   set_instance_descriptors(descriptors);
   SetNumberOfOwnDescriptors(len);
 }
@@ -4677,11 +4695,15 @@ BOOL_ACCESSORS(SharedFunctionInfo, compiler_hints, dont_optimize,
                kDontOptimize)
 BOOL_ACCESSORS(SharedFunctionInfo, compiler_hints, dont_inline, kDontInline)
 BOOL_ACCESSORS(SharedFunctionInfo, compiler_hints, dont_cache, kDontCache)
-BOOL_ACCESSORS(SharedFunctionInfo, compiler_hints, dont_flush, kDontFlush)
 BOOL_ACCESSORS(SharedFunctionInfo, compiler_hints, is_generator, kIsGenerator)
 
 void SharedFunctionInfo::BeforeVisitingPointers() {
   if (IsInobjectSlackTrackingInProgress()) DetachInitialMap();
+}
+
+
+void SharedFunctionInfo::ClearOptimizedCodeMap() {
+  set_optimized_code_map(Smi::FromInt(0));
 }
 
 
@@ -5129,7 +5151,6 @@ ACCESSORS(JSGeneratorObject, context, Context, kContextOffset)
 ACCESSORS(JSGeneratorObject, receiver, Object, kReceiverOffset)
 SMI_ACCESSORS(JSGeneratorObject, continuation, kContinuationOffset)
 ACCESSORS(JSGeneratorObject, operand_stack, FixedArray, kOperandStackOffset)
-SMI_ACCESSORS(JSGeneratorObject, stack_handler_index, kStackHandlerIndexOffset)
 
 
 JSGeneratorObject* JSGeneratorObject::cast(Object* obj) {
@@ -5320,23 +5341,13 @@ void JSArrayBuffer::set_backing_store(void* value, WriteBarrierMode mode) {
 
 
 ACCESSORS(JSArrayBuffer, byte_length, Object, kByteLengthOffset)
-ACCESSORS_TO_SMI(JSArrayBuffer, flag, kFlagOffset)
-
-
-bool JSArrayBuffer::is_external() {
-  return BooleanBit::get(flag(), kIsExternalBit);
-}
-
-
-void JSArrayBuffer::set_is_external(bool value) {
-  set_flag(BooleanBit::set(flag(), kIsExternalBit, value));
-}
 
 
 ACCESSORS(JSTypedArray, buffer, Object, kBufferOffset)
 ACCESSORS(JSTypedArray, byte_offset, Object, kByteOffsetOffset)
 ACCESSORS(JSTypedArray, byte_length, Object, kByteLengthOffset)
 ACCESSORS(JSTypedArray, length, Object, kLengthOffset)
+
 
 ACCESSORS(JSRegExp, data, Object, kDataOffset)
 

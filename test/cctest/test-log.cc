@@ -62,7 +62,7 @@ class ScopedLoggerInitializer {
         // Need to run this prior to creating the scope.
         trick_to_run_init_flags_(init_flags_(prof_lazy)),
         scope_(v8::Isolate::GetCurrent()),
-        env_(v8::Context::New(v8::Isolate::GetCurrent())),
+        env_(v8::Context::New()),
         logger_(i::Isolate::Current()->logger()) {
     env_->Enter();
   }
@@ -371,7 +371,7 @@ class SimpleExternalString : public v8::String::ExternalStringResource {
 
 TEST(Issue23768) {
   v8::HandleScope scope(v8::Isolate::GetCurrent());
-  v8::Handle<v8::Context> env = v8::Context::New(v8::Isolate::GetCurrent());
+  v8::Handle<v8::Context> env = v8::Context::New();
   env->Enter();
 
   SimpleExternalString source_ext_str("(function ext() {})();");
@@ -400,13 +400,12 @@ TEST(LogCallbacks) {
   ScopedLoggerInitializer initialize_logger(false);
   Logger* logger = initialize_logger.logger();
 
-  v8::Local<v8::FunctionTemplate> obj =
-      v8::Local<v8::FunctionTemplate>::New(v8::Isolate::GetCurrent(),
-                                           v8::FunctionTemplate::New());
+  v8::Persistent<v8::FunctionTemplate> obj =
+      v8::Persistent<v8::FunctionTemplate>::New(v8::Isolate::GetCurrent(),
+                                                v8::FunctionTemplate::New());
   obj->SetClassName(v8_str("Obj"));
   v8::Handle<v8::ObjectTemplate> proto = obj->PrototypeTemplate();
-  v8::Local<v8::Signature> signature =
-      v8::Signature::New(v8::Handle<v8::FunctionTemplate>(*obj));
+  v8::Local<v8::Signature> signature = v8::Signature::New(obj);
   proto->Set(v8_str("method1"),
              v8::FunctionTemplate::New(ObjMethod1,
                                        v8::Handle<v8::Value>(),
@@ -429,6 +428,8 @@ TEST(LogCallbacks) {
                   ObjMethod1);
 
   CHECK_NE(NULL, StrNStr(log.start(), ref_data.start(), log.length()));
+
+  obj.Dispose(v8::Isolate::GetCurrent());
 }
 
 
@@ -451,9 +452,9 @@ TEST(LogAccessorCallbacks) {
   ScopedLoggerInitializer initialize_logger(false);
   Logger* logger = initialize_logger.logger();
 
-  v8::Local<v8::FunctionTemplate> obj =
-      v8::Local<v8::FunctionTemplate>::New(v8::Isolate::GetCurrent(),
-                                           v8::FunctionTemplate::New());
+  v8::Persistent<v8::FunctionTemplate> obj =
+      v8::Persistent<v8::FunctionTemplate>::New(v8::Isolate::GetCurrent(),
+                                                v8::FunctionTemplate::New());
   obj->SetClassName(v8_str("Obj"));
   v8::Handle<v8::ObjectTemplate> inst = obj->InstanceTemplate();
   inst->SetAccessor(v8_str("prop1"), Prop1Getter, Prop1Setter);
@@ -486,6 +487,8 @@ TEST(LogAccessorCallbacks) {
                   Prop2Getter);
   CHECK_NE(NULL,
            StrNStr(log.start(), prop2_getter_record.start(), log.length()));
+
+  obj.Dispose(v8::Isolate::GetCurrent());
 }
 
 
@@ -560,9 +563,9 @@ TEST(EquivalenceOfLoggingAndTraversal) {
   // The result either be a "true" literal or problem description.
   if (!result->IsTrue()) {
     v8::Local<v8::String> s = result->ToString();
-    i::ScopedVector<char> data(s->Utf8Length() + 1);
+    i::ScopedVector<char> data(s->Length() + 1);
     CHECK_NE(NULL, data.start());
-    s->WriteUtf8(data.start());
+    s->WriteAscii(data.start());
     printf("%s\n", data.start());
     // Make sure that our output is written prior crash due to CHECK failure.
     fflush(stdout);

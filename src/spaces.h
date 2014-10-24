@@ -29,6 +29,7 @@
 #define V8_SPACES_H_
 
 #include "allocation.h"
+#include "atomicops.h"
 #include "hashmap.h"
 #include "list.h"
 #include "log.h"

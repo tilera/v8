@@ -295,6 +295,7 @@ TEST(HandleDereferenceRead) {
       ->NewHandleDereference(helper.isolate_);
   HandleArray* array = *helper.handle_array_;
   v8::Handle<v8::String> expected = v8_str("whatever");
-  array->handles_[index].Reset(helper.isolate_, expected);
+  array->handles_[index] = v8::Persistent<v8::Value>::New(helper.isolate_,
+                                                          expected);
   VerifyRead(descriptor, internal_field, array, expected);
 }

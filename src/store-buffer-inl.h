@@ -29,6 +29,7 @@
 #define V8_STORE_BUFFER_INL_H_
 
 #include "store-buffer.h"
+#include <arch/atomic.h>
 
 namespace v8 {
 namespace internal {

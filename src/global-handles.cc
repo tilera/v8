@@ -25,9 +25,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// TODO(dcarney): remove
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_IMPLICIT
-
 #include "v8.h"
 
 #include "api.h"
@@ -105,7 +102,7 @@ class GlobalHandles::Node {
     *first_free = this;
   }
 
-  void Acquire(Object* object) {
+  void Acquire(Object* object, GlobalHandles* global_handles) {
     ASSERT(state() == FREE);
     object_ = object;
     class_id_ = v8::HeapProfiler::kPersistentHandleNoClassId;
@@ -114,10 +111,10 @@ class GlobalHandles::Node {
     set_state(NORMAL);
     parameter_or_next_free_.parameter = NULL;
     near_death_callback_ = NULL;
-    IncreaseBlockUses();
+    IncreaseBlockUses(global_handles);
   }
 
-  void Release() {
+  void Release(GlobalHandles* global_handles) {
     ASSERT(state() != FREE);
     set_state(FREE);
 #ifdef ENABLE_EXTRA_CHECKS
@@ -128,7 +125,9 @@ class GlobalHandles::Node {
     set_partially_dependent(false);
     near_death_callback_ = NULL;
 #endif
-    DecreaseBlockUses();
+    parameter_or_next_free_.next_free = global_handles->first_free_;
+    global_handles->first_free_ = this;
+    DecreaseBlockUses(global_handles);
   }
 
   // Object slot accessors.
@@ -233,7 +232,7 @@ class GlobalHandles::Node {
 
   void MakeWeak(GlobalHandles* global_handles,
                 void* parameter,
-                RevivableCallback weak_reference_callback,
+                WeakReferenceCallback weak_reference_callback,
                 NearDeathCallback near_death_callback) {
     ASSERT(state() != FREE);
     set_state(WEAK);
@@ -254,17 +253,18 @@ class GlobalHandles::Node {
     set_parameter(NULL);
   }
 
-  bool PostGarbageCollectionProcessing(Isolate* isolate) {
+  bool PostGarbageCollectionProcessing(Isolate* isolate,
+                                       GlobalHandles* global_handles) {
     if (state() != Node::PENDING) return false;
     if (near_death_callback_ == NULL) {
-      Release();
+      Release(global_handles);
       return false;
     }
     void* par = parameter();
     set_state(NEAR_DEATH);
     set_parameter(NULL);
 
-    v8::Persistent<v8::Value> object = ToApi<v8::Value>(handle());
+    v8::Persistent<v8::Object> object = ToApi<v8::Object>(handle());
     {
       // Check that we are not passing a finalized external string to
       // the callback.
@@ -276,11 +276,9 @@ class GlobalHandles::Node {
       VMState<EXTERNAL> state(isolate);
       if (near_death_callback_ != NULL) {
         if (IsWeakCallback::decode(flags_)) {
-          RevivableCallback callback =
-              reinterpret_cast<RevivableCallback>(near_death_callback_);
-          callback(reinterpret_cast<v8::Isolate*>(isolate),
-                   &object,
-                   par);
+          WeakReferenceCallback callback =
+              reinterpret_cast<WeakReferenceCallback>(near_death_callback_);
+          callback(object, par);
         } else {
           near_death_callback_(reinterpret_cast<v8::Isolate*>(isolate),
                                object,
@@ -296,8 +294,8 @@ class GlobalHandles::Node {
 
  private:
   inline NodeBlock* FindBlock();
-  inline void IncreaseBlockUses();
-  inline void DecreaseBlockUses();
+  inline void IncreaseBlockUses(GlobalHandles* global_handles);
+  inline void DecreaseBlockUses(GlobalHandles* global_handles);
 
   // Storage for object pointer.
   // Placed first to avoid offset computation.
@@ -340,12 +338,8 @@ class GlobalHandles::NodeBlock {
  public:
   static const int kSize = 256;
 
-  explicit NodeBlock(GlobalHandles* global_handles, NodeBlock* next)
-      : next_(next),
-        used_nodes_(0),
-        next_used_(NULL),
-        prev_used_(NULL),
-        global_handles_(global_handles) {}
+  explicit NodeBlock(NodeBlock* next)
+      : next_(next), used_nodes_(0), next_used_(NULL), prev_used_(NULL) {}
 
   void PutNodesOnFreeList(Node** first_free) {
     for (int i = kSize - 1; i >= 0; --i) {
@@ -358,11 +352,11 @@ class GlobalHandles::NodeBlock {
     return &nodes_[index];
   }
 
-  void IncreaseUses() {
+  void IncreaseUses(GlobalHandles* global_handles) {
     ASSERT(used_nodes_ < kSize);
     if (used_nodes_++ == 0) {
-      NodeBlock* old_first = global_handles_->first_used_block_;
-      global_handles_->first_used_block_ = this;
+      NodeBlock* old_first = global_handles->first_used_block_;
+      global_handles->first_used_block_ = this;
       next_used_ = old_first;
       prev_used_ = NULL;
       if (old_first == NULL) return;
@@ -370,18 +364,16 @@ class GlobalHandles::NodeBlock {
     }
   }
 
-  void DecreaseUses() {
+  void DecreaseUses(GlobalHandles* global_handles) {
     ASSERT(used_nodes_ > 0);
     if (--used_nodes_ == 0) {
       if (next_used_ != NULL) next_used_->prev_used_ = prev_used_;
       if (prev_used_ != NULL) prev_used_->next_used_ = next_used_;
-      if (this == global_handles_->first_used_block_) {
-        global_handles_->first_used_block_ = next_used_;
+      if (this == global_handles->first_used_block_) {
+        global_handles->first_used_block_ = next_used_;
       }
     }
   }
-
-  GlobalHandles* global_handles() { return global_handles_; }
 
   // Next block in the list of all blocks.
   NodeBlock* next() const { return next_; }
@@ -396,7 +388,6 @@ class GlobalHandles::NodeBlock {
   int used_nodes_;
   NodeBlock* next_used_;
   NodeBlock* prev_used_;
-  GlobalHandles* global_handles_;
 };
 
 
@@ -409,23 +400,13 @@ GlobalHandles::NodeBlock* GlobalHandles::Node::FindBlock() {
 }
 
 
-void GlobalHandles::Node::IncreaseBlockUses() {
-  NodeBlock* node_block = FindBlock();
-  node_block->IncreaseUses();
-  GlobalHandles* global_handles = node_block->global_handles();
-  global_handles->isolate()->counters()->global_handles()->Increment();
-  global_handles->number_of_global_handles_++;
+void GlobalHandles::Node::IncreaseBlockUses(GlobalHandles* global_handles) {
+  FindBlock()->IncreaseUses(global_handles);
 }
 
 
-void GlobalHandles::Node::DecreaseBlockUses() {
-  NodeBlock* node_block = FindBlock();
-  GlobalHandles* global_handles = node_block->global_handles();
-  parameter_or_next_free_.next_free = global_handles->first_free_;
-  global_handles->first_free_ = this;
-  node_block->DecreaseUses();
-  global_handles->isolate()->counters()->global_handles()->Decrement();
-  global_handles->number_of_global_handles_--;
+void GlobalHandles::Node::DecreaseBlockUses(GlobalHandles* global_handles) {
+  FindBlock()->DecreaseUses(global_handles);
 }
 
 
@@ -479,15 +460,17 @@ GlobalHandles::~GlobalHandles() {
 
 
 Handle<Object> GlobalHandles::Create(Object* value) {
+  isolate_->counters()->global_handles()->Increment();
+  number_of_global_handles_++;
   if (first_free_ == NULL) {
-    first_block_ = new NodeBlock(this, first_block_);
+    first_block_ = new NodeBlock(first_block_);
     first_block_->PutNodesOnFreeList(&first_free_);
   }
   ASSERT(first_free_ != NULL);
   // Take the first node in the free list.
   Node* result = first_free_;
   first_free_ = result->next_free();
-  result->Acquire(value);
+  result->Acquire(value, this);
   if (isolate_->heap()->InNewSpace(value) &&
       !result->is_in_new_space_list()) {
     new_space_nodes_.Add(result);
@@ -498,15 +481,18 @@ Handle<Object> GlobalHandles::Create(Object* value) {
 
 
 void GlobalHandles::Destroy(Object** location) {
-  if (location != NULL) Node::FromLocation(location)->Release();
+  isolate_->counters()->global_handles()->Decrement();
+  number_of_global_handles_--;
+  if (location == NULL) return;
+  Node::FromLocation(location)->Release(this);
 }
 
 
 void GlobalHandles::MakeWeak(Object** location,
                              void* parameter,
-                             RevivableCallback weak_reference_callback,
+                             WeakReferenceCallback weak_reference_callback,
                              NearDeathCallback near_death_callback) {
-  ASSERT((weak_reference_callback == NULL) != (near_death_callback == NULL));
+  ASSERT(near_death_callback != NULL);
   Node::FromLocation(location)->MakeWeak(this,
                                          parameter,
                                          weak_reference_callback,
@@ -662,7 +648,7 @@ bool GlobalHandles::PostGarbageCollectionProcessing(
         continue;
       }
       node->clear_partially_dependent();
-      if (node->PostGarbageCollectionProcessing(isolate_)) {
+      if (node->PostGarbageCollectionProcessing(isolate_, this)) {
         if (initial_post_gc_processing_count != post_gc_processing_count_) {
           // Weak callback triggered another GC and another round of
           // PostGarbageCollection processing.  The current node might
@@ -678,7 +664,7 @@ bool GlobalHandles::PostGarbageCollectionProcessing(
   } else {
     for (NodeIterator it(this); !it.done(); it.Advance()) {
       it.node()->clear_partially_dependent();
-      if (it.node()->PostGarbageCollectionProcessing(isolate_)) {
+      if (it.node()->PostGarbageCollectionProcessing(isolate_, this)) {
         if (initial_post_gc_processing_count != post_gc_processing_count_) {
           // See the comment above.
           return next_gc_likely_to_collect_more;

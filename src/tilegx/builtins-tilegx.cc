@@ -26,7 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 #include "v8.h"
 
 #if defined(V8_TARGET_ARCH_TILEGX)
@@ -861,10 +860,6 @@ void Builtins::Generate_NotifyDeoptimized(MacroAssembler* masm) {
   Generate_NotifyDeoptimizedHelper(masm, Deoptimizer::EAGER);
 }
 
-void Builtins::Generate_NotifySoftDeoptimized(MacroAssembler* masm) {
-  Generate_NotifyDeoptimizedHelper(masm, Deoptimizer::SOFT);
-}
-
 void Builtins::Generate_NotifyLazyDeoptimized(MacroAssembler* masm) {
   Generate_NotifyDeoptimizedHelper(masm, Deoptimizer::LAZY);
 }
@@ -1387,6 +1382,7 @@ static void AllocateJSArray(MacroAssembler* masm,
                             Register scratch2,
                             bool fill_with_hole,
                             Label* gc_required) {
+
   // Load the initial map from the array function.
   __ LoadInitialArrayMap(array_function, scratch2,
                          elements_array_storage, fill_with_hole);
@@ -1403,6 +1399,7 @@ static void AllocateJSArray(MacroAssembler* masm,
         (JSArray::kSize + FixedArray::kHeaderSize) / kPointerSize);
   __ sra(scratch1, array_size, kSmiTagSize + kSmiShiftSize);
   __ Addu(elements_array_end, elements_array_end, scratch1);
+
   __ Allocate(elements_array_end,
               result,
               scratch1,
@@ -1529,7 +1526,7 @@ void ArrayNativeCode(MacroAssembler* masm, Label* call_generic_code) {
 
   __ bind(&not_empty_array);
   __ And(a3, a2, Operand(kIntptrSignBit | kSmiTagMask));
-  __ Branch(call_generic_code, eq, a3, Operand(zero));
+  __ Branch(call_generic_code, ne, a3, Operand(zero));
 
   // Handle construction of an empty array of a certain size. Bail out if size
   // is too large to actually allocate an elements array.

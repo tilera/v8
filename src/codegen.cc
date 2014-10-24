@@ -58,12 +58,13 @@ Comment::~Comment() {
 #undef __
 
 
-void CodeGenerator::MakeCodePrologue(CompilationInfo* info, const char* kind) {
+void CodeGenerator::MakeCodePrologue(CompilationInfo* info) {
+#ifdef DEBUG
   bool print_source = false;
   bool print_ast = false;
   const char* ftype;
 
-  if (info->isolate()->bootstrapper()->IsActive()) {
+  if (Isolate::Current()->bootstrapper()->IsActive()) {
     print_source = FLAG_print_builtin_source;
     print_ast = FLAG_print_builtin_ast;
     ftype = "builtin";
@@ -74,18 +75,17 @@ void CodeGenerator::MakeCodePrologue(CompilationInfo* info, const char* kind) {
   }
 
   if (FLAG_trace_codegen || print_source || print_ast) {
-    PrintF("[generating %s code for %s function: ", kind, ftype);
+    PrintF("*** Generate code for %s function: ", ftype);
     if (info->IsStub()) {
       const char* name =
           CodeStub::MajorName(info->code_stub()->MajorKey(), true);
       PrintF("%s", name == NULL ? "<unknown>" : name);
     } else {
-      PrintF("%s", *info->function()->debug_name()->ToCString());
+      info->function()->name()->ShortPrint();
     }
-    PrintF("]\n");
+    PrintF(" ***\n");
   }
 
-#ifdef DEBUG
   if (!info->IsStub() && print_source) {
     PrintF("--- Source from AST ---\n%s\n",
            PrettyPrinter().PrintProgram(info->function()));

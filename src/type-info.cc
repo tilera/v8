@@ -67,7 +67,7 @@ TypeFeedbackOracle::TypeFeedbackOracle(Handle<Code> code,
       isolate_(isolate),
       zone_(zone) {
   BuildDictionary(code);
-  ASSERT(dictionary_->IsDictionary());
+  ASSERT(reinterpret_cast<Address>(*dictionary_.location()) != kHandleZapValue);
 }
 
 
@@ -105,8 +105,6 @@ bool TypeFeedbackOracle::LoadIsMonomorphicNormal(Property* expr) {
         Code::ExtractTypeFromFlags(code->flags()) == Code::NORMAL;
     if (!preliminary_checks) return false;
     Map* map = code->FindFirstMap();
-    if (map == NULL) return false;
-    map = map->CurrentMapForDeprecated();
     return map != NULL && !CanRetainOtherContext(map, *native_context_);
   }
   return false;
@@ -138,8 +136,6 @@ bool TypeFeedbackOracle::StoreIsMonomorphicNormal(TypeFeedbackId ast_id) {
         Code::ExtractTypeFromFlags(code->flags()) == Code::NORMAL;
     if (!preliminary_checks) return false;
     Map* map = code->FindFirstMap();
-    if (map == NULL) return false;
-    map = map->CurrentMapForDeprecated();
     return map != NULL && !CanRetainOtherContext(map, *native_context_);
   }
   return false;
@@ -184,11 +180,10 @@ bool TypeFeedbackOracle::ObjectLiteralStoreIsMonomorphic(
 }
 
 
-byte TypeFeedbackOracle::ForInType(ForInStatement* stmt) {
+bool TypeFeedbackOracle::IsForInFastCase(ForInStatement* stmt) {
   Handle<Object> value = GetInfo(stmt->ForInFeedbackId());
   return value->IsSmi() &&
-      Smi::cast(*value)->value() == TypeFeedbackCells::kForInFastCaseMarker
-          ? ForInStatement::FAST_FOR_IN : ForInStatement::SLOW_FOR_IN;
+      Smi::cast(*value)->value() == TypeFeedbackCells::kForInFastCaseMarker;
 }
 
 
@@ -197,10 +192,11 @@ Handle<Map> TypeFeedbackOracle::LoadMonomorphicReceiverType(Property* expr) {
   Handle<Object> map_or_code = GetInfo(expr->PropertyFeedbackId());
   if (map_or_code->IsCode()) {
     Handle<Code> code = Handle<Code>::cast(map_or_code);
-    Map* map = code->FindFirstMap()->CurrentMapForDeprecated();
-    return map == NULL || CanRetainOtherContext(map, *native_context_)
+    Map* first_map = code->FindFirstMap();
+    ASSERT(first_map != NULL);
+    return CanRetainOtherContext(first_map, *native_context_)
         ? Handle<Map>::null()
-        : Handle<Map>(map);
+        : Handle<Map>(first_map);
   }
   return Handle<Map>::cast(map_or_code);
 }
@@ -212,28 +208,22 @@ Handle<Map> TypeFeedbackOracle::StoreMonomorphicReceiverType(
   Handle<Object> map_or_code = GetInfo(ast_id);
   if (map_or_code->IsCode()) {
     Handle<Code> code = Handle<Code>::cast(map_or_code);
-    Map* map = code->FindFirstMap()->CurrentMapForDeprecated();
-    return map == NULL || CanRetainOtherContext(map, *native_context_)
+    Map* first_map = code->FindFirstMap();
+    ASSERT(first_map != NULL);
+    return CanRetainOtherContext(first_map, *native_context_)
         ? Handle<Map>::null()
-        : Handle<Map>(map);
+        : Handle<Map>(first_map);
   }
   return Handle<Map>::cast(map_or_code);
 }
 
 
 Handle<Map> TypeFeedbackOracle::CompareNilMonomorphicReceiverType(
-    CompareOperation* expr) {
-  Handle<Object> maybe_code = GetInfo(expr->CompareOperationFeedbackId());
+    TypeFeedbackId id) {
+  Handle<Object> maybe_code = GetInfo(id);
   if (maybe_code->IsCode()) {
-    Map* map = Handle<Code>::cast(maybe_code)->FindFirstMap();
-    if (map == NULL) return Handle<Map>();
-    map = map->CurrentMapForDeprecated();
-    return map == NULL || CanRetainOtherContext(map, *native_context_)
-           ? Handle<Map>()
-           : Handle<Map>(map);
-  } else if (maybe_code->IsMap()) {
-    ASSERT(!Handle<Map>::cast(maybe_code)->is_deprecated());
-    return Handle<Map>::cast(maybe_code);
+    Map* first_map = Handle<Code>::cast(maybe_code)->FindFirstMap();
+    if (first_map != NULL) return Handle<Map>(first_map);
   }
   return Handle<Map>();
 }
@@ -294,6 +284,31 @@ CheckType TypeFeedbackOracle::GetCallCheckType(Call* expr) {
   CheckType check = static_cast<CheckType>(Smi::cast(*value)->value());
   ASSERT(check != RECEIVER_MAP_CHECK);
   return check;
+}
+
+
+Handle<JSObject> TypeFeedbackOracle::GetPrototypeForPrimitiveCheck(
+    CheckType check) {
+  JSFunction* function = NULL;
+  switch (check) {
+    case RECEIVER_MAP_CHECK:
+      UNREACHABLE();
+      break;
+    case STRING_CHECK:
+      function = native_context_->string_function();
+      break;
+    case SYMBOL_CHECK:
+      function = native_context_->symbol_function();
+      break;
+    case NUMBER_CHECK:
+      function = native_context_->number_function();
+      break;
+    case BOOLEAN_CHECK:
+      function = native_context_->boolean_function();
+      break;
+  }
+  ASSERT(function != NULL);
+  return Handle<JSObject>(JSObject::cast(function->instance_prototype()));
 }
 
 
@@ -411,10 +426,11 @@ Handle<Map> TypeFeedbackOracle::GetCompareMap(CompareOperation* expr) {
   if (state != CompareIC::KNOWN_OBJECT) {
     return Handle<Map>::null();
   }
-  Map* map = code->FindFirstMap()->CurrentMapForDeprecated();
-  return map == NULL || CanRetainOtherContext(map, *native_context_)
+  Map* first_map = code->FindFirstMap();
+  ASSERT(first_map != NULL);
+  return CanRetainOtherContext(first_map, *native_context_)
       ? Handle<Map>::null()
-      : Handle<Map>(map);
+      : Handle<Map>(first_map);
 }
 
 
@@ -523,6 +539,15 @@ TypeInfo TypeFeedbackOracle::IncrementType(CountOperation* expr) {
 }
 
 
+static void AddMapIfMissing(Handle<Map> map, SmallMapList* list,
+                            Zone* zone) {
+  for (int i = 0; i < list->length(); ++i) {
+    if (list->at(i).is_identical_to(map)) return;
+  }
+  list->Add(map, zone);
+}
+
+
 void TypeFeedbackOracle::CollectPolymorphicMaps(Handle<Code> code,
                                                 SmallMapList* types) {
   MapHandleList maps;
@@ -531,7 +556,7 @@ void TypeFeedbackOracle::CollectPolymorphicMaps(Handle<Code> code,
   for (int i = 0; i < maps.length(); i++) {
     Handle<Map> map(maps.at(i));
     if (!CanRetainOtherContext(*map, *native_context_)) {
-      types->AddMapIfMissing(map, zone());
+      AddMapIfMissing(map, types, zone());
     }
   }
 }
@@ -549,7 +574,7 @@ void TypeFeedbackOracle::CollectReceiverTypes(TypeFeedbackId ast_id,
     // we need a generic store (or load) here.
     ASSERT(Handle<Code>::cast(object)->ic_state() == GENERIC);
   } else if (object->IsMap()) {
-    types->AddMapIfMissing(Handle<Map>::cast(object), zone());
+    types->Add(Handle<Map>::cast(object), zone());
   } else if (Handle<Code>::cast(object)->ic_state() == POLYMORPHIC) {
     CollectPolymorphicMaps(Handle<Code>::cast(object), types);
   } else if (FLAG_collect_megamorphic_maps_from_stub_cache &&
@@ -557,7 +582,7 @@ void TypeFeedbackOracle::CollectReceiverTypes(TypeFeedbackId ast_id,
     types->Reserve(4, zone());
     ASSERT(object->IsCode());
     isolate_->stub_cache()->CollectMatchingMaps(types,
-                                                name,
+                                                *name,
                                                 flags,
                                                 native_context_,
                                                 zone());
@@ -617,13 +642,13 @@ byte TypeFeedbackOracle::ToBooleanTypes(TypeFeedbackId id) {
 }
 
 
-byte TypeFeedbackOracle::CompareNilTypes(CompareOperation* expr) {
-  Handle<Object> object = GetInfo(expr->CompareOperationFeedbackId());
+byte TypeFeedbackOracle::CompareNilTypes(TypeFeedbackId id) {
+  Handle<Object> object = GetInfo(id);
   if (object->IsCode() &&
       Handle<Code>::cast(object)->is_compare_nil_ic_stub()) {
-    return Handle<Code>::cast(object)->compare_nil_types();
+    return Handle<Code>::cast(object)->compare_nil_state();
   } else {
-    return CompareNilICStub::Types::FullCompare().ToIntegral();
+    return CompareNilICStub::kFullCompare;
   }
 }
 
@@ -701,8 +726,7 @@ void TypeFeedbackOracle::ProcessRelocInfos(ZoneList<RelocInfo>* infos) {
               SetInfo(ast_id, static_cast<Object*>(target));
             } else if (!CanRetainOtherContext(Map::cast(map),
                                               *native_context_)) {
-              Map* feedback = Map::cast(map)->CurrentMapForDeprecated();
-              if (feedback != NULL) SetInfo(ast_id, feedback);
+              SetInfo(ast_id, map);
             }
           }
         } else {

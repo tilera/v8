@@ -293,14 +293,7 @@ static int DecodeIt(Isolate* isolate,
                                                 addr,
                                                 Deoptimizer::LAZY);
           if (id == Deoptimizer::kNotDeoptimizationEntry) {
-            id = Deoptimizer::GetDeoptimizationId(isolate,
-                                                  addr,
-                                                  Deoptimizer::SOFT);
-            if (id == Deoptimizer::kNotDeoptimizationEntry) {
-              out.AddFormatted("    ;; %s", RelocInfo::RelocModeName(rmode));
-            } else {
-              out.AddFormatted("    ;; soft deoptimization bailout %d", id);
-            }
+            out.AddFormatted("    ;; %s", RelocInfo::RelocModeName(rmode));
           } else {
             out.AddFormatted("    ;; lazy deoptimization bailout %d", id);
           }

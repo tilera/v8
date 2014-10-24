@@ -67,19 +67,14 @@ void CcTest::InitializeVM(CcTestExtensionFlags extensions) {
   if (extensions.Contains(Name##_ID)) extension_names[extension_count++] = Id;
   EXTENSION_LIST(CHECK_EXTENSION_FLAG)
 #undef CHECK_EXTENSION_FLAG
-  v8::Isolate* isolate = default_isolate();
   if (context_.IsEmpty()) {
+    v8::Isolate* isolate = default_isolate();
     v8::HandleScope scope(isolate);
     v8::ExtensionConfiguration config(extension_count, extension_names);
     v8::Local<v8::Context> context = v8::Context::New(isolate, &config);
-    context_.Reset(isolate, context);
+    context_ = v8::Persistent<v8::Context>::New(isolate, context);
   }
-  {
-    v8::HandleScope scope(isolate);
-    v8::Local<v8::Context> context =
-        v8::Local<v8::Context>::New(isolate, context_);
-    context->Enter();
-  }
+  context_->Enter();
 }
 
 
@@ -100,8 +95,6 @@ v8::Isolate* CcTest::default_isolate_;
 
 int main(int argc, char* argv[]) {
   v8::internal::FlagList::SetFlagsFromCommandLine(&argc, argv, true);
-  v8::internal::FLAG_harmony_array_buffer = true;
-  v8::internal::FLAG_harmony_typed_arrays = true;
   CcTest::set_default_isolate(v8::Isolate::GetCurrent());
   CHECK(CcTest::default_isolate() != NULL);
   int tests_run = 0;

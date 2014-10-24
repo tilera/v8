@@ -651,17 +651,9 @@ class ExternalReference BASE_EMBEDDED {
     // Handle<Value> f(v8::Arguments&)
     DIRECT_API_CALL,
 
-    // Direct call to API function callback.
-    // void f(v8::Arguments&)
-    DIRECT_API_CALL_NEW,
-
     // Direct call to accessor getter callback.
     // Handle<value> f(Local<String> property, AccessorInfo& info)
-    DIRECT_GETTER_CALL,
-
-    // Direct call to accessor getter callback.
-    // void f(Local<String> property, AccessorInfo& info)
-    DIRECT_GETTER_CALL_NEW
+    DIRECT_GETTER_CALL
   };
 
   static void SetUp();
@@ -768,8 +760,6 @@ class ExternalReference BASE_EMBEDDED {
   static ExternalReference old_data_space_allocation_top_address(
       Isolate* isolate);
   static ExternalReference old_data_space_allocation_limit_address(
-      Isolate* isolate);
-  static ExternalReference new_space_high_promotion_mode_active_address(
       Isolate* isolate);
 
   static ExternalReference double_fp_operation(Token::Value operation,

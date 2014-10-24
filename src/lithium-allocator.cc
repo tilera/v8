@@ -142,7 +142,6 @@ LiveRange::LiveRange(int id, Zone* zone)
       next_(NULL),
       current_interval_(NULL),
       last_processed_use_(NULL),
-      current_hint_operand_(NULL),
       spill_operand_(new(zone) LOperand()),
       spill_start_index_(kMaxInt) { }
 
@@ -229,6 +228,13 @@ bool LiveRange::CanBeSpilled(LifetimePosition pos) {
   if (use_pos == NULL) return true;
   return
       use_pos->pos().Value() > pos.NextInstruction().InstructionEnd().Value();
+}
+
+
+UsePosition* LiveRange::FirstPosWithHint() const {
+  UsePosition* pos = first_pos_;
+  while (pos != NULL && !pos->HasHint()) pos = pos->next();
+  return pos;
 }
 
 
@@ -373,7 +379,7 @@ bool LiveRange::ShouldBeAllocatedBefore(const LiveRange* other) const {
   LifetimePosition start = Start();
   LifetimePosition other_start = other->Start();
   if (start.Value() == other_start.Value()) {
-    UsePosition* pos = first_pos();
+    UsePosition* pos = FirstPosWithHint();
     if (pos == NULL) return false;
     UsePosition* other_pos = other->first_pos();
     if (other_pos == NULL) return true;
@@ -455,11 +461,9 @@ void LiveRange::AddUsePosition(LifetimePosition pos,
                          id_,
                          pos.Value());
   UsePosition* use_pos = new(zone) UsePosition(pos, operand, hint);
-  UsePosition* prev_hint = NULL;
   UsePosition* prev = NULL;
   UsePosition* current = first_pos_;
   while (current != NULL && current->pos().Value() < pos.Value()) {
-    prev_hint = current->HasHint() ? current : prev_hint;
     prev = current;
     current = current->next();
   }
@@ -470,10 +474,6 @@ void LiveRange::AddUsePosition(LifetimePosition pos,
   } else {
     use_pos->next_ = prev->next_;
     prev->next_ = use_pos;
-  }
-
-  if (prev_hint == NULL && use_pos->HasHint()) {
-    current_hint_operand_ = hint;
   }
 }
 
@@ -627,13 +627,13 @@ LOperand* LAllocator::AllocateFixed(LUnallocated* operand,
                                     bool is_tagged) {
   TraceAlloc("Allocating fixed reg for op %d\n", operand->virtual_register());
   ASSERT(operand->HasFixedPolicy());
-  if (operand->HasFixedSlotPolicy()) {
-    operand->ConvertTo(LOperand::STACK_SLOT, operand->fixed_slot_index());
-  } else if (operand->HasFixedRegisterPolicy()) {
-    int reg_index = operand->fixed_register_index();
+  if (operand->policy() == LUnallocated::FIXED_SLOT) {
+    operand->ConvertTo(LOperand::STACK_SLOT, operand->fixed_index());
+  } else if (operand->policy() == LUnallocated::FIXED_REGISTER) {
+    int reg_index = operand->fixed_index();
     operand->ConvertTo(LOperand::REGISTER, reg_index);
-  } else if (operand->HasFixedDoubleRegisterPolicy()) {
-    int reg_index = operand->fixed_register_index();
+  } else if (operand->policy() == LUnallocated::FIXED_DOUBLE_REGISTER) {
+    int reg_index = operand->fixed_index();
     operand->ConvertTo(LOperand::DOUBLE_REGISTER, reg_index);
   } else {
     UNREACHABLE();
@@ -848,7 +848,7 @@ void LAllocator::MeetConstraintsBetween(LInstruction* first,
         bool is_tagged = HasTaggedValue(cur_input->virtual_register());
         AllocateFixed(cur_input, gap_index + 1, is_tagged);
         AddConstraintsGapMove(gap_index, input_copy, cur_input);
-      } else if (cur_input->HasWritableRegisterPolicy()) {
+      } else if (cur_input->policy() == LUnallocated::WRITABLE_REGISTER) {
         // The live range of writable input registers always goes until the end
         // of the instruction.
         ASSERT(!cur_input->IsUsedAtStart());
@@ -927,7 +927,7 @@ void LAllocator::ProcessInstructions(HBasicBlock* block, BitVector* live) {
         if (phi != NULL) {
           // This is a phi resolving move.
           if (!phi->block()->IsLoopHeader()) {
-            hint = LiveRangeFor(phi->id())->current_hint_operand();
+            hint = LiveRangeFor(phi->id())->FirstHint();
           }
         } else {
           if (to->IsUnallocated()) {
@@ -1059,7 +1059,7 @@ void LAllocator::ResolvePhis(HBasicBlock* block) {
       LInstruction* branch =
           InstructionAt(cur_block->last_instruction_index());
       if (branch->HasPointerMap()) {
-        if (phi->representation().IsSmiOrTagged()) {
+        if (phi->representation().IsTagged()) {
           branch->pointer_map()->RecordPointer(phi_operand, zone());
         } else if (!phi->representation().IsDouble()) {
           branch->pointer_map()->RecordUntagged(phi_operand, zone());
@@ -1642,7 +1642,7 @@ void LAllocator::TraceAlloc(const char* msg, ...) {
 bool LAllocator::HasTaggedValue(int virtual_register) const {
   HValue* value = graph_->LookupValue(virtual_register);
   if (value == NULL) return false;
-  return value->representation().IsSmiOrTagged();
+  return value->representation().IsTagged();
 }
 
 
@@ -1815,23 +1815,26 @@ bool LAllocator::TryAllocateFreeReg(LiveRange* current) {
     free_until_pos[cur_reg] = Min(free_until_pos[cur_reg], next_intersection);
   }
 
-  LOperand* hint = current->FirstHint();
-  if (hint != NULL && (hint->IsRegister() || hint->IsDoubleRegister())) {
-    int register_index = hint->index();
-    TraceAlloc(
-        "Found reg hint %s (free until [%d) for live range %d (end %d[).\n",
-        RegisterName(register_index),
-        free_until_pos[register_index].Value(),
-        current->id(),
-        current->End().Value());
+  UsePosition* hinted_use = current->FirstPosWithHint();
+  if (hinted_use != NULL) {
+    LOperand* hint = hinted_use->hint();
+    if (hint->IsRegister() || hint->IsDoubleRegister()) {
+      int register_index = hint->index();
+      TraceAlloc(
+          "Found reg hint %s (free until [%d) for live range %d (end %d[).\n",
+          RegisterName(register_index),
+          free_until_pos[register_index].Value(),
+          current->id(),
+          current->End().Value());
 
-    // The desired register is free until the end of the current live range.
-    if (free_until_pos[register_index].Value() >= current->End().Value()) {
-      TraceAlloc("Assigning preferred reg %s to live range %d\n",
-                 RegisterName(register_index),
-                 current->id());
-      SetLiveRangeAssignedRegister(current, register_index, mode_, zone_);
-      return true;
+      // The desired register is free until the end of the current live range.
+      if (free_until_pos[register_index].Value() >= current->End().Value()) {
+        TraceAlloc("Assigning preferred reg %s to live range %d\n",
+                   RegisterName(register_index),
+                   current->id());
+        SetLiveRangeAssignedRegister(current, register_index, mode_, zone_);
+        return true;
+      }
     }
   }
 

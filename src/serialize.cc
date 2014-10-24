@@ -558,25 +558,6 @@ void ExternalReferenceTable::PopulateTable(Isolate* isolate) {
       UNCLASSIFIED,
       58,
       "Runtime::AllocateInOldPointerSpace");
-  Add(ExternalReference::old_data_space_allocation_top_address(
-      isolate).address(),
-      UNCLASSIFIED,
-      59,
-      "Heap::OldDataSpaceAllocationTopAddress");
-  Add(ExternalReference::old_data_space_allocation_limit_address(
-      isolate).address(),
-      UNCLASSIFIED,
-      60,
-      "Heap::OldDataSpaceAllocationLimitAddress");
-  Add(ExternalReference(Runtime::kAllocateInOldDataSpace, isolate).address(),
-      UNCLASSIFIED,
-      61,
-      "Runtime::AllocateInOldDataSpace");
-  Add(ExternalReference::new_space_high_promotion_mode_active_address(isolate).
-      address(),
-      UNCLASSIFIED,
-      62,
-      "Heap::NewSpaceAllocationLimitAddress");
 
   // Add a small set of deopt entry addresses to encoder without generating the
   // deopt table code, which isn't possible at deserialization time.
@@ -587,7 +568,7 @@ void ExternalReferenceTable::PopulateTable(Isolate* isolate) {
         entry,
         Deoptimizer::LAZY,
         Deoptimizer::CALCULATE_ENTRY_ADDRESS);
-    Add(address, LAZY_DEOPTIMIZATION, 63 + entry, "lazy_deopt");
+    Add(address, LAZY_DEOPTIMIZATION, 59 + entry, "lazy_deopt");
   }
 }
 

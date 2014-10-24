@@ -36,7 +36,6 @@
 #include "deoptimizer.h"
 #include "full-codegen.h"
 #include "gdb-jit.h"
-#include "typing.h"
 #include "hydrogen.h"
 #include "isolate-inl.h"
 #include "lithium.h"
@@ -104,8 +103,6 @@ void CompilationInfo::Initialize(Isolate* isolate, Mode mode, Zone* zone) {
   code_stub_ = NULL;
   prologue_offset_ = kPrologueOffsetNotSet;
   opt_count_ = shared_info().is_null() ? 0 : shared_info()->opt_count();
-  no_frame_ranges_ = isolate->cpu_profiler()->is_profiling()
-                   ? new List<OffsetRange>(2) : NULL;
   if (mode == STUB) {
     mode_ = STUB;
     return;
@@ -124,7 +121,6 @@ void CompilationInfo::Initialize(Isolate* isolate, Mode mode, Zone* zone) {
 
 CompilationInfo::~CompilationInfo() {
   delete deferred_handles_;
-  delete no_frame_ranges_;
 }
 
 
@@ -148,8 +144,7 @@ Code::Flags CompilationInfo::flags() const {
     return Code::ComputeFlags(code_stub()->GetCodeKind(),
                               code_stub()->GetICState(),
                               code_stub()->GetExtraICState(),
-                              code_stub()->GetStubType(),
-                              code_stub()->GetStubFlags());
+                              Code::NORMAL, -1);
   } else {
     return Code::ComputeFlags(Code::OPTIMIZED_FUNCTION);
   }
@@ -220,8 +215,9 @@ void OptimizingCompiler::RecordOptimizationStats() {
   double ms_optimize = static_cast<double>(time_taken_to_optimize_) / 1000;
   double ms_codegen = static_cast<double>(time_taken_to_codegen_) / 1000;
   if (FLAG_trace_opt) {
-    PrintF("[optimizing ");
-    function->ShortPrint();
+    PrintF("[optimizing: ");
+    function->PrintName();
+    PrintF(" / %" V8PRIxPTR, reinterpret_cast<intptr_t>(*function));
     PrintF(" - took %0.3f, %0.3f, %0.3f ms]\n", ms_creategraph, ms_optimize,
            ms_codegen);
   }
@@ -303,14 +299,14 @@ OptimizingCompiler::Status OptimizingCompiler::CreateGraph() {
   //
   // The encoding is as a signed value, with parameters and receiver using
   // the negative indices and locals the non-negative ones.
-  const int parameter_limit = -LUnallocated::kMinFixedSlotIndex;
+  const int parameter_limit = -LUnallocated::kMinFixedIndex;
   Scope* scope = info()->scope();
   if ((scope->num_parameters() + 1) > parameter_limit) {
     info()->set_bailout_reason("too many parameters");
     return AbortOptimization();
   }
 
-  const int locals_limit = LUnallocated::kMaxFixedSlotIndex;
+  const int locals_limit = LUnallocated::kMaxFixedIndex;
   if (!info()->osr_ast_id().IsNone() &&
       scope->num_parameters() + 1 + scope->num_stack_slots() > locals_limit) {
     info()->set_bailout_reason("too many parameters/locals");
@@ -318,9 +314,15 @@ OptimizingCompiler::Status OptimizingCompiler::CreateGraph() {
   }
 
   // Take --hydrogen-filter into account.
-  if (!info()->closure()->PassesHydrogenFilter()) {
+  Handle<String> name = info()->function()->debug_name();
+  if (*FLAG_hydrogen_filter != '\0') {
+    Vector<const char> filter = CStrVector(FLAG_hydrogen_filter);
+    if ((filter[0] == '-'
+         && name->IsUtf8EqualTo(filter.SubVector(1, filter.length())))
+        || (filter[0] != '-' && !name->IsUtf8EqualTo(filter))) {
       info()->SetCode(code);
       return SetLastStatus(BAILED_OUT);
+    }
   }
 
   // Recompile the unoptimized version of the code if the current version
@@ -357,16 +359,15 @@ OptimizingCompiler::Status OptimizingCompiler::CreateGraph() {
   ASSERT(info()->shared_info()->has_deoptimization_support());
 
   if (FLAG_trace_hydrogen) {
-    Handle<String> name = info()->function()->debug_name();
     PrintF("-----------------------------------------------------------\n");
     PrintF("Compiling method %s using hydrogen\n", *name->ToCString());
     isolate()->GetHTracer()->TraceCompilation(info());
   }
-
-  // Type-check the function.
-  AstTyper::Type(info());
-
-  graph_builder_ = new(info()->zone()) HOptimizedGraphBuilder(info());
+  Handle<Context> native_context(
+      info()->closure()->context()->native_context());
+  oracle_ = new(info()->zone()) TypeFeedbackOracle(
+      code, native_context, isolate(), info()->zone());
+  graph_builder_ = new(info()->zone()) HOptimizedGraphBuilder(info(), oracle_);
 
   Timer t(this, &time_taken_to_create_graph_);
   graph_ = graph_builder_->CreateGraph();
@@ -572,7 +573,6 @@ static Handle<SharedFunctionInfo> MakeFunctionInfo(CompilationInfo* info) {
             : Logger::ToNativeByScript(Logger::SCRIPT_TAG, *script),
         *info->code(),
         *result,
-        info,
         String::cast(script->name())));
     GDBJIT(AddCode(Handle<String>(String::cast(script->name())),
                    script,
@@ -585,7 +585,6 @@ static Handle<SharedFunctionInfo> MakeFunctionInfo(CompilationInfo* info) {
             : Logger::ToNativeByScript(Logger::SCRIPT_TAG, *script),
         *info->code(),
         *result,
-        info,
         isolate->heap()->empty_string()));
     GDBJIT(AddCode(Handle<String>(), script, info->code(), info));
   }
@@ -813,10 +812,6 @@ static void InstallCodeCommon(CompilationInfo* info) {
   // reset this bit when lazy compiling the code again.
   if (shared->optimization_disabled()) code->set_optimizable(false);
 
-  if (shared->code() == *code) {
-    // Do not send compilation event for the same code twice.
-    return;
-  }
   Compiler::RecordFunctionCompilation(Logger::LAZY_COMPILE_TAG, info, shared);
 }
 
@@ -847,9 +842,9 @@ static bool InstallCodeFromOptimizedCodeMap(CompilationInfo* info) {
     int index = shared->SearchOptimizedCodeMap(*native_context);
     if (index > 0) {
       if (FLAG_trace_opt) {
-        PrintF("[found optimized code for ");
-        function->ShortPrint();
-        PrintF("]\n");
+        PrintF("[found optimized code for: ");
+        function->PrintName();
+        PrintF(" / %" V8PRIxPTR "]\n", reinterpret_cast<intptr_t>(*function));
       }
       // Caching of optimized code enabled and optimized code found.
       shared->InstallFromOptimizedCodeMap(*function, index);
@@ -1161,7 +1156,6 @@ void Compiler::RecordFunctionCompilation(Logger::LogEventsAndTags tag,
               CodeCreateEvent(Logger::ToNativeByScript(tag, *script),
                               *code,
                               *shared,
-                              info,
                               String::cast(script->name()),
                               line_num));
     } else {
@@ -1169,7 +1163,6 @@ void Compiler::RecordFunctionCompilation(Logger::LogEventsAndTags tag,
               CodeCreateEvent(Logger::ToNativeByScript(tag, *script),
                               *code,
                               *shared,
-                              info,
                               shared->DebugName()));
     }
   }

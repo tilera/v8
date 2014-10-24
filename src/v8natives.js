@@ -1225,27 +1225,20 @@ function ObjectFreeze(obj) {
   if (!IS_SPEC_OBJECT(obj)) {
     throw MakeTypeError("called_on_non_object", ["Object.freeze"]);
   }
-  var isProxy = %IsJSProxy(obj);
-  if (isProxy || %HasNonStrictArgumentsElements(obj)) {
-    if (isProxy) {
-      ProxyFix(obj);
-    }
-    var names = ObjectGetOwnPropertyNames(obj);
-    for (var i = 0; i < names.length; i++) {
-      var name = names[i];
-      var desc = GetOwnProperty(obj, name);
-      if (desc.isWritable() || desc.isConfigurable()) {
-        if (IsDataDescriptor(desc)) desc.setWritable(false);
-        desc.setConfigurable(false);
-        DefineOwnProperty(obj, name, desc, true);
-      }
-    }
-    %PreventExtensions(obj);
-  } else {
-    // TODO(adamk): Is it worth going to this fast path if the
-    // object's properties are already in dictionary mode?
-    %ObjectFreeze(obj);
+  if (%IsJSProxy(obj)) {
+    ProxyFix(obj);
   }
+  var names = ObjectGetOwnPropertyNames(obj);
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    var desc = GetOwnProperty(obj, name);
+    if (desc.isWritable() || desc.isConfigurable()) {
+      if (IsDataDescriptor(desc)) desc.setWritable(false);
+      desc.setConfigurable(false);
+      DefineOwnProperty(obj, name, desc, true);
+    }
+  }
+  %PreventExtensions(obj);
   return obj;
 }
 
@@ -1363,7 +1356,6 @@ function ObjectConstructor(x) {
 function SetUpObject() {
   %CheckIsBootstrapping();
 
-  %SetNativeFlag($Object);
   %SetCode($Object, ObjectConstructor);
   %FunctionSetName(ObjectPoisonProto, "__proto__");
   %FunctionRemovePrototype(ObjectPoisonProto);
@@ -1673,6 +1665,7 @@ function FunctionSourceString(func) {
     func = %GetCallTrap(func);
   }
 
+  // TODO(wingo): Print source using function* for generators.
   if (!IS_FUNCTION(func)) {
     throw new $TypeError('Function.prototype.toString is not generic');
   }
@@ -1691,8 +1684,7 @@ function FunctionSourceString(func) {
   var name = %FunctionNameShouldPrintAsAnonymous(func)
       ? 'anonymous'
       : %FunctionGetName(func);
-  var head = %FunctionIsGenerator(func) ? 'function* ' : 'function ';
-  return head + name + source;
+  return 'function ' + name + source;
 }
 
 
@@ -1775,7 +1767,7 @@ function NewFunction(arg1) {  // length == 1
     // character - it may make the combined function expression
     // compile. We avoid this problem by checking for this early on.
     if (%_CallFunction(p, ')', StringIndexOf) != -1) {
-      throw MakeSyntaxError('paren_in_arg_string',[]);
+	throw MakeSyntaxError('paren_in_arg_string',[]);
     }
     // If the formal parameters include an unbalanced block comment, the
     // function must be rejected. Since JavaScript does not allow nested
@@ -1785,11 +1777,13 @@ function NewFunction(arg1) {  // length == 1
   var body = (n > 0) ? ToString(%_Arguments(n - 1)) : '';
   var source = '(function(' + p + ') {\n' + body + '\n})';
 
+  // The call to SetNewFunctionAttributes will ensure the prototype
+  // property of the resulting function is enumerable (ECMA262, 15.3.5.2).
   var global_receiver = %GlobalReceiver(global);
   var f = %_CallFunction(global_receiver, %CompileString(source, true));
 
   %FunctionMarkNameShouldPrintAsAnonymous(f);
-  return f;
+  return %SetNewFunctionAttributes(f);
 }
 
 

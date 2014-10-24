@@ -794,7 +794,7 @@ FunctionLiteral* Parser::ParseLazy(Utf16CharacterStream* source,
 }
 
 
-Handle<String> Parser::GetSymbol() {
+Handle<String> Parser::GetSymbol(bool* ok) {
   int symbol_id = -1;
   if (pre_parse_data() != NULL) {
     symbol_id = pre_parse_data()->GetSymbolIdentifier();
@@ -1341,7 +1341,7 @@ Module* Parser::ParseModuleUrl(bool* ok) {
   //    String
 
   Expect(Token::STRING, CHECK_OK);
-  Handle<String> symbol = GetSymbol();
+  Handle<String> symbol = GetSymbol(CHECK_OK);
 
   // TODO(ES6): Request JS resource from environment...
 
@@ -3114,7 +3114,7 @@ Expression* Parser::ParseYieldExpression(bool* ok) {
       current_function_state_->generator_object_variable());
   Expression* expression = ParseAssignmentExpression(false, CHECK_OK);
   Yield* yield =
-      factory()->NewYield(generator_object, expression, kind, position);
+    factory()->NewYield(generator_object, expression, kind, position);
   if (kind == Yield::DELEGATING) {
     yield->set_index(current_function_state_->NextHandlerIndex());
   }
@@ -3692,7 +3692,7 @@ Expression* Parser::ParsePrimaryExpression(bool* ok) {
 
     case Token::STRING: {
       Consume(Token::STRING);
-      Handle<String> symbol = GetSymbol();
+      Handle<String> symbol = GetSymbol(CHECK_OK);
       result = factory()->NewLiteral(symbol);
       if (fni_ != NULL) fni_->PushLiteralName(symbol);
       break;
@@ -3740,6 +3740,33 @@ Expression* Parser::ParsePrimaryExpression(bool* ok) {
   }
 
   return result;
+}
+
+
+void Parser::BuildArrayLiteralBoilerplateLiterals(ZoneList<Expression*>* values,
+                                                  Handle<FixedArray> literals,
+                                                  bool* is_simple,
+                                                  int* depth) {
+  // Fill in the literals.
+  // Accumulate output values in local variables.
+  bool is_simple_acc = true;
+  int depth_acc = 1;
+  for (int i = 0; i < values->length(); i++) {
+    MaterializedLiteral* m_literal = values->at(i)->AsMaterializedLiteral();
+    if (m_literal != NULL && m_literal->depth() >= depth_acc) {
+      depth_acc = m_literal->depth() + 1;
+    }
+    Handle<Object> boilerplate_value = GetBoilerplateValue(values->at(i));
+    if (boilerplate_value->IsUndefined()) {
+      literals->set_the_hole(i);
+      is_simple_acc = false;
+    } else {
+      literals->set(i, *boilerplate_value);
+    }
+  }
+
+  *is_simple = is_simple_acc;
+  *depth = depth_acc;
 }
 
 
@@ -3969,8 +3996,7 @@ void Parser::BuildObjectLiteralConstantProperties(
     Handle<FixedArray> constant_properties,
     bool* is_simple,
     bool* fast_elements,
-    int* depth,
-    bool* may_store_doubles) {
+    int* depth) {
   int position = 0;
   // Accumulate the value in local variables and store it at the end.
   bool is_simple_acc = true;
@@ -3993,13 +4019,6 @@ void Parser::BuildObjectLiteralConstantProperties(
     // runtime. The enumeration order is maintained.
     Handle<Object> key = property->key()->handle();
     Handle<Object> value = GetBoilerplateValue(property->value());
-
-    // Ensure objects with doubles are always treated as nested objects.
-    // TODO(verwaest): Remove once we can store them inline.
-    if (FLAG_track_double_fields && value->IsNumber()) {
-      *may_store_doubles = true;
-    }
-
     is_simple_acc = is_simple_acc && !value->IsUndefined();
 
     // Keep track of the number of elements in the object literal and
@@ -4047,7 +4066,7 @@ ObjectLiteral::Property* Parser::ParseObjectLiteralGetSet(bool is_getter,
     if (is_keyword) {
       name = isolate_->factory()->InternalizeUtf8String(Token::String(next));
     } else {
-      name = GetSymbol();
+      name = GetSymbol(CHECK_OK);
     }
     FunctionLiteral* value =
         ParseFunctionLiteral(name,
@@ -4128,7 +4147,7 @@ Expression* Parser::ParseObjectLiteral(bool* ok) {
       }
       case Token::STRING: {
         Consume(Token::STRING);
-        Handle<String> string = GetSymbol();
+        Handle<String> string = GetSymbol(CHECK_OK);
         if (fni_ != NULL) fni_->PushLiteralName(string);
         uint32_t index;
         if (!string.is_null() && string->AsArrayIndex(&index)) {
@@ -4150,7 +4169,7 @@ Expression* Parser::ParseObjectLiteral(bool* ok) {
       default:
         if (Token::IsKeyword(next)) {
           Consume(next);
-          Handle<String> string = GetSymbol();
+          Handle<String> string = GetSymbol(CHECK_OK);
           key = factory()->NewLiteral(string);
         } else {
           // Unexpected token.
@@ -4201,20 +4220,17 @@ Expression* Parser::ParseObjectLiteral(bool* ok) {
   bool is_simple = true;
   bool fast_elements = true;
   int depth = 1;
-  bool may_store_doubles = false;
   BuildObjectLiteralConstantProperties(properties,
                                        constant_properties,
                                        &is_simple,
                                        &fast_elements,
-                                       &depth,
-                                       &may_store_doubles);
+                                       &depth);
   return factory()->NewObjectLiteral(constant_properties,
                                      properties,
                                      literal_index,
                                      is_simple,
                                      fast_elements,
                                      depth,
-                                     may_store_doubles,
                                      has_function);
 }
 
@@ -4823,7 +4839,7 @@ void Parser::ExpectSemicolon(bool* ok) {
 void Parser::ExpectContextualKeyword(const char* keyword, bool* ok) {
   Expect(Token::IDENTIFIER, ok);
   if (!*ok) return;
-  Handle<String> symbol = GetSymbol();
+  Handle<String> symbol = GetSymbol(ok);
   if (!*ok) return;
   if (!symbol->IsUtf8EqualTo(CStrVector(keyword))) {
     *ok = false;
@@ -4850,7 +4866,7 @@ Handle<String> Parser::ParseIdentifier(bool* ok) {
       (top_scope_->is_classic_mode() &&
        (next == Token::FUTURE_STRICT_RESERVED_WORD ||
         (next == Token::YIELD && !is_generator())))) {
-    return GetSymbol();
+    return GetSymbol(ok);
   } else {
     ReportUnexpectedToken(next);
     *ok = false;
@@ -4874,7 +4890,7 @@ Handle<String> Parser::ParseIdentifierOrStrictReservedWord(
     *ok = false;
     return Handle<String>();
   }
-  return GetSymbol();
+  return GetSymbol(ok);
 }
 
 
@@ -4888,7 +4904,7 @@ Handle<String> Parser::ParseIdentifierName(bool* ok) {
     *ok = false;
     return Handle<String>();
   }
-  return GetSymbol();
+  return GetSymbol(ok);
 }
 
 

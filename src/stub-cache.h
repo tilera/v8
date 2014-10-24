@@ -112,8 +112,7 @@ class StubCache {
   Handle<Code> ComputeLoadField(Handle<Name> name,
                                 Handle<JSObject> object,
                                 Handle<JSObject> holder,
-                                PropertyIndex field_index,
-                                Representation representation);
+                                PropertyIndex field_index);
 
   Handle<Code> ComputeLoadCallback(Handle<Name> name,
                                    Handle<JSObject> object,
@@ -148,8 +147,7 @@ class StubCache {
   Handle<Code> ComputeKeyedLoadField(Handle<Name> name,
                                      Handle<JSObject> object,
                                      Handle<JSObject> holder,
-                                     PropertyIndex field_index,
-                                     Representation representation);
+                                     PropertyIndex field_index);
 
   Handle<Code> ComputeKeyedLoadCallback(
       Handle<Name> name,
@@ -281,7 +279,8 @@ class StubCache {
   // ---
 
   Handle<Code> ComputeCompareNil(Handle<Map> receiver_map,
-                                 CompareNilICStub& stub);
+                                 NilValue nil,
+                                 CompareNilICStub::Types types);
 
   // ---
 
@@ -312,7 +311,7 @@ class StubCache {
 
   // Collect all maps that match the name and flags.
   void CollectMatchingMaps(SmallMapList* types,
-                           Handle<Name> name,
+                           Name* name,
                            Code::Flags flags,
                            Handle<Context> native_context,
                            Zone* zone);
@@ -507,9 +506,13 @@ class StubCompiler BASE_EMBEDDED {
   static void GenerateFastPropertyLoad(MacroAssembler* masm,
                                        Register dst,
                                        Register src,
-                                       bool inobject,
-                                       int index,
-                                       Representation representation);
+                                       Handle<JSObject> holder,
+                                       PropertyIndex index);
+  static void DoGenerateFastPropertyLoad(MacroAssembler* masm,
+                                         Register dst,
+                                         Register src,
+                                         bool inobject,
+                                         int index);
 
   static void GenerateLoadArrayLength(MacroAssembler* masm,
                                       Register receiver,
@@ -539,10 +542,8 @@ class StubCompiler BASE_EMBEDDED {
                                Register value_reg,
                                Register scratch1,
                                Register scratch2,
-                               Register scratch3,
                                Label* miss_label,
-                               Label* miss_restore_name,
-                               Label* slow);
+                               Label* miss_restore_name);
 
   void GenerateStoreField(MacroAssembler* masm,
                           Handle<JSObject> object,
@@ -563,14 +564,6 @@ class StubCompiler BASE_EMBEDDED {
       default: UNREACHABLE();
     }
     return Builtins::kLoadIC_Miss;
-  }
-  static Builtins::Name SlowBuiltin(Code::Kind kind) {
-    switch (kind) {
-      case Code::STORE_IC: return Builtins::kStoreIC_Slow;
-      case Code::KEYED_STORE_IC: return Builtins::kKeyedStoreIC_Slow;
-      default: UNREACHABLE();
-    }
-    return Builtins::kStoreIC_Slow;
   }
   static void TailCallBuiltin(MacroAssembler* masm, Builtins::Name name);
 
@@ -650,8 +643,7 @@ class BaseLoadStubCompiler: public StubCompiler {
   Handle<Code> CompileLoadField(Handle<JSObject> object,
                                 Handle<JSObject> holder,
                                 Handle<Name> name,
-                                PropertyIndex index,
-                                Representation representation);
+                                PropertyIndex index);
 
   Handle<Code> CompileLoadCallback(Handle<JSObject> object,
                                    Handle<JSObject> holder,
@@ -703,8 +695,7 @@ class BaseLoadStubCompiler: public StubCompiler {
 
   void GenerateLoadField(Register reg,
                          Handle<JSObject> holder,
-                         PropertyIndex field,
-                         Representation representation);
+                         PropertyIndex index);
   void GenerateLoadConstant(Handle<JSFunction> value);
   void GenerateLoadCallback(Register reg,
                             Handle<ExecutableAccessorInfo> callback);

@@ -132,16 +132,12 @@ class DebugLocalContext {
       v8::Handle<v8::ObjectTemplate> global_template =
           v8::Handle<v8::ObjectTemplate>(),
       v8::Handle<v8::Value> global_object = v8::Handle<v8::Value>())
-      : scope_(v8::Isolate::GetCurrent()),
-        context_(
-          v8::Context::New(v8::Isolate::GetCurrent(),
-                           extensions,
-                           global_template,
-                           global_object)) {
+      : context_(v8::Context::New(extensions, global_template, global_object)) {
     context_->Enter();
   }
   inline ~DebugLocalContext() {
     context_->Exit();
+    context_.Dispose(context_->GetIsolate());
   }
   inline v8::Context* operator->() { return *context_; }
   inline v8::Context* operator*() { return *context_; }
@@ -166,8 +162,7 @@ class DebugLocalContext {
   }
 
  private:
-  v8::HandleScope scope_;
-  v8::Local<v8::Context> context_;
+  v8::Persistent<v8::Context> context_;
 };
 
 
@@ -680,7 +675,7 @@ static void DebugEventBreakPointHitCount(v8::DebugEvent event,
       } else {
         CHECK(result->IsString());
         v8::Handle<v8::String> function_name(result->ToString());
-        function_name->WriteUtf8(last_function_hit);
+        function_name->WriteAscii(last_function_hit);
       }
     }
 
@@ -715,7 +710,7 @@ static void DebugEventBreakPointHitCount(v8::DebugEvent event,
       } else {
         CHECK(result->IsString());
         v8::Handle<v8::String> script_name(result->ToString());
-        script_name->WriteUtf8(last_script_name_hit);
+        script_name->WriteAscii(last_script_name_hit);
       }
     }
 
@@ -731,7 +726,7 @@ static void DebugEventBreakPointHitCount(v8::DebugEvent event,
         result = result->ToString();
         CHECK(result->IsString());
         v8::Handle<v8::String> script_data(result->ToString());
-        script_data->WriteUtf8(last_script_data_hit);
+        script_data->WriteAscii(last_script_data_hit);
       }
     }
 
@@ -751,7 +746,7 @@ static void DebugEventBreakPointHitCount(v8::DebugEvent event,
       result = result->ToString();
       CHECK(result->IsString());
       v8::Handle<v8::String> script_data(result->ToString());
-      script_data->WriteUtf8(last_script_data_hit);
+      script_data->WriteAscii(last_script_data_hit);
     }
   }
 }
@@ -846,8 +841,8 @@ static void DebugEventEvaluate(v8::DebugEvent event,
       v8::Handle<v8::Value> result =
           evaluate_check_function->Call(exec_state, argc, argv);
       if (!result->IsTrue()) {
-        v8::String::Utf8Value utf8(checks[i].expected->ToString());
-        V8_Fatal(__FILE__, __LINE__, "%s != %s", checks[i].expr, *utf8);
+        v8::String::AsciiValue ascii(checks[i].expected->ToString());
+        V8_Fatal(__FILE__, __LINE__, "%s != %s", checks[i].expr, *ascii);
       }
     }
   }
@@ -919,7 +914,7 @@ static void DebugEventStepSequence(v8::DebugEvent event,
     v8::Handle<v8::Value> result = frame_function_name->Call(exec_state,
                                                              argc, argv);
     CHECK(result->IsString());
-    v8::String::Utf8Value function_name(result->ToString());
+    v8::String::AsciiValue function_name(result->ToString());
     CHECK_EQ(1, StrLength(*function_name));
     CHECK_EQ((*function_name)[0],
               expected_step_sequence[break_point_hit_count]);
@@ -4235,8 +4230,7 @@ static const char* kSimpleExtensionSource =
 // http://crbug.com/28933
 // Test that debug break is disabled when bootstrapper is active.
 TEST(NoBreakWhenBootstrapping) {
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope scope(isolate);
+  v8::HandleScope scope(v8::Isolate::GetCurrent());
 
   // Register a debug event listener which sets the break flag and counts.
   v8::Debug::SetDebugEventListener(DebugEventCounter);
@@ -4251,8 +4245,8 @@ TEST(NoBreakWhenBootstrapping) {
                                             kSimpleExtensionSource));
     const char* extension_names[] = { "simpletest" };
     v8::ExtensionConfiguration extensions(1, extension_names);
-    v8::HandleScope handle_scope(isolate);
-    v8::Context::New(isolate, &extensions);
+    v8::Persistent<v8::Context> context = v8::Context::New(&extensions);
+    context.Dispose(context->GetIsolate());
   }
   // Check that no DebugBreak events occured during the context creation.
   CHECK_EQ(0, break_point_hit_count);
@@ -4281,7 +4275,7 @@ static v8::Handle<v8::Array> IndexedEnum(const v8::AccessorInfo&) {
 
 static v8::Handle<v8::Value> NamedGetter(v8::Local<v8::String> name,
                                          const v8::AccessorInfo& info) {
-  v8::String::Utf8Value n(name);
+  v8::String::AsciiValue n(name);
   if (strcmp(*n, "a") == 0) {
     return v8::String::New("AA");
   } else if (strcmp(*n, "b") == 0) {
@@ -5159,9 +5153,7 @@ void V8Thread::Run() {
   v8::Handle<v8::ObjectTemplate> global_template = v8::ObjectTemplate::New();
   global_template->Set(v8::String::New("ThreadedAtBarrier1"),
                        v8::FunctionTemplate::New(ThreadedAtBarrier1));
-  v8::Handle<v8::Context> context = v8::Context::New(v8::Isolate::GetCurrent(),
-                                                     NULL,
-                                                     global_template);
+  v8::Handle<v8::Context> context = v8::Context::New(NULL, global_template);
   v8::Context::Scope context_scope(context);
 
   CompileRun(source);
@@ -5537,9 +5529,7 @@ TEST(CallFunctionInDebugger) {
                        v8::FunctionTemplate::New(CheckDataParameter));
   global_template->Set(v8::String::New("CheckClosure"),
                        v8::FunctionTemplate::New(CheckClosure));
-  v8::Handle<v8::Context> context = v8::Context::New(v8::Isolate::GetCurrent(),
-                                                     NULL,
-                                                     global_template);
+  v8::Handle<v8::Context> context = v8::Context::New(NULL, global_template);
   v8::Context::Scope context_scope(context);
 
   // Compile a function for checking the number of JavaScript frames.
@@ -6237,7 +6227,7 @@ TEST(ScriptNameAndData) {
 }
 
 
-static v8::Handle<v8::Context> expected_context;
+static v8::Persistent<v8::Context> expected_context;
 static v8::Handle<v8::Value> expected_context_data;
 
 
@@ -6263,19 +6253,18 @@ static void ContextCheckMessageHandler(const v8::Debug::Message& message) {
 // Checks that this data is set correctly and that when the debug message
 // handler is called the expected context is the one active.
 TEST(ContextData) {
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope scope(isolate);
+  v8::HandleScope scope(v8::Isolate::GetCurrent());
 
   v8::Debug::SetMessageHandler2(ContextCheckMessageHandler);
 
   // Create two contexts.
-  v8::Handle<v8::Context> context_1;
-  v8::Handle<v8::Context> context_2;
+  v8::Persistent<v8::Context> context_1;
+  v8::Persistent<v8::Context> context_2;
   v8::Handle<v8::ObjectTemplate> global_template =
       v8::Handle<v8::ObjectTemplate>();
   v8::Handle<v8::Value> global_object = v8::Handle<v8::Value>();
-  context_1 = v8::Context::New(isolate, NULL, global_template, global_object);
-  context_2 = v8::Context::New(isolate, NULL, global_template, global_object);
+  context_1 = v8::Context::New(NULL, global_template, global_object);
+  context_2 = v8::Context::New(NULL, global_template, global_object);
 
   // Default data value is undefined.
   CHECK(context_1->GetEmbedderData(0)->IsUndefined());
@@ -6387,7 +6376,7 @@ static void DebugEventDebugBreak(
       } else {
         CHECK(result->IsString());
         v8::Handle<v8::String> function_name(result->ToString());
-        function_name->WriteUtf8(last_function_hit);
+        function_name->WriteAscii(last_function_hit);
       }
     }
 
@@ -6436,11 +6425,10 @@ TEST(RegExpDebugBreak) {
 // Common part of EvalContextData and NestedBreakEventContextData tests.
 static void ExecuteScriptForContextCheck() {
   // Create a context.
-  v8::Handle<v8::Context> context_1;
+  v8::Persistent<v8::Context> context_1;
   v8::Handle<v8::ObjectTemplate> global_template =
       v8::Handle<v8::ObjectTemplate>();
-  context_1 =
-      v8::Context::New(v8::Isolate::GetCurrent(), NULL, global_template);
+  context_1 = v8::Context::New(NULL, global_template);
 
   // Default data value is undefined.
   CHECK(context_1->GetEmbedderData(0)->IsUndefined());
@@ -6456,7 +6444,7 @@ static void ExecuteScriptForContextCheck() {
   // Enter and run function in the context.
   {
     v8::Context::Scope context_scope(context_1);
-    expected_context = v8::Local<v8::Context>(*context_1);
+    expected_context = context_1;
     expected_context_data = data_1;
     v8::Local<v8::Function> f = CompileFunction(source, "f");
     f->Call(context_1->Global(), 0, NULL);
@@ -6617,40 +6605,22 @@ TEST(ScriptCollectedEventContext) {
   script_collected_message_count = 0;
   v8::HandleScope scope(isolate);
 
-  v8::Persistent<v8::Context> context;
-  {
-    v8::HandleScope scope(isolate);
-    context.Reset(isolate, v8::Context::New(isolate));
+  { // Scope for the DebugLocalContext.
+    DebugLocalContext env;
+
+    // Request the loaded scripts to initialize the debugger script cache.
+    debug->GetLoadedScripts();
+
+    // Do garbage collection to ensure that only the script in this test will be
+    // collected afterwards.
+    HEAP->CollectAllGarbage(Heap::kNoGCFlags);
+
+    v8::Debug::SetMessageHandler2(ScriptCollectedMessageHandler);
+    {
+      v8::Script::Compile(v8::String::New("eval('a=1')"))->Run();
+      v8::Script::Compile(v8::String::New("eval('a=2')"))->Run();
+    }
   }
-
-  // Enter context.  We can't have a handle to the context in the outer
-  // scope, so we have to do it the hard way.
-  {
-    v8::HandleScope scope(isolate);
-    v8::Local<v8::Context> local_context =
-        v8::Local<v8::Context>::New(isolate, context);
-    local_context->Enter();
-  }
-
-  // Request the loaded scripts to initialize the debugger script cache.
-  debug->GetLoadedScripts();
-
-  // Do garbage collection to ensure that only the script in this test will be
-  // collected afterwards.
-  HEAP->CollectAllGarbage(Heap::kNoGCFlags);
-
-  v8::Debug::SetMessageHandler2(ScriptCollectedMessageHandler);
-  v8::Script::Compile(v8::String::New("eval('a=1')"))->Run();
-  v8::Script::Compile(v8::String::New("eval('a=2')"))->Run();
-
-  // Leave context
-  {
-    v8::HandleScope scope(isolate);
-    v8::Local<v8::Context> local_context =
-        v8::Local<v8::Context>::New(isolate, context);
-    local_context->Exit();
-  }
-  context.Dispose(isolate);
 
   // Do garbage collection to collect the script above which is no longer
   // referenced.
@@ -7018,7 +6988,7 @@ v8::Handle<v8::Context> debugger_context;
 static v8::Handle<v8::Value> NamedGetterWithCallingContextCheck(
     v8::Local<v8::String> name,
     const v8::AccessorInfo& info) {
-  CHECK_EQ(0, strcmp(*v8::String::Utf8Value(name), "a"));
+  CHECK_EQ(0, strcmp(*v8::String::AsciiValue(name), "a"));
   v8::Handle<v8::Context> current = v8::Context::GetCurrent();
   CHECK(current == debugee_context);
   CHECK(current != debugger_context);
@@ -7109,14 +7079,14 @@ static void DebugEventContextChecker(const v8::Debug::EventDetails& details) {
 
 // Check that event details contain context where debug event occured.
 TEST(DebugEventContext) {
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  v8::HandleScope scope(isolate);
+  v8::HandleScope scope(v8::Isolate::GetCurrent());
   expected_callback_data = v8::Int32::New(2010);
   v8::Debug::SetDebugEventListener2(DebugEventContextChecker,
                                     expected_callback_data);
-  expected_context = v8::Context::New(isolate);
+  expected_context = v8::Context::New();
   v8::Context::Scope context_scope(expected_context);
   v8::Script::Compile(v8::String::New("(function(){debugger;})();"))->Run();
+  expected_context.Dispose(expected_context->GetIsolate());
   expected_context.Clear();
   v8::Debug::SetDebugEventListener(NULL);
   expected_context_data = v8::Handle<v8::Value>();
@@ -7206,7 +7176,7 @@ static void DebugEventBreakDeoptimize(v8::DebugEvent event,
         char fn[80];
         CHECK(result->IsString());
         v8::Handle<v8::String> function_name(result->ToString());
-        function_name->WriteUtf8(fn);
+        function_name->WriteAscii(fn);
         if (strcmp(fn, "bar") == 0) {
           i::Deoptimizer::DeoptimizeAll(v8::internal::Isolate::Current());
           debug_event_break_deoptimize_done = true;

@@ -25,11 +25,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// TODO(dcarney): remove this
-#define V8_ALLOW_ACCESS_TO_RAW_HANDLE_CONSTRUCTOR
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_IMPLICIT
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_ARROW
-
 #include <v8.h>
 #include <assert.h>
 #include <fcntl.h>
@@ -50,7 +45,7 @@
  */
 
 
-v8::Handle<v8::Context> CreateShellContext(v8::Isolate* isolate);
+v8::Persistent<v8::Context> CreateShellContext();
 void RunShell(v8::Handle<v8::Context> context);
 int RunMain(v8::Isolate* isolate, int argc, char* argv[]);
 bool ExecuteString(v8::Isolate* isolate,
@@ -77,7 +72,7 @@ int main(int argc, char* argv[]) {
   int result;
   {
     v8::HandleScope handle_scope(isolate);
-    v8::Handle<v8::Context> context = CreateShellContext(isolate);
+    v8::Persistent<v8::Context> context = CreateShellContext();
     if (context.IsEmpty()) {
       fprintf(stderr, "Error creating context\n");
       return 1;
@@ -86,6 +81,7 @@ int main(int argc, char* argv[]) {
     result = RunMain(isolate, argc, argv);
     if (run_shell) RunShell(context);
     context->Exit();
+    context.Dispose(isolate);
   }
   v8::V8::Dispose();
   return result;
@@ -100,7 +96,7 @@ const char* ToCString(const v8::String::Utf8Value& value) {
 
 // Creates a new execution environment containing the built-in
 // functions.
-v8::Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
+v8::Persistent<v8::Context> CreateShellContext() {
   // Create a template for the global object.
   v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
   // Bind the global 'print' function to the C++ Print callback.
@@ -114,7 +110,7 @@ v8::Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
   // Bind the 'version' function
   global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
 
-  return v8::Context::New(isolate, NULL, global);
+  return v8::Context::New(NULL, global);
 }
 
 

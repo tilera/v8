@@ -31,20 +31,16 @@
 
 var GeneratorFunction = (function*(){yield 1;}).__proto__.constructor;
 
-function assertIteratorResult(value, done, result) {
-  assertEquals({ value: value, done: done}, result);
-}
-
 function TestGeneratorResultPrototype() {
-  function* g() { yield 1; }
-  var iter = g();
-  var result = iter.next();
+    function* g() { yield 1; }
+    var iter = g();
+    var result = iter.next();
 
-  assertSame(Object.prototype, Object.getPrototypeOf(result));
-  property_names = Object.getOwnPropertyNames(result);
-  property_names.sort();
-  assertEquals(["done", "value"], property_names);
-  assertIteratorResult(1, false, result);
+    assertSame(Object.prototype, Object.getPrototypeOf(result));
+    property_names = Object.getOwnPropertyNames(result);
+    property_names.sort();
+    assertEquals(["done", "value"], property_names);
+    assertEquals({ value: 1, done: false }, result);
 }
 TestGeneratorResultPrototype()
 
@@ -53,18 +49,19 @@ function TestGenerator(g, expected_values_for_next,
   function testNext(thunk) {
     var iter = thunk();
     for (var i = 0; i < expected_values_for_next.length; i++) {
-      assertIteratorResult(expected_values_for_next[i],
-                           i == expected_values_for_next.length - 1,
-                           iter.next());
+	assertEquals({ value: expected_values_for_next[i],
+		    done: i == expected_values_for_next.length - 1 },
+	            iter.next());
     }
     assertThrows(function() { iter.next(); }, Error);
   }
   function testSend(thunk) {
     var iter = thunk();
     for (var i = 0; i < expected_values_for_send.length; i++) {
-      assertIteratorResult(expected_values_for_send[i],
-                           i == expected_values_for_send.length - 1,
-                           iter.send(send_val));
+	assertEquals({ value: expected_values_for_send[i],
+		    done: i == expected_values_for_send.length - 1 },
+	            iter.send(send_val));
+
     }
     assertThrows(function() { iter.send(send_val); }, Error);
   }
@@ -72,9 +69,9 @@ function TestGenerator(g, expected_values_for_next,
     for (var i = 0; i < expected_values_for_next.length; i++) {
       var iter = thunk();
       for (var j = 0; j < i; j++) {
-        assertIteratorResult(expected_values_for_next[j],
-                             j == expected_values_for_next.length - 1,
-                             iter.next());
+	  assertEquals({ value: expected_values_for_next[j],
+		      done: j == expected_values_for_next.length - 1 },
+	              iter.next());
       }
       function Sentinel() {}
       assertThrows(function () { iter.throw(new Sentinel); }, Sentinel);
@@ -85,10 +82,6 @@ function TestGenerator(g, expected_values_for_next,
   testNext(g);
   testSend(g);
   testThrow(g);
-
-  testNext(function*() { return yield* g(); });
-  testSend(function*() { return yield* g(); });
-  testThrow(function*() { return yield* g(); });
 
   if (g instanceof GeneratorFunction) {
     testNext(function() { return new g(); });
@@ -296,274 +289,6 @@ TestGenerator(
     [2, NaN, 5, NaN, NaN],
     "foo",
     [2, "1foo3", 5, "4foo6", "foofoo"]);
-
-// Rewind a try context with and without operands on the stack.
-TestGenerator(
-    function* g24() {
-      try {
-        return (yield (1 + (yield 2) + 3)) + (yield (4 + (yield 5) + 6));
-      } catch (e) {
-        throw e;
-      }
-    },
-    [2, NaN, 5, NaN, NaN],
-    "foo",
-    [2, "1foo3", 5, "4foo6", "foofoo"]);
-
-// Yielding in a catch context, with and without operands on the stack.
-TestGenerator(
-    function* g25() {
-      try {
-        throw (yield (1 + (yield 2) + 3))
-      } catch (e) {
-        if (typeof e == 'object') throw e;
-        return e + (yield (4 + (yield 5) + 6));
-      }
-    },
-    [2, NaN, 5, NaN, NaN],
-    "foo",
-    [2, "1foo3", 5, "4foo6", "foofoo"]);
-
-function TestTryCatch(instantiate) {
-  function* g() { yield 1; try { yield 2; } catch (e) { yield e; } yield 3; }
-  function Sentinel() {}
-
-  function Test1(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test1(instantiate(g));
-
-  function Test2(iter) {
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test2(instantiate(g));
-
-  function Test3(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test3(instantiate(g));
-
-  function Test4(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    var exn = new Sentinel;
-    assertIteratorResult(exn, false, iter.throw(exn));
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test4(instantiate(g));
-
-  function Test5(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    var exn = new Sentinel;
-    assertIteratorResult(exn, false, iter.throw(exn));
-    assertIteratorResult(3, false, iter.next());
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-
-  }
-  Test5(instantiate(g));
-
-  function Test6(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    var exn = new Sentinel;
-    assertIteratorResult(exn, false, iter.throw(exn));
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test6(instantiate(g));
-
-  function Test7(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test7(instantiate(g));
-}
-TestTryCatch(function (g) { return g(); });
-TestTryCatch(function* (g) { return yield* g(); });
-
-function TestTryFinally(instantiate) {
-  function* g() { yield 1; try { yield 2; } finally { yield 3; } yield 4; }
-  function Sentinel() {}
-  function Sentinel2() {}
-
-  function Test1(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(4, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test1(instantiate(g));
-
-  function Test2(iter) {
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test2(instantiate(g));
-
-  function Test3(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test3(instantiate(g));
-
-  function Test4(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.throw(new Sentinel));
-    assertThrows(function() { iter.next(); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-
-  }
-  Test4(instantiate(g));
-
-  function Test5(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.throw(new Sentinel));
-    assertThrows(function() { iter.throw(new Sentinel2); }, Sentinel2);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test5(instantiate(g));
-
-  function Test6(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test6(instantiate(g));
-
-  function Test7(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(4, false, iter.next());
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test7(instantiate(g));
-
-  function Test8(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(4, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-
-  }
-  Test8(instantiate(g));
-}
-TestTryFinally(function (g) { return g(); });
-TestTryFinally(function* (g) { return yield* g(); });
-
-function TestNestedTry(instantiate) {
-  function* g() {
-    try {
-      yield 1;
-      try { yield 2; } catch (e) { yield e; }
-      yield 3;
-    } finally {
-      yield 4;
-    }
-    yield 5;
-  }
-  function Sentinel() {}
-  function Sentinel2() {}
-
-  function Test1(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(4, false, iter.next());
-    assertIteratorResult(5, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test1(instantiate(g));
-
-  function Test2(iter) {
-    assertThrows(function() { iter.throw(new Sentinel); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test2(instantiate(g));
-
-  function Test3(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(4, false, iter.throw(new Sentinel));
-    assertThrows(function() { iter.next(); }, Sentinel);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test3(instantiate(g));
-
-  function Test4(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(4, false, iter.throw(new Sentinel));
-    assertThrows(function() { iter.throw(new Sentinel2); }, Sentinel2);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test4(instantiate(g));
-
-  function Test5(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    var exn = new Sentinel;
-    assertIteratorResult(exn, false, iter.throw(exn));
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(4, false, iter.next());
-    assertIteratorResult(5, false, iter.next());
-    assertIteratorResult(undefined, true, iter.next());
-    assertThrows(function() { iter.next(); }, Error);
-
-  }
-  Test5(instantiate(g));
-
-  function Test6(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    var exn = new Sentinel;
-    assertIteratorResult(exn, false, iter.throw(exn));
-    assertIteratorResult(4, false, iter.throw(new Sentinel2));
-    assertThrows(function() { iter.next(); }, Sentinel2);
-    assertThrows(function() { iter.next(); }, Error);
-  }
-  Test6(instantiate(g));
-
-  function Test7(iter) {
-    assertIteratorResult(1, false, iter.next());
-    assertIteratorResult(2, false, iter.next());
-    var exn = new Sentinel;
-    assertIteratorResult(exn, false, iter.throw(exn));
-    assertIteratorResult(3, false, iter.next());
-    assertIteratorResult(4, false, iter.throw(new Sentinel2));
-    assertThrows(function() { iter.next(); }, Sentinel2);
-    assertThrows(function() { iter.next(); }, Error);
-
-  }
-  Test7(instantiate(g));
-
-  // That's probably enough.
-}
-TestNestedTry(function (g) { return g(); });
-TestNestedTry(function* (g) { return yield* g(); });
 
 function TestRecursion() {
   function TestNextRecursion() {

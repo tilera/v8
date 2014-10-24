@@ -29,6 +29,7 @@
 #define V8_TYPE_INFO_H_
 
 #include "allocation.h"
+#include "ast.h"
 #include "globals.h"
 #include "zone-inl.h"
 
@@ -231,8 +232,6 @@ class ICStub;
 class Property;
 class SmallMapList;
 class UnaryOperation;
-class ObjectLiteral;
-class ObjectLiteralProperty;
 
 
 class TypeFeedbackOracle: public ZoneObject {
@@ -249,15 +248,13 @@ class TypeFeedbackOracle: public ZoneObject {
   bool StoreIsPolymorphic(TypeFeedbackId ast_id);
   bool CallIsMonomorphic(Call* expr);
   bool CallNewIsMonomorphic(CallNew* expr);
-  bool ObjectLiteralStoreIsMonomorphic(ObjectLiteralProperty* prop);
+  bool ObjectLiteralStoreIsMonomorphic(ObjectLiteral::Property* prop);
 
-  // TODO(1571) We can't use ForInStatement::ForInType as the return value due
-  // to various cycles in our headers.
-  byte ForInType(ForInStatement* expr);
+  bool IsForInFastCase(ForInStatement* expr);
 
   Handle<Map> LoadMonomorphicReceiverType(Property* expr);
   Handle<Map> StoreMonomorphicReceiverType(TypeFeedbackId id);
-  Handle<Map> CompareNilMonomorphicReceiverType(CompareOperation* expr);
+  Handle<Map> CompareNilMonomorphicReceiverType(TypeFeedbackId id);
 
   KeyedAccessStoreMode GetStoreMode(TypeFeedbackId ast_id);
 
@@ -281,24 +278,26 @@ class TypeFeedbackOracle: public ZoneObject {
   void CollectPolymorphicMaps(Handle<Code> code, SmallMapList* types);
 
   CheckType GetCallCheckType(Call* expr);
+  Handle<JSObject> GetPrototypeForPrimitiveCheck(CheckType check);
+
   Handle<JSFunction> GetCallTarget(Call* expr);
   Handle<JSFunction> GetCallNewTarget(CallNew* expr);
   ElementsKind GetCallNewElementsKind(CallNew* expr);
 
-  Handle<Map> GetObjectLiteralStoreMap(ObjectLiteralProperty* prop);
+  Handle<Map> GetObjectLiteralStoreMap(ObjectLiteral::Property* prop);
 
   bool LoadIsBuiltin(Property* expr, Builtins::Name id);
   bool LoadIsStub(Property* expr, ICStub* stub);
 
   // TODO(1571) We can't use ToBooleanStub::Types as the return value because
-  // of various cycles in our headers. Death to tons of implementations in
+  // of various cylces in our headers. Death to tons of implementations in
   // headers!! :-P
   byte ToBooleanTypes(TypeFeedbackId ast_id);
 
   // TODO(1571) We can't use CompareNilICStub::Types as the return value because
   // of various cylces in our headers. Death to tons of implementations in
   // headers!! :-P
-  byte CompareNilTypes(CompareOperation* expr);
+  byte CompareNilTypes(TypeFeedbackId ast_id);
 
   // Get type information for arithmetic operations and compares.
   TypeInfo UnaryType(UnaryOperation* expr);
@@ -315,7 +314,6 @@ class TypeFeedbackOracle: public ZoneObject {
   TypeInfo IncrementType(CountOperation* expr);
 
   Zone* zone() const { return zone_; }
-  Isolate* isolate() const { return isolate_; }
 
  private:
   void CollectReceiverTypes(TypeFeedbackId ast_id,

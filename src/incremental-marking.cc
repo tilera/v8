@@ -490,16 +490,10 @@ bool IncrementalMarking::WorthActivating() {
   // debug tests run with incremental marking and some without.
   static const intptr_t kActivationThreshold = 0;
 #endif
-  // Only start incremental marking in a safe state: 1) when expose GC is
-  // deactivated, 2) when incremental marking is turned on, 3) when we are
-  // currently not in a GC, and 4) when we are currently not serializing
-  // or deserializing the heap.
+
   return !FLAG_expose_gc &&
       FLAG_incremental_marking &&
-      FLAG_incremental_marking_steps &&
-      heap_->gc_state() == Heap::NOT_IN_GC &&
       !Serializer::enabled() &&
-      heap_->isolate()->IsInitialized() &&
       heap_->PromotedSpaceSizeOfObjects() > kActivationThreshold;
 }
 
@@ -567,21 +561,17 @@ void IncrementalMarking::UncommitMarkingDeque() {
 }
 
 
-void IncrementalMarking::Start(CompactionFlag flag) {
+void IncrementalMarking::Start() {
   if (FLAG_trace_incremental_marking) {
     PrintF("[IncrementalMarking] Start\n");
   }
   ASSERT(FLAG_incremental_marking);
-  ASSERT(FLAG_incremental_marking_steps);
   ASSERT(state_ == STOPPED);
-  ASSERT(heap_->gc_state() == Heap::NOT_IN_GC);
-  ASSERT(!Serializer::enabled());
-  ASSERT(heap_->isolate()->IsInitialized());
 
   ResetStepCounters();
 
   if (heap_->IsSweepingComplete()) {
-    StartMarking(flag);
+    StartMarking(ALLOW_COMPACTION);
   } else {
     if (FLAG_trace_incremental_marking) {
       PrintF("[IncrementalMarking] Start sweeping.\n");
@@ -870,17 +860,6 @@ void IncrementalMarking::MarkingComplete(CompletionAction action) {
 }
 
 
-void IncrementalMarking::OldSpaceStep(intptr_t allocated) {
-  if (IsStopped() && WorthActivating() && heap_->NextGCIsLikelyToBeFull()) {
-    // TODO(hpayer): Let's play safe for now, but compaction should be
-    // in principle possible.
-    Start(PREVENT_COMPACTION);
-  } else {
-    Step(allocated * kFastMarking / kInitialMarkingSpeed, GC_VIA_STACK_GUARD);
-  }
-}
-
-
 void IncrementalMarking::Step(intptr_t allocated_bytes,
                               CompletionAction action) {
   if (heap_->gc_state() != Heap::NOT_IN_GC ||
@@ -986,7 +965,7 @@ void IncrementalMarking::Step(intptr_t allocated_bytes,
         PrintPID("Postponing speeding up marking until marking starts\n");
       }
     } else {
-      marking_speed_ += kMarkingSpeedAccelleration;
+      marking_speed_ += kMarkingSpeedAccellerationInterval;
       marking_speed_ = static_cast<int>(
           Min(kMaxMarkingSpeed,
               static_cast<intptr_t>(marking_speed_ * 1.3)));

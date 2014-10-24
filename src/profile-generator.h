@@ -35,8 +35,6 @@
 namespace v8 {
 namespace internal {
 
-struct OffsetRange;
-
 class TokenEnumerator {
  public:
   TokenEnumerator();
@@ -102,7 +100,6 @@ class CodeEntry {
                    const char* resource_name,
                    int line_number,
                    int security_token_id));
-  ~CodeEntry();
 
   INLINE(bool is_js_function() const) { return is_js_function_tag(tag_); }
   INLINE(const char* name_prefix() const) { return name_prefix_; }
@@ -114,11 +111,6 @@ class CodeEntry {
   INLINE(int security_token_id() const) { return security_token_id_; }
 
   INLINE(static bool is_js_function_tag(Logger::LogEventsAndTags tag));
-
-  List<OffsetRange>* no_frame_ranges() const { return no_frame_ranges_; }
-  void set_no_frame_ranges(List<OffsetRange>* ranges) {
-    no_frame_ranges_ = ranges;
-  }
 
   void CopyData(const CodeEntry& source);
   uint32_t GetCallUid() const;
@@ -134,7 +126,6 @@ class CodeEntry {
   int line_number_;
   int shared_id_;
   int security_token_id_;
-  List<OffsetRange>* no_frame_ranges_;
 
   DISALLOW_COPY_AND_ASSIGN(CodeEntry);
 };
@@ -260,7 +251,7 @@ class CodeMap {
   CodeMap() : next_shared_id_(1) { }
   void AddCode(Address addr, CodeEntry* entry, unsigned size);
   void MoveCode(Address from, Address to);
-  CodeEntry* FindEntry(Address addr, Address* start = NULL);
+  CodeEntry* FindEntry(Address addr);
   int GetSharedId(Address addr);
 
   void Print();

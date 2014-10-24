@@ -228,7 +228,6 @@ TEST(4) {
     double g;
     double h;
     int i;
-    double j;
     double m;
     double n;
     float x;
@@ -291,12 +290,6 @@ TEST(4) {
     __ vcvt_f64_s32(d4, s31);
     __ vstr(d4, r4, OFFSET_OF(T, f));
 
-    // Convert from fixed point to floating point.
-    __ mov(lr, Operand(1234));
-    __ vmov(s8, lr);
-    __ vcvt_f64_s32(d4, 1);
-    __ vstr(d4, r4, OFFSET_OF(T, j));
-
     // Test vabs.
     __ vldr(d1, r4, OFFSET_OF(T, g));
     __ vabs(d0, d1);
@@ -335,7 +328,6 @@ TEST(4) {
     t.g = -2718.2818;
     t.h = 31415926.5;
     t.i = 0;
-    t.j = 0;
     t.m = -2718.2818;
     t.n = 123.456;
     t.x = 4.5;
@@ -349,7 +341,6 @@ TEST(4) {
     CHECK_EQ(2, t.i);
     CHECK_EQ(2718.2818, t.g);
     CHECK_EQ(31415926.5, t.h);
-    CHECK_EQ(617.0, t.j);
     CHECK_EQ(42.0, t.f);
     CHECK_EQ(1.0, t.e);
     CHECK_EQ(1.000000059604644775390625, t.d);

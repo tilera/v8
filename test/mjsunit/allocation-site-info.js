@@ -28,6 +28,10 @@
 // Flags: --allow-natives-syntax --smi-only-arrays --expose-gc
 // Flags: --track-allocation-sites --noalways-opt
 
+// TODO(mvstanton): remove --nooptimize-constructed-arrays and enable
+// the constructed array code below when the feature is turned on
+// by default.
+
 // Test element kind of objects.
 // Since --smi-only-arrays affects builtins, its default setting at compile
 // time sticks if built with snapshot.  If --smi-only-arrays is deactivated
@@ -37,7 +41,7 @@
 
 // support_smi_only_arrays = %HasFastSmiElements(new Array(1,2,3,4,5,6,7,8));
 support_smi_only_arrays = true;
-optimize_constructed_arrays = true;
+optimize_constructed_arrays = false;
 
 if (support_smi_only_arrays) {
   print("Tests include smi-only arrays.");
@@ -280,25 +284,5 @@ if (support_smi_only_arrays) {
     assertKind(elements_kind.fast, obj);
     obj = newarraycase_list_smiobj(2);
     assertKind(elements_kind.fast, obj);
-
-    // Verify that cross context calls work
-    var realmA = Realm.current();
-    var realmB = Realm.create();
-    assertEquals(0, realmA);
-    assertEquals(1, realmB);
-
-    function instanceof_check(type) {
-      assertTrue(new type() instanceof type);
-      assertTrue(new type(5) instanceof type);
-      assertTrue(new type(1,2,3) instanceof type);
-    }
-
-    var realmBArray = Realm.eval(realmB, "Array");
-    instanceof_check(Array);
-    instanceof_check(realmBArray);
-    %OptimizeFunctionOnNextCall(instanceof_check);
-    instanceof_check(Array);
-    instanceof_check(realmBArray);
-    assertTrue(2 != %GetOptimizationStatus(instanceof_check));
   }
 }

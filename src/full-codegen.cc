@@ -304,7 +304,10 @@ bool FullCodeGenerator::MakeCode(CompilationInfo* info) {
     int len = String::cast(script->source())->length();
     isolate->counters()->total_full_codegen_source_size()->Increment(len);
   }
-  CodeGenerator::MakeCodePrologue(info, "full");
+  if (FLAG_trace_codegen) {
+    PrintF("Full Compiler - ");
+  }
+  CodeGenerator::MakeCodePrologue(info);
   const int kInitialBufferSize = 4 * KB;
   MacroAssembler masm(info->isolate(), NULL, kInitialBufferSize);
 #ifdef ENABLE_GDB_JIT_INTERFACE
@@ -371,6 +374,7 @@ unsigned FullCodeGenerator::EmitBackEdgeTable() {
     __ dd(back_edges_[i].id.ToInt());
     __ dd(back_edges_[i].pc);
     __ db(back_edges_[i].loop_depth);
+    masm()->Align(kIntSize);
   }
   return offset;
 }
@@ -1589,7 +1593,7 @@ bool FullCodeGenerator::TryLiteralCompare(CompareOperation* expr) {
     return true;
   }
 
-  if (expr->IsLiteralCompareUndefined(&sub_expr)) {
+  if (expr->IsLiteralCompareUndefined(&sub_expr, isolate())) {
     EmitLiteralCompareNil(expr, sub_expr, kUndefinedValue);
     return true;
   }

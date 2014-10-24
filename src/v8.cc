@@ -281,7 +281,6 @@ void V8::InitializeOncePerProcessImpl() {
   LOperand::SetUpCaches();
   SetUpJSCallerSavedCodeData();
   ExternalReference::SetUp();
-  Bootstrapper::InitializeOncePerProcess();
 }
 
 void V8::InitializeOncePerProcess() {

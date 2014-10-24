@@ -88,8 +88,6 @@ class SourceCodeCache BASE_EMBEDDED {
 // context.
 class Bootstrapper {
  public:
-  static void InitializeOncePerProcess();
-
   // Requires: Heap::SetUp has been called.
   void Initialize(bool create_heap_objects);
   void TearDown();

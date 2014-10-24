@@ -35,7 +35,6 @@
 #include <errno.h>
 #endif
 
-
 #include "v8.h"
 
 #include "global-handles.h"
@@ -300,11 +299,11 @@ TEST(GCCallback) {
 
 static int NumberOfWeakCalls = 0;
 static void WeakPointerCallback(v8::Isolate* isolate,
-                                v8::Persistent<v8::Value>* handle,
+                                v8::Persistent<v8::Value> handle,
                                 void* id) {
   ASSERT(id == reinterpret_cast<void*>(1234));
   NumberOfWeakCalls++;
-  handle->Dispose(isolate);
+  handle.Dispose(isolate);
 }
 
 TEST(ObjectGroups) {
@@ -323,16 +322,16 @@ TEST(ObjectGroups) {
       global_handles->Create(HEAP->AllocateFixedArray(1)->ToObjectChecked());
   global_handles->MakeWeak(g1s1.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
   global_handles->MakeWeak(g1s2.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
   global_handles->MakeWeak(g1c1.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
 
   Handle<Object> g2s1 =
       global_handles->Create(HEAP->AllocateFixedArray(1)->ToObjectChecked());
@@ -342,16 +341,16 @@ TEST(ObjectGroups) {
     global_handles->Create(HEAP->AllocateFixedArray(1)->ToObjectChecked());
   global_handles->MakeWeak(g2s1.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
   global_handles->MakeWeak(g2s2.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
   global_handles->MakeWeak(g2c1.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
 
   Handle<Object> root = global_handles->Create(*g1s1);  // make a root.
 
@@ -380,8 +379,8 @@ TEST(ObjectGroups) {
   // Weaken the root.
   global_handles->MakeWeak(root.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
   // But make children strong roots---all the objects (except for children)
   // should be collectable now.
   global_handles->ClearWeakness(g1c1.location());
@@ -409,12 +408,12 @@ TEST(ObjectGroups) {
   // And now make children weak again and collect them.
   global_handles->MakeWeak(g1c1.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
   global_handles->MakeWeak(g2c1.location(),
                            reinterpret_cast<void*>(1234),
-                           &WeakPointerCallback,
-                           NULL);
+                           NULL,
+                           &WeakPointerCallback);
 
   HEAP->CollectGarbage(OLD_POINTER_SPACE);
   CHECK_EQ(7, NumberOfWeakCalls);
@@ -463,17 +462,10 @@ TEST(EmptyObjectGroups) {
 }
 
 
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define V8_WITH_ASAN 1
-#endif
-#endif
-
-
 // Here is a memory use test that uses /proc, and is therefore Linux-only.  We
 // do not care how much memory the simulator uses, since it is only there for
-// debugging purposes. Testing with ASAN doesn't make sense, either.
-#if defined(__linux__) && !defined(USE_SIMULATOR) && !defined(V8_WITH_ASAN)
+// debugging purposes.
+#if defined(__linux__) && !defined(USE_SIMULATOR)
 
 
 static uintptr_t ReadLong(char* buffer, intptr_t* position, int base) {

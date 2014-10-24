@@ -27,13 +27,11 @@
 //
 // Tests of profiles generator and utilities.
 
-#define V8_DISABLE_DEPRECATIONS 1
 #include "v8.h"
 #include "cpu-profiler-inl.h"
 #include "cctest.h"
 #include "utils.h"
 #include "../include/v8-profiler.h"
-#undef V8_DISABLE_DEPRECATIONS
 
 using i::CodeEntry;
 using i::CpuProfile;
@@ -120,8 +118,7 @@ TEST(CodeEvents) {
                             0,
                             ToAddress(0x1000),
                             0x100,
-                            ToAddress(0x10000),
-                            NULL);
+                            ToAddress(0x10000));
   processor.CodeCreateEvent(i::Logger::BUILTIN_TAG,
                             "bbb",
                             ToAddress(0x1200),
@@ -295,19 +292,6 @@ TEST(DeleteAllCpuProfiles) {
 }
 
 
-static const v8::CpuProfile* FindCpuProfile(v8::CpuProfiler* profiler,
-                                            unsigned uid) {
-  int length = profiler->GetProfileCount();
-  for (int i = 0; i < length; i++) {
-    const v8::CpuProfile* profile = profiler->GetCpuProfile(i);
-    if (profile->GetUid() == uid) {
-      return profile;
-    }
-  }
-  return NULL;
-}
-
-
 TEST(DeleteCpuProfile) {
   LocalContext env;
   v8::HandleScope scope(env->GetIsolate());
@@ -320,10 +304,10 @@ TEST(DeleteCpuProfile) {
   CHECK_NE(NULL, p1);
   CHECK_EQ(1, cpu_profiler->GetProfileCount());
   unsigned uid1 = p1->GetUid();
-  CHECK_EQ(p1, FindCpuProfile(cpu_profiler, uid1));
+  CHECK_EQ(p1, cpu_profiler->FindCpuProfile(uid1));
   const_cast<v8::CpuProfile*>(p1)->Delete();
   CHECK_EQ(0, cpu_profiler->GetProfileCount());
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid1));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid1));
 
   v8::Local<v8::String> name2 = v8::String::New("2");
   cpu_profiler->StartCpuProfiling(name2);
@@ -332,8 +316,8 @@ TEST(DeleteCpuProfile) {
   CHECK_EQ(1, cpu_profiler->GetProfileCount());
   unsigned uid2 = p2->GetUid();
   CHECK_NE(static_cast<int>(uid1), static_cast<int>(uid2));
-  CHECK_EQ(p2, FindCpuProfile(cpu_profiler, uid2));
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid1));
+  CHECK_EQ(p2, cpu_profiler->FindCpuProfile(uid2));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid1));
   v8::Local<v8::String> name3 = v8::String::New("3");
   cpu_profiler->StartCpuProfiling(name3);
   const v8::CpuProfile* p3 = cpu_profiler->StopCpuProfiling(name3);
@@ -341,17 +325,17 @@ TEST(DeleteCpuProfile) {
   CHECK_EQ(2, cpu_profiler->GetProfileCount());
   unsigned uid3 = p3->GetUid();
   CHECK_NE(static_cast<int>(uid1), static_cast<int>(uid3));
-  CHECK_EQ(p3, FindCpuProfile(cpu_profiler, uid3));
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid1));
+  CHECK_EQ(p3, cpu_profiler->FindCpuProfile(uid3));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid1));
   const_cast<v8::CpuProfile*>(p2)->Delete();
   CHECK_EQ(1, cpu_profiler->GetProfileCount());
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid2));
-  CHECK_EQ(p3, FindCpuProfile(cpu_profiler, uid3));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid2));
+  CHECK_EQ(p3, cpu_profiler->FindCpuProfile(uid3));
   const_cast<v8::CpuProfile*>(p3)->Delete();
   CHECK_EQ(0, cpu_profiler->GetProfileCount());
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid3));
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid2));
-  CHECK_EQ(NULL, FindCpuProfile(cpu_profiler, uid1));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid3));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid2));
+  CHECK_EQ(NULL, cpu_profiler->FindCpuProfile(uid1));
 }
 
 
@@ -445,15 +429,8 @@ static const v8::CpuProfileNode* FindChild(const v8::CpuProfileNode* node,
     const v8::CpuProfileNode* child = node->GetChild(i);
     if (nameHandle->Equals(child->GetFunctionName())) return child;
   }
+  CHECK(false);
   return NULL;
-}
-
-
-static const v8::CpuProfileNode* GetChild(const v8::CpuProfileNode* node,
-                                          const char* name) {
-  const v8::CpuProfileNode* result = FindChild(node, name);
-  CHECK(result);
-  return result;
 }
 
 
@@ -461,7 +438,8 @@ static void CheckSimpleBranch(const v8::CpuProfileNode* node,
                               const char* names[], int length) {
   for (int i = 0; i < length; i++) {
     const char* name = names[i];
-    node = GetChild(node, name);
+    node = FindChild(node, name);
+    CHECK(node);
     int expectedChildrenCount = (i == length - 1) ? 0 : 1;
     CHECK_EQ(expectedChildrenCount, node->GetChildrenCount());
   }
@@ -552,10 +530,10 @@ TEST(CollectCpuProfile) {
   names[2] = v8::String::New("start");
   CheckChildrenNames(root, names);
 
-  const v8::CpuProfileNode* startNode = GetChild(root, "start");
+  const v8::CpuProfileNode* startNode = FindChild(root, "start");
   CHECK_EQ(1, startNode->GetChildrenCount());
 
-  const v8::CpuProfileNode* fooNode = GetChild(startNode, "foo");
+  const v8::CpuProfileNode* fooNode = FindChild(startNode, "foo");
   CHECK_EQ(3, fooNode->GetChildrenCount());
 
   const char* barBranch[] = { "bar", "delay", "loop" };
@@ -564,77 +542,6 @@ TEST(CollectCpuProfile) {
   CheckSimpleBranch(fooNode, bazBranch, ARRAY_SIZE(bazBranch));
   const char* delayBranch[] = { "delay", "loop" };
   CheckSimpleBranch(fooNode, delayBranch, ARRAY_SIZE(delayBranch));
-
-  cpu_profiler->DeleteAllCpuProfiles();
-}
-
-
-
-static const char* cpu_profiler_test_source2 = "function loop() {}\n"
-"function delay() { loop(); }\n"
-"function start(count) {\n"
-"  var k = 0;\n"
-"  do {\n"
-"    delay();\n"
-"  } while (++k < count*100*1000);\n"
-"}\n";
-
-// Check that the profile tree doesn't contain unexpecte traces:
-//  - 'loop' can be called only by 'delay'
-//  - 'delay' may be called only by 'start'
-// The profile will look like the following:
-//
-// [Top down]:
-//   135     0   (root) [-1] #1
-//   121    72    start [-1] #3
-//    49    33      delay [-1] #4
-//    16    16        loop [-1] #5
-//    14    14    (program) [-1] #2
-TEST(SampleWhenFrameIsNotSetup) {
-  LocalContext env;
-  v8::HandleScope scope(env->GetIsolate());
-
-  v8::Script::Compile(v8::String::New(cpu_profiler_test_source2))->Run();
-  v8::Local<v8::Function> function = v8::Local<v8::Function>::Cast(
-      env->Global()->Get(v8::String::New("start")));
-
-  v8::CpuProfiler* cpu_profiler = env->GetIsolate()->GetCpuProfiler();
-  v8::Local<v8::String> profile_name = v8::String::New("my_profile");
-
-  cpu_profiler->StartCpuProfiling(profile_name);
-  int32_t repeat_count = 100;
-#if defined(USE_SIMULATOR)
-  // Simulators are much slower.
-  repeat_count = 1;
-#endif
-  v8::Handle<v8::Value> args[] = { v8::Integer::New(repeat_count) };
-  function->Call(env->Global(), ARRAY_SIZE(args), args);
-  const v8::CpuProfile* profile = cpu_profiler->StopCpuProfiling(profile_name);
-
-  CHECK_NE(NULL, profile);
-  // Dump collected profile to have a better diagnostic in case of failure.
-  reinterpret_cast<i::CpuProfile*>(
-      const_cast<v8::CpuProfile*>(profile))->Print();
-
-  const v8::CpuProfileNode* root = profile->GetTopDownRoot();
-
-  ScopedVector<v8::Handle<v8::String> > names(3);
-  names[0] = v8::String::New(ProfileGenerator::kGarbageCollectorEntryName);
-  names[1] = v8::String::New(ProfileGenerator::kProgramEntryName);
-  names[2] = v8::String::New("start");
-  CheckChildrenNames(root, names);
-
-  const v8::CpuProfileNode* startNode = FindChild(root, "start");
-  // On slow machines there may be no meaningfull samples at all, skip the
-  // check there.
-  if (startNode && startNode->GetChildrenCount() > 0) {
-    CHECK_EQ(1, startNode->GetChildrenCount());
-    const v8::CpuProfileNode* delayNode = GetChild(startNode, "delay");
-    if (delayNode->GetChildrenCount() > 0) {
-      CHECK_EQ(1, delayNode->GetChildrenCount());
-      GetChild(delayNode, "loop");
-    }
-  }
 
   cpu_profiler->DeleteAllCpuProfiles();
 }

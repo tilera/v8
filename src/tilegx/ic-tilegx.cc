@@ -909,7 +909,6 @@ void KeyedLoadIC::GenerateMiss(MacroAssembler* masm, ICMissMode miss_mode) {
   ExternalReference ref = miss_mode == MISS_FORCE_GENERIC
       ? ExternalReference(IC_Utility(kKeyedLoadIC_MissForceGeneric), isolate)
       : ExternalReference(IC_Utility(kKeyedLoadIC_Miss), isolate);
-
   __ TailCallExternalReference(ref, 2, 1);
 }
 
@@ -1445,25 +1444,6 @@ void KeyedStoreIC::GenerateMiss(MacroAssembler* masm, ICMissMode miss_mode) {
       ? ExternalReference(IC_Utility(kKeyedStoreIC_MissForceGeneric),
                           masm->isolate())
       : ExternalReference(IC_Utility(kKeyedStoreIC_Miss), masm->isolate());
-  __ TailCallExternalReference(ref, 3, 1);
-}
-
-
-void StoreIC::GenerateSlow(MacroAssembler* masm) {
-  // ---------- S t a t e --------------
-  //  -- a0     : value
-  //  -- a2     : key
-  //  -- a1     : receiver
-  //  -- ra     : return address
-  // -----------------------------------
-
-  // Push receiver, key and value for runtime call.
-  __ Push(a1, a2, a0);
-
-  // The slow case calls into the runtime to complete the store without causing
-  // an IC miss that would otherwise cause a transition to the generic stub.
-  ExternalReference ref =
-      ExternalReference(IC_Utility(kStoreIC_Slow), masm->isolate());
   __ TailCallExternalReference(ref, 3, 1);
 }
 

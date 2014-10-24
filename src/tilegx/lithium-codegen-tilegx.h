@@ -103,6 +103,8 @@ class LCodeGen BASE_EMBEDDED {
     return frame_is_built_ ? kRAHasBeenSaved : kRAHasNotBeenSaved;
   }
 
+  void PopulateDeoptimizationLiteralsWithInlinedFunctions();
+
   // Support for converting LOperands to assembler types.
   // LOperand must be a register.
   Register ToRegister(LOperand* op) const;
@@ -114,7 +116,6 @@ class LCodeGen BASE_EMBEDDED {
   DoubleRegister ToDoubleRegister(LOperand* op) const;
 
   int ToInteger32(LConstantOperand* op) const;
-  Smi* ToSmi(LConstantOperand* op) const;
   double ToDouble(LConstantOperand* op) const;
   Operand ToOperand(LOperand* op);
   MemOperand ToMemOperand(LOperand* op) const;
@@ -122,7 +123,6 @@ class LCodeGen BASE_EMBEDDED {
   MemOperand ToHighMemOperand(LOperand* op) const;
 
   bool IsInteger32(LConstantOperand* op) const;
-  bool IsSmi(LConstantOperand* op) const;
   Handle<Object> ToHandle(LConstantOperand* op) const;
 
   // Try to generate code for the entire chunk, but it may fail if the
@@ -150,7 +150,8 @@ class LCodeGen BASE_EMBEDDED {
   void DoDeferredInstanceOfKnownGlobal(LInstanceOfKnownGlobal* instr,
                                        Label* map_check);
 
-  void DoCheckMapCommon(Register map_reg, Handle<Map> map, LEnvironment* env);
+  void DoCheckMapCommon(Register map_reg, Handle<Map> map,
+                        CompareMapMode mode, LEnvironment* env);
 
   // Parallel move support.
   void DoParallelMove(LParallelMove* move);
@@ -161,7 +162,7 @@ class LCodeGen BASE_EMBEDDED {
                                  bool key_is_constant,
                                  int constant_key,
                                  int element_size,
-                                 int shift_size,
+                                 bool is_tagged,
                                  int additional_index,
                                  int additional_offset);
 
@@ -276,16 +277,8 @@ class LCodeGen BASE_EMBEDDED {
                                             Safepoint::DeoptMode mode);
   void DeoptimizeIf(Condition cc,
                     LEnvironment* environment,
-                    Deoptimizer::BailoutType bailout_type,
                     Register src1 = zero,
                     const Operand& src2 = Operand(zero));
-  void DeoptimizeIf(Condition cc,
-                    LEnvironment* environment,
-                    Register src1 = zero,
-                    const Operand& src2 = Operand(zero));
-  void SoftDeoptimize(LEnvironment* environment,
-                      Register src1 = zero,
-                      const Operand& src2 = Operand(zero));
 
   void AddToTranslation(Translation* translation,
                         LOperand* op,
@@ -298,14 +291,19 @@ class LCodeGen BASE_EMBEDDED {
   void PopulateDeoptimizationData(Handle<Code> code);
   int DefineDeoptimizationLiteral(Handle<Object> literal);
 
-  void PopulateDeoptimizationLiteralsWithInlinedFunctions();
+  void EmitNumberUntagD(Register input,
+                        DoubleRegister result,
+                        bool deoptimize_on_undefined,
+                        bool deoptimize_on_minus_zero,
+                        LEnvironment* env,
+                        NumberUntagDMode mode);
 
   Register ToRegister(int index) const;
   DoubleRegister ToDoubleRegister(int index) const;
 
   void EmitIntegerMathAbs(LMathAbs* instr);
 
-  // Support for recording safepoint and position information.
+  // Support for recording safepoint and position information.  
   void RecordSafepoint(LPointerMap* pointers,
                        Safepoint::Kind kind,
                        int arguments,
@@ -327,13 +325,6 @@ class LCodeGen BASE_EMBEDDED {
                   Condition cc,
                   Register src1,
                   const Operand& src2);
-  void EmitCmpI(LOperand* left, LOperand* right);
-  void EmitNumberUntagD(Register input,
-                        DoubleRegister result,
-                        bool deoptimize_on_undefined,
-                        bool deoptimize_on_minus_zero,
-                        LEnvironment* env,
-                        NumberUntagDMode mode);
 
   // Emits optimized code for typeof x == "y".  Modifies input register.
   // Returns the condition on which a final split to
@@ -381,6 +372,18 @@ class LCodeGen BASE_EMBEDDED {
                     int* offset,
                     AllocationSiteMode mode);
 
+  struct JumpTableEntry {
+    inline JumpTableEntry(Address entry, bool frame, bool is_lazy)
+      : label(),
+	address(entry),
+	needs_frame(frame),
+	is_lazy_deopt(is_lazy) { }
+    Label label;
+    Address address;
+    bool needs_frame;
+    bool is_lazy_deopt;
+  };
+
   void EnsureSpaceForLazyDeopt();
   void DoLoadKeyedExternalArray(LLoadKeyed* instr);
   void DoLoadKeyedFixedDoubleArray(LLoadKeyed* instr);
@@ -398,7 +401,7 @@ class LCodeGen BASE_EMBEDDED {
   int current_instruction_;
   const ZoneList<LInstruction*>* instructions_;
   ZoneList<LEnvironment*> deoptimizations_;
-  ZoneList<Deoptimizer::JumpTableEntry> deopt_jump_table_;
+  ZoneList<JumpTableEntry> deopt_jump_table_;
   ZoneList<Handle<Object> > deoptimization_literals_;
   ZoneList<Handle<Map> > prototype_maps_;
   ZoneList<Handle<Map> > transition_maps_;

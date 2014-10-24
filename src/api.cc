@@ -25,9 +25,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// TODO(dcarney): remove
-#define V8_ALLOW_ACCESS_TO_PERSISTENT_IMPLICIT
-
 #include "api.h"
 
 #include <string.h>  // For memcpy, strlen.
@@ -624,12 +621,22 @@ i::Object** V8::GlobalizeReference(i::Isolate* isolate, i::Object** obj) {
   return result.location();
 }
 
+// FIXME: Tile: Provide backward compatible alternate entry:
+i::Object** V8::GlobalizeReference(i::Object** obj) {
+  i::Isolate* isolate = (i::Isolate*)i::Isolate::GetDefaultIsolateForLocking();
+  return GlobalizeReference(isolate, obj);
+}
 
 void V8::MakeWeak(i::Isolate* isolate,
                   i::Object** object,
                   void* parameters,
-                  RevivableCallback weak_reference_callback,
+                  WeakReferenceCallback weak_reference_callback,
                   NearDeathCallback near_death_callback) {
+
+  // FIXME: Tile: If NULL isolate passed in, get default:
+  if (isolate == NULL)
+    isolate = (i::Isolate*)i::Isolate::GetDefaultIsolateForLocking();
+
   ASSERT(isolate == i::Isolate::Current());
   LOG_API(isolate, "MakeWeak");
   isolate->global_handles()->MakeWeak(object,
@@ -645,8 +652,11 @@ void V8::ClearWeak(i::Isolate* isolate, i::Object** obj) {
 }
 
 
-void V8::DisposeGlobal(i::Object** obj) {
-  i::GlobalHandles::Destroy(obj);
+void V8::DisposeGlobal(i::Isolate* isolate, i::Object** obj) {
+  ASSERT(isolate == i::Isolate::Current());
+  LOG_API(isolate, "DisposeGlobal");
+  if (!isolate->IsInitialized()) return;
+  isolate->global_handles()->Destroy(obj);
 }
 
 // --- H a n d l e s ---
@@ -980,12 +990,8 @@ void FunctionTemplate::Inherit(v8::Handle<FunctionTemplate> value) {
 }
 
 
-template<typename Callback>
-static Local<FunctionTemplate> FunctionTemplateNew(
-    Callback callback,
-    v8::Handle<Value> data,
-    v8::Handle<Signature> signature,
-    int length) {
+Local<FunctionTemplate> FunctionTemplate::New(InvocationCallback callback,
+    v8::Handle<Value> data, v8::Handle<Signature> signature, int length) {
   i::Isolate* isolate = i::Isolate::Current();
   EnsureInitializedForIsolate(isolate, "v8::FunctionTemplate::New()");
   LOG_API(isolate, "FunctionTemplate::New");
@@ -1009,24 +1015,6 @@ static Local<FunctionTemplate> FunctionTemplateNew(
   if (!signature.IsEmpty())
     obj->set_signature(*Utils::OpenHandle(*signature));
   return Utils::ToLocal(obj);
-}
-
-
-Local<FunctionTemplate> FunctionTemplate::New(
-    InvocationCallback callback,
-    v8::Handle<Value> data,
-    v8::Handle<Signature> signature,
-    int length) {
-  return FunctionTemplateNew(callback, data, signature, length);
-}
-
-
-Local<FunctionTemplate> FunctionTemplate::New(
-    FunctionCallback callback,
-    v8::Handle<Value> data,
-    v8::Handle<Signature> signature,
-    int length) {
-  return FunctionTemplateNew(callback, data, signature, length);
 }
 
 
@@ -1221,11 +1209,9 @@ int TypeSwitch::match(v8::Handle<Value> value) {
   } while (false)
 
 
-template<typename Callback>
-static void FunctionTemplateSetCallHandler(FunctionTemplate* function_template,
-                                           Callback callback_in,
-                                           v8::Handle<Value> data) {
-  i::Isolate* isolate = Utils::OpenHandle(function_template)->GetIsolate();
+void FunctionTemplate::SetCallHandler(InvocationCallback callback,
+                                      v8::Handle<Value> data) {
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate, "v8::FunctionTemplate::SetCallHandler()")) return;
   ENTER_V8(isolate);
   i::HandleScope scope(isolate);
@@ -1233,23 +1219,12 @@ static void FunctionTemplateSetCallHandler(FunctionTemplate* function_template,
       isolate->factory()->NewStruct(i::CALL_HANDLER_INFO_TYPE);
   i::Handle<i::CallHandlerInfo> obj =
       i::Handle<i::CallHandlerInfo>::cast(struct_obj);
-  InvocationCallback callback =
-      i::CallbackTable::Register(isolate, callback_in);
   SET_FIELD_WRAPPED(obj, set_callback, callback);
   if (data.IsEmpty()) data = v8::Undefined();
   obj->set_data(*Utils::OpenHandle(*data));
-  Utils::OpenHandle(function_template)->set_call_code(*obj);
+  Utils::OpenHandle(this)->set_call_code(*obj);
 }
 
-void FunctionTemplate::SetCallHandler(InvocationCallback callback,
-                                      v8::Handle<Value> data) {
-  FunctionTemplateSetCallHandler(this, callback, data);
-}
-
-void FunctionTemplate::SetCallHandler(FunctionCallback callback,
-                                      v8::Handle<Value> data) {
-  FunctionTemplateSetCallHandler(this, callback, data);
-}
 
 static i::Handle<i::AccessorInfo> SetAccessorInfoProperties(
     i::Handle<i::AccessorInfo> obj,
@@ -1269,11 +1244,10 @@ static i::Handle<i::AccessorInfo> SetAccessorInfoProperties(
 }
 
 
-template<typename Getter, typename Setter>
 static i::Handle<i::AccessorInfo> MakeAccessorInfo(
       v8::Handle<String> name,
-      Getter getter_in,
-      Setter setter_in,
+      AccessorGetter getter,
+      AccessorSetter setter,
       v8::Handle<Value> data,
       v8::AccessControl settings,
       v8::PropertyAttribute attributes,
@@ -1281,9 +1255,7 @@ static i::Handle<i::AccessorInfo> MakeAccessorInfo(
   i::Isolate* isolate = Utils::OpenHandle(*name)->GetIsolate();
   i::Handle<i::ExecutableAccessorInfo> obj =
       isolate->factory()->NewExecutableAccessorInfo();
-  AccessorGetter getter = i::CallbackTable::Register(isolate, getter_in);
   SET_FIELD_WRAPPED(obj, set_getter, getter);
-  AccessorSetter setter = i::CallbackTable::Register(isolate, setter_in);
   SET_FIELD_WRAPPED(obj, set_setter, setter);
   if (data.IsEmpty()) data = v8::Undefined();
   obj->set_data(*Utils::OpenHandle(*data));
@@ -1294,8 +1266,6 @@ static i::Handle<i::AccessorInfo> MakeAccessorInfo(
 static i::Handle<i::AccessorInfo> MakeAccessorInfo(
       v8::Handle<String> name,
       v8::Handle<v8::DeclaredAccessorDescriptor> descriptor,
-      void* setter_ignored,
-      void* data_ignored,
       v8::AccessControl settings,
       v8::PropertyAttribute attributes,
       v8::Handle<AccessorSignature> signature) {
@@ -1360,21 +1330,15 @@ void FunctionTemplate::ReadOnlyPrototype() {
   Utils::OpenHandle(this)->set_read_only_prototype(true);
 }
 
-template<
-    typename Getter,
-    typename Setter,
-    typename Query,
-    typename Deleter,
-    typename Enumerator>
-static void SetNamedInstancePropertyHandler(
-      i::Handle<i::FunctionTemplateInfo> function_template,
-      Getter getter_in,
-      Setter setter_in,
-      Query query_in,
-      Deleter remover_in,
-      Enumerator enumerator_in,
+
+void FunctionTemplate::SetNamedInstancePropertyHandler(
+      NamedPropertyGetter getter,
+      NamedPropertySetter setter,
+      NamedPropertyQuery query,
+      NamedPropertyDeleter remover,
+      NamedPropertyEnumerator enumerator,
       Handle<Value> data) {
-  i::Isolate* isolate = function_template->GetIsolate();
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate,
                   "v8::FunctionTemplate::SetNamedInstancePropertyHandler()")) {
     return;
@@ -1386,40 +1350,26 @@ static void SetNamedInstancePropertyHandler(
   i::Handle<i::InterceptorInfo> obj =
       i::Handle<i::InterceptorInfo>::cast(struct_obj);
 
-  NamedPropertyGetter getter = i::CallbackTable::Register(isolate, getter_in);
   if (getter != 0) SET_FIELD_WRAPPED(obj, set_getter, getter);
-  NamedPropertySetter setter = i::CallbackTable::Register(isolate, setter_in);
   if (setter != 0) SET_FIELD_WRAPPED(obj, set_setter, setter);
-  NamedPropertyQuery query = i::CallbackTable::Register(isolate, query_in);
   if (query != 0) SET_FIELD_WRAPPED(obj, set_query, query);
-  NamedPropertyDeleter remover =
-      i::CallbackTable::Register(isolate, remover_in);
   if (remover != 0) SET_FIELD_WRAPPED(obj, set_deleter, remover);
-  NamedPropertyEnumerator enumerator =
-      i::CallbackTable::Register(isolate, enumerator_in);
   if (enumerator != 0) SET_FIELD_WRAPPED(obj, set_enumerator, enumerator);
 
   if (data.IsEmpty()) data = v8::Undefined();
   obj->set_data(*Utils::OpenHandle(*data));
-  function_template->set_named_property_handler(*obj);
+  Utils::OpenHandle(this)->set_named_property_handler(*obj);
 }
 
 
-template<
-    typename Getter,
-    typename Setter,
-    typename Query,
-    typename Deleter,
-    typename Enumerator>
-static void SetIndexedInstancePropertyHandler(
-      i::Handle<i::FunctionTemplateInfo> function_template,
-      Getter getter_in,
-      Setter setter_in,
-      Query query_in,
-      Deleter remover_in,
-      Enumerator enumerator_in,
+void FunctionTemplate::SetIndexedInstancePropertyHandler(
+      IndexedPropertyGetter getter,
+      IndexedPropertySetter setter,
+      IndexedPropertyQuery query,
+      IndexedPropertyDeleter remover,
+      IndexedPropertyEnumerator enumerator,
       Handle<Value> data) {
-  i::Isolate* isolate = function_template->GetIsolate();
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate,
         "v8::FunctionTemplate::SetIndexedInstancePropertyHandler()")) {
     return;
@@ -1431,33 +1381,22 @@ static void SetIndexedInstancePropertyHandler(
   i::Handle<i::InterceptorInfo> obj =
       i::Handle<i::InterceptorInfo>::cast(struct_obj);
 
-  IndexedPropertyGetter getter =
-      i::CallbackTable::Register(isolate, getter_in);
   if (getter != 0) SET_FIELD_WRAPPED(obj, set_getter, getter);
-  IndexedPropertySetter setter =
-      i::CallbackTable::Register(isolate, setter_in);
   if (setter != 0) SET_FIELD_WRAPPED(obj, set_setter, setter);
-  IndexedPropertyQuery query = i::CallbackTable::Register(isolate, query_in);
   if (query != 0) SET_FIELD_WRAPPED(obj, set_query, query);
-  IndexedPropertyDeleter remover =
-      i::CallbackTable::Register(isolate, remover_in);
   if (remover != 0) SET_FIELD_WRAPPED(obj, set_deleter, remover);
-  IndexedPropertyEnumerator enumerator =
-      i::CallbackTable::Register(isolate, enumerator_in);
   if (enumerator != 0) SET_FIELD_WRAPPED(obj, set_enumerator, enumerator);
 
   if (data.IsEmpty()) data = v8::Undefined();
   obj->set_data(*Utils::OpenHandle(*data));
-  function_template->set_indexed_property_handler(*obj);
+  Utils::OpenHandle(this)->set_indexed_property_handler(*obj);
 }
 
 
-template<typename Callback>
-static void SetInstanceCallAsFunctionHandler(
-      i::Handle<i::FunctionTemplateInfo> function_template,
-      Callback callback_in,
+void FunctionTemplate::SetInstanceCallAsFunctionHandler(
+      InvocationCallback callback,
       Handle<Value> data) {
-  i::Isolate* isolate = function_template->GetIsolate();
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate,
                   "v8::FunctionTemplate::SetInstanceCallAsFunctionHandler()")) {
     return;
@@ -1468,12 +1407,10 @@ static void SetInstanceCallAsFunctionHandler(
       isolate->factory()->NewStruct(i::CALL_HANDLER_INFO_TYPE);
   i::Handle<i::CallHandlerInfo> obj =
       i::Handle<i::CallHandlerInfo>::cast(struct_obj);
-  InvocationCallback callback =
-      i::CallbackTable::Register(isolate, callback_in);
   SET_FIELD_WRAPPED(obj, set_callback, callback);
   if (data.IsEmpty()) data = v8::Undefined();
   obj->set_data(*Utils::OpenHandle(*data));
-  function_template->set_instance_call_handler(*obj);
+  Utils::OpenHandle(this)->set_instance_call_handler(*obj);
 }
 
 
@@ -1531,32 +1468,6 @@ static inline void AddPropertyToFunctionTemplate(
 }
 
 
-template<typename Setter, typename Getter, typename Data>
-static bool ObjectTemplateSetAccessor(
-    ObjectTemplate* object_template,
-    v8::Handle<String> name,
-    Getter getter,
-    Setter setter,
-    Data data,
-    AccessControl settings,
-    PropertyAttribute attribute,
-    v8::Handle<AccessorSignature> signature) {
-  i::Isolate* isolate = Utils::OpenHandle(object_template)->GetIsolate();
-  if (IsDeadCheck(isolate, "v8::ObjectTemplate::SetAccessor()")) return false;
-  ENTER_V8(isolate);
-  i::HandleScope scope(isolate);
-  EnsureConstructor(object_template);
-  i::FunctionTemplateInfo* constructor = i::FunctionTemplateInfo::cast(
-      Utils::OpenHandle(object_template)->constructor());
-  i::Handle<i::FunctionTemplateInfo> cons(constructor);
-  i::Handle<i::AccessorInfo> obj = MakeAccessorInfo(
-      name, getter, setter, data, settings, attribute, signature);
-  if (obj.is_null()) return false;
-  AddPropertyToFunctionTemplate(cons, obj);
-  return true;
-}
-
-
 void ObjectTemplate::SetAccessor(v8::Handle<String> name,
                                  AccessorGetter getter,
                                  AccessorSetter setter,
@@ -1564,20 +1475,18 @@ void ObjectTemplate::SetAccessor(v8::Handle<String> name,
                                  AccessControl settings,
                                  PropertyAttribute attribute,
                                  v8::Handle<AccessorSignature> signature) {
-  ObjectTemplateSetAccessor(
-      this, name, getter, setter, data, settings, attribute, signature);
-}
-
-
-void ObjectTemplate::SetAccessor(v8::Handle<String> name,
-                                 AccessorGetterCallback getter,
-                                 AccessorSetterCallback setter,
-                                 v8::Handle<Value> data,
-                                 AccessControl settings,
-                                 PropertyAttribute attribute,
-                                 v8::Handle<AccessorSignature> signature) {
-  ObjectTemplateSetAccessor(
-      this, name, getter, setter, data, settings, attribute, signature);
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
+  if (IsDeadCheck(isolate, "v8::ObjectTemplate::SetAccessor()")) return;
+  ENTER_V8(isolate);
+  i::HandleScope scope(isolate);
+  EnsureConstructor(this);
+  i::FunctionTemplateInfo* constructor =
+      i::FunctionTemplateInfo::cast(Utils::OpenHandle(this)->constructor());
+  i::Handle<i::FunctionTemplateInfo> cons(constructor);
+  i::Handle<i::AccessorInfo> obj = MakeAccessorInfo(name, getter, setter, data,
+                                                      settings, attribute,
+                                                      signature);
+  AddPropertyToFunctionTemplate(cons, obj);
 }
 
 
@@ -1586,67 +1495,44 @@ bool ObjectTemplate::SetAccessor(Handle<String> name,
                                  AccessControl settings,
                                  PropertyAttribute attribute,
                                  Handle<AccessorSignature> signature) {
-  void* null = NULL;
-  return ObjectTemplateSetAccessor(
-      this, name, descriptor, null, null, settings, attribute, signature);
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
+  if (IsDeadCheck(isolate, "v8::ObjectTemplate::SetAccessor()")) return false;
+  ENTER_V8(isolate);
+  i::HandleScope scope(isolate);
+  EnsureConstructor(this);
+  i::FunctionTemplateInfo* constructor =
+      i::FunctionTemplateInfo::cast(Utils::OpenHandle(this)->constructor());
+  i::Handle<i::FunctionTemplateInfo> cons(constructor);
+  i::Handle<i::AccessorInfo> obj = MakeAccessorInfo(
+      name, descriptor, settings, attribute, signature);
+  if (obj.is_null()) return false;
+  AddPropertyToFunctionTemplate(cons, obj);
+  return true;
 }
 
 
-template<
-    typename Getter,
-    typename Setter,
-    typename Query,
-    typename Deleter,
-    typename Enumerator>
-static void ObjectTemplateSetNamedPropertyHandler(
-    ObjectTemplate* object_template,
-    Getter getter,
-    Setter setter,
-    Query query,
-    Deleter remover,
-    Enumerator enumerator,
-    Handle<Value> data) {
-  i::Isolate* isolate = Utils::OpenHandle(object_template)->GetIsolate();
+void ObjectTemplate::SetNamedPropertyHandler(NamedPropertyGetter getter,
+                                             NamedPropertySetter setter,
+                                             NamedPropertyQuery query,
+                                             NamedPropertyDeleter remover,
+                                             NamedPropertyEnumerator enumerator,
+                                             Handle<Value> data) {
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate, "v8::ObjectTemplate::SetNamedPropertyHandler()")) {
     return;
   }
   ENTER_V8(isolate);
   i::HandleScope scope(isolate);
-  EnsureConstructor(object_template);
-  i::FunctionTemplateInfo* constructor = i::FunctionTemplateInfo::cast(
-      Utils::OpenHandle(object_template)->constructor());
+  EnsureConstructor(this);
+  i::FunctionTemplateInfo* constructor =
+      i::FunctionTemplateInfo::cast(Utils::OpenHandle(this)->constructor());
   i::Handle<i::FunctionTemplateInfo> cons(constructor);
-  SetNamedInstancePropertyHandler(cons,
-                                  getter,
-                                  setter,
-                                  query,
-                                  remover,
-                                  enumerator,
-                                  data);
-}
-
-
-void ObjectTemplate::SetNamedPropertyHandler(
-    NamedPropertyGetter getter,
-    NamedPropertySetter setter,
-    NamedPropertyQuery query,
-    NamedPropertyDeleter remover,
-    NamedPropertyEnumerator enumerator,
-    Handle<Value> data) {
-  ObjectTemplateSetNamedPropertyHandler(
-      this, getter, setter, query, remover, enumerator, data);
-}
-
-
-void ObjectTemplate::SetNamedPropertyHandler(
-    NamedPropertyGetterCallback getter,
-    NamedPropertySetterCallback setter,
-    NamedPropertyQueryCallback query,
-    NamedPropertyDeleterCallback remover,
-    NamedPropertyEnumeratorCallback enumerator,
-    Handle<Value> data) {
-  ObjectTemplateSetNamedPropertyHandler(
-      this, getter, setter, query, remover, enumerator, data);
+  Utils::ToLocal(cons)->SetNamedInstancePropertyHandler(getter,
+                                                        setter,
+                                                        query,
+                                                        remover,
+                                                        enumerator,
+                                                        data);
 }
 
 
@@ -1695,40 +1581,6 @@ void ObjectTemplate::SetAccessCheckCallbacks(
 }
 
 
-template<
-    typename Getter,
-    typename Setter,
-    typename Query,
-    typename Deleter,
-    typename Enumerator>
-void ObjectTemplateSetIndexedPropertyHandler(
-      ObjectTemplate* object_template,
-      Getter getter,
-      Setter setter,
-      Query query,
-      Deleter remover,
-      Enumerator enumerator,
-      Handle<Value> data) {
-  i::Isolate* isolate = Utils::OpenHandle(object_template)->GetIsolate();
-  if (IsDeadCheck(isolate, "v8::ObjectTemplate::SetIndexedPropertyHandler()")) {
-    return;
-  }
-  ENTER_V8(isolate);
-  i::HandleScope scope(isolate);
-  EnsureConstructor(object_template);
-  i::FunctionTemplateInfo* constructor = i::FunctionTemplateInfo::cast(
-      Utils::OpenHandle(object_template)->constructor());
-  i::Handle<i::FunctionTemplateInfo> cons(constructor);
-  SetIndexedInstancePropertyHandler(cons,
-                                    getter,
-                                    setter,
-                                    query,
-                                    remover,
-                                    enumerator,
-                                    data);
-}
-
-
 void ObjectTemplate::SetIndexedPropertyHandler(
       IndexedPropertyGetter getter,
       IndexedPropertySetter setter,
@@ -1736,52 +1588,39 @@ void ObjectTemplate::SetIndexedPropertyHandler(
       IndexedPropertyDeleter remover,
       IndexedPropertyEnumerator enumerator,
       Handle<Value> data) {
-  ObjectTemplateSetIndexedPropertyHandler(
-      this, getter, setter, query, remover, enumerator, data);
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
+  if (IsDeadCheck(isolate, "v8::ObjectTemplate::SetIndexedPropertyHandler()")) {
+    return;
+  }
+  ENTER_V8(isolate);
+  i::HandleScope scope(isolate);
+  EnsureConstructor(this);
+  i::FunctionTemplateInfo* constructor =
+      i::FunctionTemplateInfo::cast(Utils::OpenHandle(this)->constructor());
+  i::Handle<i::FunctionTemplateInfo> cons(constructor);
+  Utils::ToLocal(cons)->SetIndexedInstancePropertyHandler(getter,
+                                                          setter,
+                                                          query,
+                                                          remover,
+                                                          enumerator,
+                                                          data);
 }
 
 
-void ObjectTemplate::SetIndexedPropertyHandler(
-      IndexedPropertyGetterCallback getter,
-      IndexedPropertySetterCallback setter,
-      IndexedPropertyQueryCallback query,
-      IndexedPropertyDeleterCallback remover,
-      IndexedPropertyEnumeratorCallback enumerator,
-      Handle<Value> data) {
-  ObjectTemplateSetIndexedPropertyHandler(
-      this, getter, setter, query, remover, enumerator, data);
-}
-
-
-template<typename Callback>
-static void ObjectTemplateSetCallAsFunctionHandler(
-    ObjectTemplate* object_template,
-    Callback callback,
-    Handle<Value> data) {
-  i::Isolate* isolate = Utils::OpenHandle(object_template)->GetIsolate();
+void ObjectTemplate::SetCallAsFunctionHandler(InvocationCallback callback,
+                                              Handle<Value> data) {
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate,
                   "v8::ObjectTemplate::SetCallAsFunctionHandler()")) {
     return;
   }
   ENTER_V8(isolate);
   i::HandleScope scope(isolate);
-  EnsureConstructor(object_template);
-  i::FunctionTemplateInfo* constructor = i::FunctionTemplateInfo::cast(
-      Utils::OpenHandle(object_template)->constructor());
+  EnsureConstructor(this);
+  i::FunctionTemplateInfo* constructor =
+      i::FunctionTemplateInfo::cast(Utils::OpenHandle(this)->constructor());
   i::Handle<i::FunctionTemplateInfo> cons(constructor);
-  SetInstanceCallAsFunctionHandler(cons, callback, data);
-}
-
-
-void ObjectTemplate::SetCallAsFunctionHandler(InvocationCallback callback,
-                                              Handle<Value> data) {
-  return ObjectTemplateSetCallAsFunctionHandler(this, callback, data);
-}
-
-
-void ObjectTemplate::SetCallAsFunctionHandler(FunctionCallback callback,
-                                              Handle<Value> data) {
-  return ObjectTemplateSetCallAsFunctionHandler(this, callback, data);
+  Utils::ToLocal(cons)->SetInstanceCallAsFunctionHandler(callback, data);
 }
 
 
@@ -2580,46 +2419,6 @@ bool Value::IsArray() const {
 }
 
 
-bool Value::IsArrayBuffer() const {
-  if (IsDeadCheck(i::Isolate::Current(), "v8::Value::IsArrayBuffer()"))
-    return false;
-  return Utils::OpenHandle(this)->IsJSArrayBuffer();
-}
-
-
-bool Value::IsTypedArray() const {
-  if (IsDeadCheck(i::Isolate::Current(), "v8::Value::IsArrayBuffer()"))
-    return false;
-  return Utils::OpenHandle(this)->IsJSTypedArray();
-}
-
-
-#define TYPED_ARRAY_LIST(F) \
-F(Uint8Array, kExternalUnsignedByteArray) \
-F(Int8Array, kExternalByteArray) \
-F(Uint16Array, kExternalUnsignedShortArray) \
-F(Int16Array, kExternalShortArray) \
-F(Uint32Array, kExternalUnsignedIntArray) \
-F(Int32Array, kExternalIntArray) \
-F(Float32Array, kExternalFloatArray) \
-F(Float64Array, kExternalDoubleArray) \
-F(Uint8ClampedArray, kExternalPixelArray)
-
-
-#define VALUE_IS_TYPED_ARRAY(TypedArray, type_const)                          \
-  bool Value::Is##TypedArray() const {                                        \
-    if (IsDeadCheck(i::Isolate::Current(), "v8::Value::Is" #TypedArray "()")) \
-      return false;                                                           \
-    i::Handle<i::Object> obj = Utils::OpenHandle(this);                       \
-    if (!obj->IsJSTypedArray()) return false;                                 \
-    return i::JSTypedArray::cast(*obj)->type() == type_const;                 \
-  }
-
-TYPED_ARRAY_LIST(VALUE_IS_TYPED_ARRAY)
-
-#undef VALUE_IS_TYPED_ARRAY
-
-
 bool Value::IsObject() const {
   if (IsDeadCheck(i::Isolate::Current(), "v8::Value::IsObject()")) return false;
   return Utils::OpenHandle(this)->IsJSObject();
@@ -2987,7 +2786,14 @@ void v8::TypedArray::CheckCast(Value* that) {
   }
 
 
-TYPED_ARRAY_LIST(CHECK_TYPED_ARRAY_CAST)
+CHECK_TYPED_ARRAY_CAST(Uint8Array, kExternalUnsignedByteArray)
+CHECK_TYPED_ARRAY_CAST(Int8Array, kExternalByteArray)
+CHECK_TYPED_ARRAY_CAST(Uint16Array, kExternalUnsignedShortArray)
+CHECK_TYPED_ARRAY_CAST(Int16Array, kExternalShortArray)
+CHECK_TYPED_ARRAY_CAST(Uint32Array, kExternalUnsignedIntArray)
+CHECK_TYPED_ARRAY_CAST(Int32Array, kExternalIntArray)
+CHECK_TYPED_ARRAY_CAST(Float32Array, kExternalFloatArray)
+CHECK_TYPED_ARRAY_CAST(Float64Array, kExternalDoubleArray)
 
 #undef CHECK_TYPED_ARRAY_CAST
 
@@ -3518,7 +3324,7 @@ Local<String> v8::Object::ObjectProtoToString() {
       const char* postfix = "]";
 
       int prefix_len = i::StrLength(prefix);
-      int str_len = str->Utf8Length();
+      int str_len = str->Length();
       int postfix_len = i::StrLength(postfix);
 
       int buf_len = prefix_len + str_len + postfix_len;
@@ -3530,7 +3336,7 @@ Local<String> v8::Object::ObjectProtoToString() {
       ptr += prefix_len;
 
       // Write real content.
-      str->WriteUtf8(ptr, str_len);
+      str->WriteAscii(ptr, 0, str_len);
       ptr += str_len;
 
       // Write postfix.
@@ -3614,21 +3420,7 @@ bool v8::Object::Has(uint32_t index) {
 }
 
 
-template<typename Setter, typename Getter, typename Data>
-static inline bool ObjectSetAccessor(Object* obj,
-                                     Handle<String> name,
-                                     Setter getter,
-                                     Getter setter,
-                                     Data data,
-                                     AccessControl settings,
-                                     PropertyAttribute attributes) {
-  i::Isolate* isolate = Utils::OpenHandle(obj)->GetIsolate();
-  ON_BAILOUT(isolate, "v8::Object::SetAccessor()", return false);
-  ENTER_V8(isolate);
-  i::HandleScope scope(isolate);
-  v8::Handle<AccessorSignature> signature;
-  i::Handle<i::AccessorInfo> info = MakeAccessorInfo(
-      name, getter, setter, data, settings, attributes, signature);
+static inline bool SetAccessor(Object* obj, i::Handle<i::AccessorInfo> info) {
   if (info.is_null()) return false;
   bool fast = Utils::OpenHandle(obj)->HasFastProperties();
   i::Handle<i::Object> result = i::SetAccessor(Utils::OpenHandle(obj), info);
@@ -3644,19 +3436,15 @@ bool Object::SetAccessor(Handle<String> name,
                          v8::Handle<Value> data,
                          AccessControl settings,
                          PropertyAttribute attributes) {
-  return ObjectSetAccessor(
-      this, name, getter, setter, data, settings, attributes);
-}
-
-
-bool Object::SetAccessor(Handle<String> name,
-                         AccessorGetterCallback getter,
-                         AccessorSetterCallback setter,
-                         v8::Handle<Value> data,
-                         AccessControl settings,
-                         PropertyAttribute attributes) {
-  return ObjectSetAccessor(
-      this, name, getter, setter, data, settings, attributes);
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
+  ON_BAILOUT(isolate, "v8::Object::SetAccessor()", return false);
+  ENTER_V8(isolate);
+  i::HandleScope scope(isolate);
+  v8::Handle<AccessorSignature> signature;
+  i::Handle<i::AccessorInfo> info = MakeAccessorInfo(name, getter, setter, data,
+                                                     settings, attributes,
+                                                     signature);
+  return v8::SetAccessor(this, info);
 }
 
 
@@ -3664,9 +3452,14 @@ bool Object::SetAccessor(Handle<String> name,
                          Handle<DeclaredAccessorDescriptor> descriptor,
                          AccessControl settings,
                          PropertyAttribute attributes) {
-  void* null = NULL;
-  return ObjectSetAccessor(
-      this, name, descriptor, null, null, settings, attributes);
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
+  ON_BAILOUT(isolate, "v8::Object::SetAccessor()", return false);
+  ENTER_V8(isolate);
+  i::HandleScope scope(isolate);
+  v8::Handle<AccessorSignature> signature;
+  i::Handle<i::AccessorInfo> info = MakeAccessorInfo(
+      name, descriptor, settings, attributes, signature);
+  return v8::SetAccessor(this, info);
 }
 
 
@@ -4520,28 +4313,35 @@ int String::Utf8Length() const {
 class Utf8WriterVisitor {
  public:
   Utf8WriterVisitor(
-      char* buffer, int capacity, bool skip_capacity_check)
+      char* buffer,
+      int capacity,
+      bool skip_capacity_check,
+      bool replace_invalid_utf8)
     : early_termination_(false),
       last_character_(unibrow::Utf16::kNoPreviousCharacter),
       buffer_(buffer),
       start_(buffer),
       capacity_(capacity),
       skip_capacity_check_(capacity == -1 || skip_capacity_check),
+      replace_invalid_utf8_(replace_invalid_utf8),
       utf16_chars_read_(0) {
   }
 
   static int WriteEndCharacter(uint16_t character,
                                int last_character,
                                int remaining,
-                               char* const buffer) {
+			       char* const buffer,
+			       bool replace_invalid_utf8) { 
     using namespace unibrow;
     ASSERT(remaining > 0);
     // We can't use a local buffer here because Encode needs to modify
     // previous characters in the stream.  We know, however, that
     // exactly one character will be advanced.
-    if (Utf16::IsTrailSurrogate(character) &&
-        Utf16::IsLeadSurrogate(last_character)) {
-      int written = Utf8::Encode(buffer, character, last_character);
+     if (Utf16::IsSurrogatePair(last_character, character)) {
+       int written = Utf8::Encode(buffer,
+				  character,
+				  last_character,
+				  replace_invalid_utf8); 
       ASSERT(written == 1);
       return written;
     }
@@ -4550,7 +4350,8 @@ class Utf8WriterVisitor {
     // Can't encode using last_character as gcc has array bounds issues.
     int written = Utf8::Encode(temp_buffer,
                                character,
-                               Utf16::kNoPreviousCharacter);
+			       Utf16::kNoPreviousCharacter,
+			       replace_invalid_utf8);
     // Won't fit.
     if (written > remaining) return 0;
     // Copy over the character from temp_buffer.
@@ -4560,6 +4361,16 @@ class Utf8WriterVisitor {
     return written;
   }
 
+  // Visit writes out a group of code units (chars) of a v8::String to the
+  // internal buffer_. This is done in two phases. The first phase calculates a
+  // pesimistic estimate (writable_length) on how many code units can be safely
+  // written without exceeding the buffer capacity and without writing the last
+  // code unit (it could be a lead surrogate). The estimated number of code
+  // units is then written out in one go, and the reported byte usage is used
+  // to correct the estimate. This is repeated until the estimate becomes <= 0
+  // or all code units have been written out. The second phase writes out code
+  // units until the buffer capacity is reached, would be exceeded by the next
+  // unit, or all units have been written out. 
   template<typename Char>
   void Visit(const Char* chars, const int length) {
     using namespace unibrow;
@@ -4597,7 +4408,10 @@ class Utf8WriterVisitor {
       } else {
         for (; i < fast_length; i++) {
           uint16_t character = *chars++;
-          buffer += Utf8::Encode(buffer, character, last_character);
+	  buffer += Utf8::Encode(buffer,
+				 character,
+				 last_character,
+				 replace_invalid_utf8_); 
           last_character = character;
           ASSERT(capacity_ == -1 || (buffer - start_) <= capacity_);
         }
@@ -4617,10 +4431,17 @@ class Utf8WriterVisitor {
     ASSERT(remaining_capacity >= 0);
     for (; i < length && remaining_capacity > 0; i++) {
       uint16_t character = *chars++;
+      // remaining_capacity is <= 3 bytes at this point, so we do not write out
+      // an umatched lead surrogate.
+      if (replace_invalid_utf8_ && Utf16::IsLeadSurrogate(character)) {
+	early_termination_ = true;
+	break;
+      } 
       int written = WriteEndCharacter(character,
                                       last_character,
                                       remaining_capacity,
-                                      buffer);
+				      buffer,
+				      replace_invalid_utf8_); 
       if (written == 0) {
         early_termination_ = true;
         break;
@@ -4668,6 +4489,7 @@ class Utf8WriterVisitor {
   char* const start_;
   int capacity_;
   bool const skip_capacity_check_;
+  bool const replace_invalid_utf8_; 
   int utf16_chars_read_;
   DISALLOW_IMPLICIT_CONSTRUCTORS(Utf8WriterVisitor);
 };
@@ -4707,9 +4529,11 @@ int String::WriteUtf8(char* buffer,
   }
   const int string_length = str->length();
   bool write_null = !(options & NO_NULL_TERMINATION);
+  bool replace_invalid_utf8 = (options & REPLACE_INVALID_UTF8);
+  int max16BitCodeUnitSize = unibrow::Utf8::kMax16BitCodeUnitSize; 
   // First check if we can just write the string without checking capacity.
-  if (capacity == -1 || capacity / 3 >= string_length) {
-    Utf8WriterVisitor writer(buffer, capacity, true);
+  if (capacity == -1 || capacity / max16BitCodeUnitSize >= string_length) {
+    Utf8WriterVisitor writer(buffer, capacity, true, replace_invalid_utf8); 
     const int kMaxRecursion = 100;
     bool success = RecursivelySerializeToUtf8(*str, &writer, kMaxRecursion);
     if (success) return writer.CompleteWrite(write_null, nchars_ref);
@@ -4737,7 +4561,7 @@ int String::WriteUtf8(char* buffer,
   }
   // Recursive slow path can potentially be unreasonable slow. Flatten.
   str = FlattenGetString(str);
-  Utf8WriterVisitor writer(buffer, capacity, false);
+  Utf8WriterVisitor writer(buffer, capacity, false, replace_invalid_utf8); 
   i::String::VisitFlat(&writer, *str);
   return writer.CompleteWrite(write_null, nchars_ref);
 }
@@ -4999,7 +4823,6 @@ void* v8::Object::SlowGetAlignedPointerFromInternalField(int index) {
   return DecodeSmiToAligned(obj->GetInternalField(index), location);
 }
 
-
 void v8::Object::SetAlignedPointerInInternalField(int index, void* value) {
   i::Handle<i::JSObject> obj = Utils::OpenHandle(this);
   const char* location = "v8::Object::SetAlignedPointerInInternalField()";
@@ -5008,6 +4831,10 @@ void v8::Object::SetAlignedPointerInInternalField(int index, void* value) {
   ASSERT_EQ(value, GetAlignedPointerFromInternalField(index));
 }
 
+// FIXME: Tile: Provide old entry point as well
+void v8::Object::SetPointerInInternalField(int index, void* value) {
+  SetAlignedPointerInInternalField(index, value);
+}
 
 static void* ExternalValue(i::Object* obj) {
   // Obscure semantics for undefined, but somehow checked in our unit tests...
@@ -6016,37 +5843,19 @@ Local<Object> Array::CloneElementAt(uint32_t index) {
 }
 
 
-bool v8::ArrayBuffer::IsExternal() const {
-  return Utils::OpenHandle(this)->is_external();
-}
-
-v8::ArrayBufferContents::~ArrayBufferContents() {
-  free(data_);
-  data_ = NULL;
-  byte_length_ = 0;
-}
-
-
-void v8::ArrayBuffer::Externalize(ArrayBufferContents* contents) {
-  i::Handle<i::JSArrayBuffer> obj = Utils::OpenHandle(this);
-  ApiCheck(!obj->is_external(),
-            "v8::ArrayBuffer::Externalize",
-            "ArrayBuffer already externalized");
-  obj->set_is_external(true);
-  size_t byte_length = static_cast<size_t>(obj->byte_length()->Number());
-  ApiCheck(contents->data_ == NULL,
-           "v8::ArrayBuffer::Externalize",
-           "Externalizing into non-empty ArrayBufferContents");
-  contents->data_ = obj->backing_store();
-  contents->byte_length_ = byte_length;
-}
-
-
 size_t v8::ArrayBuffer::ByteLength() const {
   i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
   if (IsDeadCheck(isolate, "v8::ArrayBuffer::ByteLength()")) return 0;
   i::Handle<i::JSArrayBuffer> obj = Utils::OpenHandle(this);
   return static_cast<size_t>(obj->byte_length()->Number());
+}
+
+
+void* v8::ArrayBuffer::Data() const {
+  i::Isolate* isolate = Utils::OpenHandle(this)->GetIsolate();
+  if (IsDeadCheck(isolate, "v8::ArrayBuffer::Data()")) return 0;
+  i::Handle<i::JSArrayBuffer> obj = Utils::OpenHandle(this);
+  return obj->backing_store();
 }
 
 
@@ -6069,7 +5878,7 @@ Local<ArrayBuffer> v8::ArrayBuffer::New(void* data, size_t byte_length) {
   ENTER_V8(isolate);
   i::Handle<i::JSArrayBuffer> obj =
       isolate->factory()->NewJSArrayBuffer();
-  i::Runtime::SetupArrayBuffer(isolate, obj, true, data, byte_length);
+  i::Runtime::SetupArrayBuffer(isolate, obj, data, byte_length);
   return Utils::ToLocal(obj);
 }
 
@@ -6152,6 +5961,10 @@ i::Handle<i::JSTypedArray> NewTypedArray(
       isolate->factory()->NewExternalArray(
           static_cast<int>(length), array_type,
           static_cast<uint8_t*>(buffer->backing_store()) + byte_offset);
+  i::Handle<i::Map> map =
+      isolate->factory()->GetElementsTransitionMap(
+          obj, elements_kind);
+  obj->set_map(*map);
   obj->set_elements(*elements);
   return obj;
 }
@@ -6175,8 +5988,6 @@ i::Handle<i::JSTypedArray> NewTypedArray(
 
 TYPED_ARRAY_NEW(Uint8Array, uint8_t, kExternalUnsignedByteArray,
                 i::EXTERNAL_UNSIGNED_BYTE_ELEMENTS)
-TYPED_ARRAY_NEW(Uint8ClampedArray, uint8_t, kExternalPixelArray,
-                i::EXTERNAL_PIXEL_ELEMENTS)
 TYPED_ARRAY_NEW(Int8Array, int8_t, kExternalByteArray,
                 i::EXTERNAL_BYTE_ELEMENTS)
 TYPED_ARRAY_NEW(Uint16Array, uint16_t, kExternalUnsignedShortArray,
@@ -6222,19 +6033,12 @@ Local<Symbol> v8::Symbol::New(Isolate* isolate, const char* data, int length) {
 Local<Number> v8::Number::New(double value) {
   i::Isolate* isolate = i::Isolate::Current();
   EnsureInitializedForIsolate(isolate, "v8::Number::New()");
-  return Number::New(reinterpret_cast<Isolate*>(isolate), value);
-}
-
-
-Local<Number> v8::Number::New(Isolate* isolate, double value) {
-  i::Isolate* internal_isolate = reinterpret_cast<i::Isolate*>(isolate);
-  ASSERT(internal_isolate->IsInitialized());
   if (std::isnan(value)) {
     // Introduce only canonical NaN value into the VM, to avoid signaling NaNs.
     value = i::OS::nan_value();
   }
-  ENTER_V8(internal_isolate);
-  i::Handle<i::Object> result = internal_isolate->factory()->NewNumber(value);
+  ENTER_V8(isolate);
+  i::Handle<i::Object> result = isolate->factory()->NewNumber(value);
   return Utils::NumberToLocal(result);
 }
 
@@ -6277,19 +6081,6 @@ Local<Integer> v8::Integer::NewFromUnsigned(uint32_t value, Isolate* isolate) {
   i::Handle<i::Object> result = internal_isolate->factory()->NewNumber(value);
   return Utils::IntegerToLocal(result);
 }
-
-
-#ifdef DEBUG
-v8::AssertNoGCScope::AssertNoGCScope(v8::Isolate* isolate)
-  : isolate_(isolate),
-    last_state_(i::EnterAllocationScope(
-        reinterpret_cast<i::Isolate*>(isolate), false)) {
-}
-
-v8::AssertNoGCScope::~AssertNoGCScope() {
-  i::ExitAllocationScope(reinterpret_cast<i::Isolate*>(isolate_), last_state_);
-}
-#endif
 
 
 void V8::IgnoreOutOfMemoryException() {
@@ -6704,10 +6495,9 @@ String::AsciiValue::AsciiValue(v8::Handle<v8::Value> obj)
   TryCatch try_catch;
   Handle<String> str = obj->ToString();
   if (str.IsEmpty()) return;
-  length_ = str->Utf8Length();
+  length_ = str->Length();
   str_ = i::NewArray<char>(length_ + 1);
-  str->WriteUtf8(str_);
-  ASSERT(i::String::NonAsciiStart(str_, length_) >= length_);
+  str->WriteAscii(str_);
 }
 
 
@@ -7243,12 +7033,6 @@ const CpuProfile* CpuProfiler::GetCpuProfile(int index,
 }
 
 
-const CpuProfile* CpuProfiler::GetCpuProfile(int index) {
-  return reinterpret_cast<const CpuProfile*>(
-      reinterpret_cast<i::CpuProfiler*>(this)->GetProfile(NULL, index));
-}
-
-
 const CpuProfile* CpuProfiler::FindProfile(unsigned uid,
                                            Handle<Value> security_token) {
   i::Isolate* isolate = i::Isolate::Current();
@@ -7304,14 +7088,6 @@ const CpuProfile* CpuProfiler::StopCpuProfiling(Handle<String> title,
   return reinterpret_cast<const CpuProfile*>(
       reinterpret_cast<i::CpuProfiler*>(this)->StopProfiling(
           security_token.IsEmpty() ? NULL : *Utils::OpenHandle(*security_token),
-          *Utils::OpenHandle(*title)));
-}
-
-
-const CpuProfile* CpuProfiler::StopCpuProfiling(Handle<String> title) {
-  return reinterpret_cast<const CpuProfile*>(
-      reinterpret_cast<i::CpuProfiler*>(this)->StopProfiling(
-          NULL,
           *Utils::OpenHandle(*title)));
 }
 

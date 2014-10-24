@@ -173,7 +173,8 @@ class MacroAssembler: public Assembler {
                           Register input_reg,
                           Register temp_reg,
                           Register temp_reg1,
-                          Register temp_reg2);
+                          Register temp_reg2,
+			  Register temp_reg3);
 
   void LoadInstanceDescriptors(Register map, Register descriptors);
   void EnumLength(Register dst, Register map);
@@ -758,7 +759,8 @@ class MacroAssembler: public Assembler {
                            Handle<Map> map,
                            Label* early_success,
                            Condition cond,
-                           Label* branch_to);
+                           Label* branch_to,
+                           CompareMapMode mode = REQUIRE_EXACT_MAP);
 
   // As above, but the map of the object is already loaded into the register
   // which is preserved by the code generated.
@@ -766,7 +768,8 @@ class MacroAssembler: public Assembler {
                            Handle<Map> map,
                            Label* early_success,
                            Condition cond,
-                           Label* branch_to);
+                           Label* branch_to,
+                           CompareMapMode mode = REQUIRE_EXACT_MAP);
 
   void StoreNumberToDoubleElements(Register value_reg,
                                    Register key_reg,
@@ -850,10 +853,7 @@ class MacroAssembler: public Assembler {
   // from handle and propagates exceptions.  Restores context.  stack_space
   // - space to be unwound on exit (includes the call JS arguments space and
   // the additional space allocated for the fast call).
-  void CallApiFunctionAndReturn(ExternalReference function,
-                                int stack_space,
-                                bool returns_handle,
-                                int return_value_offset_from_fp);
+  void CallApiFunctionAndReturn(ExternalReference function, int stack_space);
 
   // Jump to the builtin routine.
   void JumpToExternalReference(const ExternalReference& builtin);
@@ -916,7 +916,9 @@ class MacroAssembler: public Assembler {
                 Register scratch,
                 Handle<Map> map,
                 Label* fail,
-                SmiCheckType smi_check_type);
+		SmiCheckType smi_check_type,
+		CompareMapMode mode = REQUIRE_EXACT_MAP);
+
 
   void CheckMap(Register obj,
                 Register scratch,

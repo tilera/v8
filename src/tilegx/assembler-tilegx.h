@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <arch/opcode.h>
 #include "assembler.h"
+#include "cpu.h"
 #include "constants-tilegx.h"
 #include "serialize.h"
 
@@ -105,9 +106,25 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
       create_RRROpcodeExtension_X0(FDOUBLE_ADD_FLAGS_RRR_0_OPCODE_X0) | FNOP_X1
 
+#define FDOUBLE_ADDSUB_X0                                                      \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+    create_RRROpcodeExtension_X0(FDOUBLE_ADDSUB_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define FDOUBLE_UNPACK_MAX_X0                                                  \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+    create_RRROpcodeExtension_X0(FDOUBLE_UNPACK_MAX_RRR_0_OPCODE_X0) | FNOP_X1
+
+#define FDOUBLE_UNPACK_MIN_X0                                                  \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
+    create_RRROpcodeExtension_X0(FDOUBLE_UNPACK_MIN_RRR_0_OPCODE_X0) | FNOP_X1
+
 #define ADD_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
       create_RRROpcodeExtension_X1(ADD_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define ADDX_X1							               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |	       \
+    create_RRROpcodeExtension_X1(ADDX_RRR_0_OPCODE_X1) | FNOP_X0
 
 #define SUB_X1                                                                 \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
@@ -145,6 +162,14 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(RRR_0_OPCODE_X0) |             \
       create_RRROpcodeExtension_X0(CMOVEQZ_RRR_0_OPCODE_X0) | FNOP_X1
 
+#define CMPEXCH_X1                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+    create_RRROpcodeExtension_X1(CMPEXCH_RRR_0_OPCODE_X1) | FNOP_X0
+
+#define MTSPR_X1                                                               \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(IMM8_OPCODE_X1) |              \
+    create_Imm8OpcodeExtension_X1(MTSPR_IMM8_OPCODE_X1) | FNOP_X0
+
 #define ADDLI_X1                                                               \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(ADDLI_OPCODE_X1) | FNOP_X0
 
@@ -175,6 +200,10 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 #define BFEXTS_X0                                                              \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X0(BF_OPCODE_X0) |                \
       create_BFOpcodeExtension_X0(BFEXTS_BF_OPCODE_X0) | FNOP_X1
+
+#define SHL1ADD_X1                                                             \
+  create_Mode(TILEGX_X_MODE) | create_Opcode_X1(RRR_0_OPCODE_X1) |             \
+    create_RRROpcodeExtension_X1(SHL1ADD_RRR_0_OPCODE_X1) | FNOP_X0
 
 #define SHL16INSLI_X1                                                          \
   create_Mode(TILEGX_X_MODE) | create_Opcode_X1(SHL16INSLI_OPCODE_X1) | FNOP_X0
@@ -398,6 +427,7 @@ int print_insn_tilegx_buf (unsigned char * memaddr, char *buf);
 #define DEST_X1(x) create_Dest_X1(x)
 #define SRCA_X1(x) create_SrcA_X1(x)
 #define SRCB_X1(x) create_SrcB_X1(x)
+#define MT_IMM14_X1(x) create_MT_Imm14_X1(x)
 #define IMM16_X1(x) create_Imm16_X1(x)
 #define IMM8_X1(x) create_Imm8_X1(x)
 #define BFSTART_X0(x) create_BFStart_X0(x)
@@ -881,8 +911,9 @@ class Assembler : public AssemblerBase {
     *reinterpret_cast<Instr*>(pc) = instr;
   }
   Instr instr_at(int pos) { return *reinterpret_cast<Instr*>(buffer_ + pos); }
-  void instr_at_put(int pos, Instr instr) {
-    *reinterpret_cast<Instr*>(buffer_ + pos) = instr;
+  void instr_at_put(int pos, Instr instr, bool flush = true) {
+    Instr* pc= reinterpret_cast<Instr*>(buffer_ + pos);
+    *pc = instr;
   }
 
   static bool IsBranch(Instr instr);
@@ -1010,6 +1041,9 @@ class Assembler : public AssemblerBase {
   void cmpltui(const Register& rd, const Register& rsa, int8_t imm, int line = 0);
   void cmpleu(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 
+  void cmpexch(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void mtspr(int16_t imm, const Register& rs, int line = 0);
+
   void bpt(int line = 0);
   void info(const int16_t imm16, int line = 0);
   void lnk(const Register& rd, int line = 0);
@@ -1040,6 +1074,7 @@ class Assembler : public AssemblerBase {
   void ld4s(const Register& rd, const MemOperand& rs, int line = 0);
   void ld4s(const Register& rd, const Register& rs, int line = 0);
   void add(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void addx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void sub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void subx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void mulx(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
@@ -1060,6 +1095,7 @@ class Assembler : public AssemblerBase {
   void sllx(const Register& rd, const Register& rs, const Register& rt, int line = 0);
 
   void moveli(const Register& rd, int16_t imm, int line = 0);
+  void shl1add(const Register& rd, const Register& rs, const Register& rt, int line = 0);
   void shl16insli(const Register& rd, const Register& rs, int16_t imm, int line = 0);
   void move(const Register& rt, const Register& rs, int line = 0);
   void and_(const Register& rd, const Register& rs, const Register& rt, int line = 0);
@@ -1083,7 +1119,9 @@ class Assembler : public AssemblerBase {
   void fdouble_pack1(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_pack2(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
   void fdouble_add_flags(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
-
+  void fdouble_addsub(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void fdouble_unpack_max(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
+  void fdouble_unpack_min(const Register& rd, const Register& rsa, const Register& rsb, int line = 0);
 
   void break_(uint32_t code, bool break_as_stop = false);
   void stop(const char* msg, uint32_t code = kMaxStopCode);

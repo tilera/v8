@@ -1016,7 +1016,6 @@ static const char* ComputeMarker(Code* code) {
 void Logger::CodeCreateEvent(LogEventsAndTags tag,
                              Code* code,
                              SharedFunctionInfo* shared,
-                             CompilationInfo* info,
                              Name* name) {
   if (!is_logging_code_events()) return;
   if (FLAG_ll_prof || Serializer::enabled() || code_event_handler_ != NULL) {
@@ -1094,7 +1093,6 @@ void Logger::CodeCreateEvent(LogEventsAndTags tag,
 void Logger::CodeCreateEvent(LogEventsAndTags tag,
                              Code* code,
                              SharedFunctionInfo* shared,
-                             CompilationInfo* info,
                              Name* source, int line) {
   if (!is_logging_code_events()) return;
   if (FLAG_ll_prof || Serializer::enabled() || code_event_handler_ != NULL) {
@@ -1739,20 +1737,20 @@ void Logger::LogExistingFunction(Handle<SharedFunctionInfo> shared,
         PROFILE(isolate_,
                 CodeCreateEvent(
                     Logger::ToNativeByScript(Logger::LAZY_COMPILE_TAG, *script),
-                    *code, *shared, NULL,
+                    *code, *shared,
                     *script_name, line_num + 1));
       } else {
         // Can't distinguish eval and script here, so always use Script.
         PROFILE(isolate_,
                 CodeCreateEvent(
                     Logger::ToNativeByScript(Logger::SCRIPT_TAG, *script),
-                    *code, *shared, NULL, *script_name));
+                    *code, *shared, *script_name));
       }
     } else {
       PROFILE(isolate_,
               CodeCreateEvent(
                   Logger::ToNativeByScript(Logger::LAZY_COMPILE_TAG, *script),
-                  *code, *shared, NULL, *func_name));
+                  *code, *shared, *func_name));
     }
   } else if (shared->IsApiFunction()) {
     // API function.
@@ -1767,7 +1765,7 @@ void Logger::LogExistingFunction(Handle<SharedFunctionInfo> shared,
   } else {
     PROFILE(isolate_,
             CodeCreateEvent(
-                Logger::LAZY_COMPILE_TAG, *code, *shared, NULL, *func_name));
+                Logger::LAZY_COMPILE_TAG, *code, *shared, *func_name));
   }
 }
 

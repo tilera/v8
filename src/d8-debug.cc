@@ -77,7 +77,7 @@ void HandleDebugEvent(DebugEvent event,
 
   // Print the event details.
   Handle<Object> details =
-      Shell::DebugMessageDetails(isolate, Handle<String>::Cast(event_json));
+      Shell::DebugMessageDetails(Handle<String>::Cast(event_json));
   if (try_catch.HasCaught()) {
     Shell::ReportException(isolate, &try_catch);
     return;
@@ -114,7 +114,7 @@ void HandleDebugEvent(DebugEvent event,
 
     // Convert the debugger command to a JSON debugger request.
     Handle<Value> request =
-        Shell::DebugCommandToJSONRequest(isolate, String::New(command));
+        Shell::DebugCommandToJSONRequest(String::New(command));
     if (try_catch.HasCaught()) {
       Shell::ReportException(isolate, &try_catch);
       continue;
@@ -146,8 +146,7 @@ void HandleDebugEvent(DebugEvent event,
     Handle<String> response = Handle<String>::Cast(response_val);
 
     // Convert the debugger response into text details and the running state.
-    Handle<Object> response_details =
-        Shell::DebugMessageDetails(isolate, response);
+    Handle<Object> response_details = Shell::DebugMessageDetails(response);
     if (try_catch.HasCaught()) {
       Shell::ReportException(isolate, &try_catch);
       continue;
@@ -282,8 +281,7 @@ void RemoteDebugger::HandleMessageReceived(char* message) {
   // Print the event details.
   TryCatch try_catch;
   Handle<Object> details =
-      Shell::DebugMessageDetails(isolate_,
-                                 Handle<String>::Cast(String::New(message)));
+      Shell::DebugMessageDetails(Handle<String>::Cast(String::New(message)));
   if (try_catch.HasCaught()) {
     Shell::ReportException(isolate_, &try_catch);
     PrintPrompt();
@@ -312,7 +310,7 @@ void RemoteDebugger::HandleKeyboardCommand(char* command) {
   // Convert the debugger command to a JSON debugger request.
   TryCatch try_catch;
   Handle<Value> request =
-      Shell::DebugCommandToJSONRequest(isolate_, String::New(command));
+      Shell::DebugCommandToJSONRequest(String::New(command));
   if (try_catch.HasCaught()) {
     Shell::ReportException(isolate_, &try_catch);
     PrintPrompt();

@@ -1,3 +1,4 @@
+
 // Copyright 2012 the V8 project authors. All rights reserved.
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -302,45 +303,45 @@ function SimpleSlice(array, start_i, del_count, len, deleted_elements) {
   }
 }
 
-
 function SimpleMove(array, start_i, del_count, len, num_additional_args) {
-  if (num_additional_args !== del_count) {
-    // Move the existing elements after the elements to be deleted
-    // to the right position in the resulting array.
-    if (num_additional_args > del_count) {
-      for (var i = len - del_count; i > start_i; i--) {
-        var from_index = i + del_count - 1;
-        var to_index = i + num_additional_args - 1;
-        // The spec could also be interpreted such that
-        // %HasLocalProperty would be the appropriate test.  We follow
-        // KJS in consulting the prototype.
-        var current = array[from_index];
-        if (!IS_UNDEFINED(current) || from_index in array) {
-          array[to_index] = current;
-        } else {
-          delete array[to_index];
-        }
-      }
-    } else {
-      for (var i = start_i; i < len - del_count; i++) {
-        var from_index = i + del_count;
-        var to_index = i + num_additional_args;
-        // The spec could also be interpreted such that
-        // %HasLocalProperty would be the appropriate test.  We follow
-        // KJS in consulting the prototype.
-        var current = array[from_index];
-        if (!IS_UNDEFINED(current) || from_index in array) {
-          array[to_index] = current;
-        } else {
-          delete array[to_index];
-        }
-      }
-      for (var i = len; i > len - del_count + num_additional_args; i--) {
-        delete array[i - 1];
-      }
+    if (num_additional_args !== del_count) {
+	// Move the existing elements after the elements to be deleted
+	// to the right position in the resulting array.
+	if (num_additional_args > del_count) {
+	    for (var i = len - del_count; i > start_i; i--) {
+		var from_index = i + del_count - 1;
+		var to_index = i + num_additional_args - 1;
+		// The spec could also be interpreted such that
+		// %HasLocalProperty would be the appropriate test.  We follow
+		// KJS in consulting the prototype.
+		var current = array[from_index];
+		if (!IS_UNDEFINED(current) || from_index in array) {
+		    array[to_index] = current;
+		} else {
+		    delete array[to_index];
+		}
+	    }
+	} else {
+	    for (var i = start_i; i < len - del_count; i++) {
+		var from_index = i + del_count;
+		var to_index = i + num_additional_args;
+		// The spec could also be interpreted such that
+		// %HasLocalProperty would be the appropriate test.  We follow
+		// KJS in consulting the prototype.
+		var current = array[from_index];
+		if (!IS_UNDEFINED(current) || from_index in array) {
+		    array[to_index] = current;
+		} else {
+		    delete array[to_index];
+		}
+	    }
+	    for (var i = len; i > len - del_count + num_additional_args; i--) {
+		delete array[i - 1];
+	    }
+	}
     }
-  }
 }
+
 
 
 // -------------------------------------------------------------------
@@ -415,7 +416,6 @@ function ArrayPop() {
   return value;
 }
 
-
 function ObservedArrayPush() {
   var n = TO_UINT32(this.length);
   var m = %_ArgumentsLength();
@@ -443,9 +443,6 @@ function ArrayPush() {
     throw MakeTypeError("called_on_null_or_undefined",
                         ["Array.prototype.push"]);
   }
-
-  if (%IsObserved(this))
-    return ObservedArrayPush.apply(this, arguments);
 
   var n = TO_UINT32(this.length);
   var m = %_ArgumentsLength();
@@ -1001,13 +998,11 @@ function ArraySort(comparefn) {
     max_prototype_element = CopyFromPrototype(this, length);
   }
 
-  var num_non_undefined = %IsObserved(this) ?
-      -1 : %RemoveArrayHoles(this, length);
-
+  var num_non_undefined = %RemoveArrayHoles(this, length);
   if (num_non_undefined == -1) {
-    // The array is observed, or there were indexed accessors in the array.
-    // Move array holes and undefineds to the end using a Javascript function
-    // that is safe in the presence of accessors and is observable.
+    // There were indexed accessors in the array.  Move array holes and
+    // undefineds to the end using a Javascript function that is safe
+    // in the presence of accessors.
     num_non_undefined = SafeRemoveArrayHoles(this);
   }
 
